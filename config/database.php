@@ -1,7 +1,5 @@
 <?php
-/**
- * Kết nối CSDL và các hàm Helper thao tác Database
- */
+
 require_once __DIR__ . '/config.php';
 
 if (!function_exists('getDB')) {
@@ -19,7 +17,7 @@ if (!function_exists('getDB')) {
                         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                         PDO::ATTR_EMULATE_PREPARES => true
                     ]);
-                    break; // Kết nối thành công, thoát vòng lặp
+                    break;
                 } catch (PDOException $e) {
                     $lastException = $e;
                 }
@@ -42,35 +40,23 @@ if (!function_exists('getDB')) {
     }
 }
 
-/**
- * Lấy 1 bản ghi
- */
 function db_fetch_one($sql, $params = []) {
     $stmt = getDB()->prepare($sql);
     $stmt->execute($params);
     return $stmt->fetch();
 }
 
-/**
- * Lấy danh sách nhiều bản ghi
- */
 function db_fetch_all($sql, $params = []) {
     $stmt = getDB()->prepare($sql);
     $stmt->execute($params);
     return $stmt->fetchAll();
 }
 
-/**
- * Thực thi câu lệnh UPDATE / DELETE
- */
 function db_execute($sql, $params = []) {
     $stmt = getDB()->prepare($sql);
     return $stmt->execute($params);
 }
 
-/**
- * Thực thi INSERT và trả về ID tự tăng vừa tạo
- */
 function db_insert($sql, $params = []) {
     $pdo = getDB();
     $stmt = $pdo->prepare($sql);
@@ -78,23 +64,17 @@ function db_insert($sql, $params = []) {
     return $pdo->lastInsertId();
 }
 
-/**
- * Đếm số lượng bản ghi
- */
 function db_count($table, $where = "1", $params = []) {
     $sql = "SELECT COUNT(*) as total FROM `{$table}` WHERE {$where}";
     $row = db_fetch_one($sql, $params);
     return intval($row['total'] ?? 0);
 }
 
-/**
- * Lấy bảng xếp hạng (Leaderboard) theo phòng chơi
- */
 function get_room_leaderboard($id_room) {
-    $sql = "SELECT p.*, 
+    $sql = "SELECT p.*,
             (SELECT COUNT(*) FROM votes v JOIN answers a ON v.id_answer = a.id_answer WHERE v.id_player = p.id_player AND a.is_correct = 1) as correct_count
-            FROM players p 
-            WHERE p.id_room = :id_room 
+            FROM players p
+            WHERE p.id_room = :id_room
             ORDER BY p.score DESC, p.playeradd ASC";
     return db_fetch_all($sql, [':id_room' => $id_room]);
 }

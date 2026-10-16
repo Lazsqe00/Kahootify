@@ -1,14 +1,11 @@
 <?php
-/**
- * THÀNH VIÊN 2: Chỉnh sửa Quiz & Quản lý danh sách câu hỏi / 4 phương án màu
- */
+
 require_once __DIR__ . '/../../includes/auth_check.php';
 require_once __DIR__ . '/../../config/database.php';
 
 $creatorId = intval($_SESSION['id_creator']);
 $quizId    = intval($_GET['id'] ?? 0);
 
-// Kiểm tra quyền sở hữu Quiz
 $quiz = db_fetch_one("SELECT * FROM quiz WHERE id_quiz = :q AND id_creator = :c", [
     ':q' => $quizId,
     ':c' => $creatorId
@@ -19,7 +16,6 @@ if (!$quiz) {
     redirect('modules/quiz/list.php');
 }
 
-// Xử lý Thêm câu hỏi mới
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'add_question') {
     $qText     = trim($_POST['question_text'] ?? '');
     $timeLimit = intval($_POST['time_limit'] ?? 20);
@@ -27,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $timeLimit = 20;
     }
     $points    = intval($_POST['points'] ?? 1000);
-    $correctIdx = intval($_POST['correct_answer'] ?? 0); // 0: Red, 1: Blue, 2: Yellow, 3: Green
+    $correctIdx = intval($_POST['correct_answer'] ?? 0);
     $answers   = $_POST['answers'] ?? [];
 
     if (!empty($qText) && count($answers) === 4) {
@@ -60,7 +56,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
 }
 
-// Xử lý Xóa câu hỏi
 if (isset($_GET['delete_question'])) {
     $delQId = intval($_GET['delete_question']);
     db_execute("DELETE FROM questions WHERE id_question = :qid AND id_quiz = :quizId", [
@@ -71,7 +66,6 @@ if (isset($_GET['delete_question'])) {
     redirect('modules/quiz/edit.php?id=' . $quizId);
 }
 
-// Lấy danh sách câu hỏi kèm đáp án
 $questions = db_fetch_all("SELECT * FROM questions WHERE id_quiz = :q ORDER BY id_question ASC", [':q' => $quizId]);
 foreach ($questions as &$q) {
     $q['answers'] = db_fetch_all("SELECT * FROM answers WHERE id_question = :qid ORDER BY id_answer ASC", [':qid' => $q['id_question']]);
@@ -84,7 +78,7 @@ require_once __DIR__ . '/../../includes/navbar.php';
 ?>
 
 <div class="container my-4">
-    <!-- Breadcrumb & Tiêu đề -->
+
     <div class="d-flex justify-content-between align-items-center mb-3">
         <div>
             <a href="<?= BASE_URL ?>modules/quiz/list.php" class="text-muted font-weight-bold">
@@ -102,7 +96,7 @@ require_once __DIR__ . '/../../includes/navbar.php';
     </div>
 
     <div class="row">
-        <!-- Cột trái: Form thêm câu hỏi mới -->
+
         <div class="col-lg-6 mb-4">
             <div class="card border-0 shadow-sm" style="border-radius: 12px;">
                 <div class="card-header bg-white py-3">
@@ -113,7 +107,7 @@ require_once __DIR__ . '/../../includes/navbar.php';
                 <div class="card-body p-4">
                     <form action="" method="POST">
                         <input type="hidden" name="action" value="add_question">
-                        
+
                         <div class="form-group">
                             <label class="font-weight-bold">Question Text <span class="text-danger">*</span></label>
                             <input type="text" name="question_text" class="form-control" required>
@@ -143,7 +137,6 @@ require_once __DIR__ . '/../../includes/navbar.php';
                             4 Answer Choices (Select radio button for CORRECT answer) <span class="text-danger">*</span>
                         </label>
 
-                        <!-- Đáp án 1: Đỏ -->
                         <div class="input-group mb-2">
                             <div class="input-group-prepend">
                                 <span class="input-group-text text-white font-weight-bold" style="background-color: var(--kahoot-red); min-width: 55px;">
@@ -156,7 +149,6 @@ require_once __DIR__ . '/../../includes/navbar.php';
                             <input type="text" name="answers[]" class="form-control" required>
                         </div>
 
-                        <!-- Đáp án 2: Xanh dương -->
                         <div class="input-group mb-2">
                             <div class="input-group-prepend">
                                 <span class="input-group-text text-white font-weight-bold" style="background-color: var(--kahoot-blue); min-width: 55px;">
@@ -169,7 +161,6 @@ require_once __DIR__ . '/../../includes/navbar.php';
                             <input type="text" name="answers[]" class="form-control" required>
                         </div>
 
-                        <!-- Đáp án 3: Vàng -->
                         <div class="input-group mb-2">
                             <div class="input-group-prepend">
                                 <span class="input-group-text text-white font-weight-bold" style="background-color: var(--kahoot-yellow); min-width: 55px;">
@@ -182,7 +173,6 @@ require_once __DIR__ . '/../../includes/navbar.php';
                             <input type="text" name="answers[]" class="form-control" required>
                         </div>
 
-                        <!-- Đáp án 4: Xanh lá -->
                         <div class="input-group mb-3">
                             <div class="input-group-prepend">
                                 <span class="input-group-text text-white font-weight-bold" style="background-color: var(--kahoot-green); min-width: 55px;">
@@ -203,7 +193,6 @@ require_once __DIR__ . '/../../includes/navbar.php';
             </div>
         </div>
 
-        <!-- Cột phải: Danh sách câu hỏi hiện có trong Quiz -->
         <div class="col-lg-6">
             <div class="card border-0 shadow-sm" style="border-radius: 12px;">
                 <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
@@ -224,7 +213,7 @@ require_once __DIR__ . '/../../includes/navbar.php';
                             <p>Add your first question using the form on the left!</p>
                         </div>
                     <?php else: ?>
-                        <?php 
+                        <?php
                         $colors = [KAHOOT_COLOR_RED, KAHOOT_COLOR_BLUE, KAHOOT_COLOR_YELLOW, KAHOOT_COLOR_GREEN];
                         $icons  = [KAHOOT_ICON_RED, KAHOOT_ICON_BLUE, KAHOOT_ICON_YELLOW, KAHOOT_ICON_GREEN];
                         ?>
@@ -234,9 +223,9 @@ require_once __DIR__ . '/../../includes/navbar.php';
                                     <span class="badge badge-primary font-weight-bold px-2 py-1">
                                         Question <?= $idx + 1 ?> (<?= $q['time_limit'] ?>s - <?= $q['points'] ?> pts)
                                     </span>
-                                    <a href="<?= BASE_URL ?>modules/quiz/edit.php?id=<?= $quizId ?>&delete_question=<?= $q['id_question'] ?>" 
-                                       class="btn btn-sm btn-outline-danger" 
-                                       onclick="return confirm('Delete this question?');" 
+                                    <a href="<?= BASE_URL ?>modules/quiz/edit.php?id=<?= $quizId ?>&delete_question=<?= $q['id_question'] ?>"
+                                       class="btn btn-sm btn-outline-danger"
+                                       onclick="return confirm('Delete this question?');"
                                        title="Delete question">
                                         <i class="fas fa-trash-alt"></i>
                                     </a>

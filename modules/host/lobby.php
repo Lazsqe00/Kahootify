@@ -1,7 +1,5 @@
 <?php
-/**
- * THÀNH VIÊN 3: Màn hình phòng chờ Lobby chiếu mã PIN
- */
+
 require_once __DIR__ . '/../../includes/auth_check.php';
 require_once __DIR__ . '/../../config/database.php';
 
@@ -13,7 +11,6 @@ if (!$room || $room['status'] === 'finished') {
     redirect('modules/auth/dashboard.php');
 }
 
-// Xử lý Bắt đầu Game
 if (isset($_GET['start_game'])) {
     $firstQ = db_fetch_one("SELECT id_question FROM questions WHERE id_quiz = :q ORDER BY id_question ASC LIMIT 1", [':q' => $room['id_quiz']]);
     if ($firstQ) {
@@ -26,7 +23,6 @@ if (isset($_GET['start_game'])) {
     }
 }
 
-// Xử lý Hủy phòng
 if (isset($_GET['cancel_game'])) {
     db_execute("UPDATE room SET status = 'finished' WHERE id_room = :r", [':r' => $roomId]);
     unset($_SESSION['id_room'], $_SESSION['pin'], $_SESSION['id_quiz']);
@@ -34,7 +30,6 @@ if (isset($_GET['cancel_game'])) {
     redirect('modules/auth/dashboard.php');
 }
 
-// Lấy danh sách người chơi hiện tại
 $players = db_fetch_all("SELECT * FROM players WHERE id_room = :r ORDER BY id_player ASC", [':r' => $roomId]);
 
 $pageTitle = "Lobby - Game PIN: " . htmlspecialchars($room['pin']);
@@ -42,21 +37,19 @@ $bodyClass = "backgroundColorChanges";
 require_once __DIR__ . '/../../includes/header.php';
 ?>
 
-<!-- Audio nhạc nền phòng chờ -->
 <audio id="lobbyAudio" loop preload="auto">
     <source src="<?= BASE_URL ?>assets/audio/lobby.mp3" type="audio/mpeg">
     <source src="<?= BASE_URL ?>assets/audio/lobby.wav" type="audio/wav">
     <source src="<?= BASE_URL ?>assets/audio/lobby.ogg" type="audio/ogg">
 </audio>
 
-<!-- Header Host điều khiển -->
 <nav class="navbar navbar-dark bg-dark px-4 py-2 d-flex justify-content-between align-items-center">
     <div class="d-flex align-items-center">
         <img src="<?= BASE_URL ?>assets/img/logo.png" alt="Logo" style="max-height: 32px; filter: brightness(100);" class="mr-3">
         <span class="text-white font-weight-bold" style="font-size: 1.1rem;"><?= htmlspecialchars($room['quiz_name']) ?></span>
     </div>
     <div class="d-flex align-items-center" style="gap: 12px;">
-        <!-- Nút Bật / Tắt Nhạc nền -->
+
         <button type="button" id="audioToggleBtn" class="btn btn-sm btn-light font-weight-bold shadow-sm rounded-pill px-3" onclick="toggleAudio()" title="Toggle lobby music">
             <i class="fas fa-volume-up text-success mr-1" id="audioIcon"></i>
             <span id="audioLabel">Music: ON</span>
@@ -69,7 +62,7 @@ require_once __DIR__ . '/../../includes/header.php';
 </nav>
 
 <style>
-/* Hộp hiển thị mã PIN phòng chờ rộng rãi, không bị tràn số */
+
 .lobby-pin-card {
     background: #ffffff;
     border-radius: 20px;
@@ -86,7 +79,7 @@ require_once __DIR__ . '/../../includes/header.php';
     font-weight: 900;
     font-size: clamp(3rem, 7.5vw, 4.8rem);
     letter-spacing: 10px;
-    margin-right: -10px; /* Bù trừ khoảng trắng của ký tự cuối cùng để căn giữa hoàn hảo */
+    margin-right: -10px;
     line-height: 1.1;
     color: #212529;
     user-select: all;
@@ -97,7 +90,7 @@ require_once __DIR__ . '/../../includes/header.php';
 </style>
 
 <div class="container-fluid text-center text-white py-4">
-    <!-- Hộp hiển thị mã Game PIN chuẩn đẹp, không bị tràn số -->
+
     <div class="lobby-pin-card mx-auto text-dark">
         <p class="text-muted font-weight-bold text-uppercase mb-2" style="letter-spacing: 3px; font-size: 0.95rem;">GAME PIN</p>
         <div class="lobby-pin-number">
@@ -105,7 +98,6 @@ require_once __DIR__ . '/../../includes/header.php';
         </div>
     </div>
 
-    <!-- Thanh trạng thái và nút Bắt đầu -->
     <div class="d-flex justify-content-center align-items-center my-4" style="gap: 20px;">
         <div class="bg-dark px-4 py-2 rounded-pill shadow">
             <i class="fas fa-users text-success mr-2"></i>
@@ -119,7 +111,6 @@ require_once __DIR__ . '/../../includes/header.php';
         </a>
     </div>
 
-    <!-- Danh sách người chơi đã tham gia phòng -->
     <div class="container mt-4" style="max-width: 900px;">
         <h5 class="font-weight-bold mb-3" style="text-shadow: 1px 1px 3px rgba(0,0,0,0.5);">
             Waiting for players to join:
@@ -145,7 +136,7 @@ require_once __DIR__ . '/../../includes/header.php';
 
 <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
 <script>
-// ==================== QUẢN LÝ NHẠC PHÒNG CHỜ ====================
+
 const audio = document.getElementById('lobbyAudio');
 
 function tryPlayAudio() {
@@ -153,9 +144,9 @@ function tryPlayAudio() {
     audio.play().then(function() {
         updateAudioUI(true);
     }).catch(function() {
-        // Trình duyệt chặn autoplay khi chưa có tương tác người dùng
+
         updateAudioUI(false);
-        // Tự động phát ngay khi người dùng click bất kỳ đâu trên trang
+
         $(document).one('click keydown', function() {
             audio.play().then(function() {
                 updateAudioUI(true);
@@ -194,13 +185,10 @@ function updateAudioUI(isPlaying) {
     }
 }
 
-// Khởi chạy nhạc khi trang sẵn sàng
 $(document).ready(function() {
     tryPlayAudio();
 });
 
-// ==================== POLLING NGƯỜI CHƠI ====================
-// Polling trạng thái phòng & cập nhật người chơi mỗi 1.5 giây
 const roomId = <?= $roomId ?>;
 let previousCount = <?= count($players) ?>;
 
@@ -210,7 +198,6 @@ function checkLobbyPlayers() {
             const players = res.players;
             $('#playerCount').text(players.length);
 
-            // Bật/tắt nút bắt đầu nếu có ít nhất 1 người
             if (players.length > 0) {
                 $('#btnStartGame').css({'pointer-events': 'auto', 'opacity': '1'});
                 $('#waitingMsg').remove();
@@ -218,7 +205,6 @@ function checkLobbyPlayers() {
                 $('#btnStartGame').css({'pointer-events': 'none', 'opacity': '0.6'});
             }
 
-            // Nếu số lượng người chơi thay đổi, cập nhật danh sách
             if (players.length !== previousCount) {
                 previousCount = players.length;
                 let html = '';

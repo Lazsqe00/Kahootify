@@ -1,7 +1,5 @@
 <?php
-/**
- * TRANG CHỦ BÀI TẬP NHÓM (BTN) - KAHOOT CLONE
- */
+
 require_once __DIR__ . '/config/config.php';
 require_once __DIR__ . '/config/database.php';
 
@@ -11,7 +9,7 @@ require_once __DIR__ . '/includes/navbar.php';
 ?>
 
 <style>
-/* ================= HERO ANIMATIONS ================= */
+
 @keyframes fadeInUp {
     from { opacity: 0; transform: translateY(40px); }
     to { opacity: 1; transform: translateY(0); }
@@ -53,7 +51,6 @@ require_once __DIR__ . '/includes/navbar.php';
     to { opacity: 1; transform: translateY(0); }
 }
 
-/* ================= HERO SECTION ================= */
 .hero-section {
     background: linear-gradient(135deg, #46178F 0%, #1a0a3e 50%, #2d1066 100%);
     min-height: 600px;
@@ -64,7 +61,6 @@ require_once __DIR__ . '/includes/navbar.php';
     padding: 80px 0 60px;
 }
 
-/* Floating geometric shapes background */
 .hero-shape {
     position: absolute;
     border-radius: 50%;
@@ -94,7 +90,7 @@ require_once __DIR__ . '/includes/navbar.php';
     bottom: 20%; left: 5%;
     animation: floatSlow 5s ease-in-out infinite 0.5s;
 }
-/* Small decorative triangles & squares */
+
 .hero-deco {
     position: absolute;
     opacity: 0.12;
@@ -128,7 +124,6 @@ require_once __DIR__ . '/includes/navbar.php';
     animation: spinSlow 15s linear infinite reverse;
 }
 
-/* Hero text animations */
 .hero-badge {
     animation: fadeInUp 0.8s ease-out both;
     animation-delay: 0.2s;
@@ -146,7 +141,6 @@ require_once __DIR__ . '/includes/navbar.php';
     animation-delay: 0.8s;
 }
 
-/* ================= PHONE MOCKUP WITH VIDEO ================= */
 .phone-mockup-wrapper {
     animation: fadeInRight 1s ease-out both;
     animation-delay: 0.5s;
@@ -177,7 +171,7 @@ require_once __DIR__ . '/includes/navbar.php';
     border-radius: 36px;
     box-shadow: inset 0 0 15px rgba(0,0,0,0.3);
 }
-/* Glow ring around phone */
+
 .phone-glow {
     position: absolute;
     top: 50%; left: 50%;
@@ -189,7 +183,6 @@ require_once __DIR__ . '/includes/navbar.php';
     z-index: 0;
 }
 
-/* Floating interactive badges */
 .floating-badge {
     position: absolute;
     z-index: 4;
@@ -261,7 +254,6 @@ require_once __DIR__ . '/includes/navbar.php';
     animation: pulse 1s infinite;
 }
 
-/* ================= HOW IT WORKS ================= */
 .how-it-works {
     background: #fff;
     padding: 80px 0;
@@ -305,7 +297,6 @@ require_once __DIR__ . '/includes/navbar.php';
     z-index: 2;
 }
 
-/* ================= STATS SECTION ================= */
 .stats-section {
     background: linear-gradient(135deg, #46178F 0%, #2d1066 100%);
     padding: 60px 0;
@@ -336,7 +327,6 @@ require_once __DIR__ . '/includes/navbar.php';
     margin-top: 5px;
 }
 
-/* ================= FEATURE CARDS (ENHANCED) ================= */
 .feature-cards-section {
     padding: 80px 0;
     background: #f8f9fa;
@@ -375,7 +365,6 @@ require_once __DIR__ . '/includes/navbar.php';
     background: rgba(255,255,255,0.35);
 }
 
-/* ================= VIDEO SHOWCASE SECTION (HOME.MP4) ================= */
 .video-showcase-section {
     background: linear-gradient(180deg, #f8f9fa 0%, #ede8f7 50%, #f8f9fa 100%);
     padding: 90px 0;
@@ -441,7 +430,6 @@ require_once __DIR__ . '/includes/navbar.php';
     box-shadow: 0 15px 35px rgba(70, 23, 143, 0.12);
 }
 
-/* ================= CTA SECTION ================= */
 .cta-section {
     background: linear-gradient(135deg, #26890c 0%, #1a6207 100%);
     padding: 80px 0;
@@ -469,7 +457,6 @@ require_once __DIR__ . '/includes/navbar.php';
     box-shadow: 0 10px 30px rgba(0,0,0,0.3);
 }
 
-/* ================= RESPONSIVE ================= */
 @media (max-width: 991px) {
     .hero-section { padding: 50px 0 40px; min-height: auto; }
     .phone-frame { max-height: 350px; }
@@ -484,9 +471,8 @@ require_once __DIR__ . '/includes/navbar.php';
 }
 </style>
 
-<!-- ================= HERO BANNER ================= -->
 <div class="hero-section text-white">
-    <!-- Floating shapes background -->
+
     <div class="hero-shape hero-shape-1"></div>
     <div class="hero-shape hero-shape-2"></div>
     <div class="hero-shape hero-shape-3"></div>
@@ -525,13 +511,11 @@ require_once __DIR__ . '/includes/navbar.php';
                 </div>
             </div>
 
-            <!-- Phone mockup with video -->
             <div class="col-lg-6 text-center">
                 <div class="phone-mockup-wrapper">
                     <div class="phone-mockup-container">
                         <div class="phone-glow"></div>
-                        
-                        <!-- Floating Badge: Top 1 Leaderboard -->
+
                         <div class="floating-badge badge-top-right">
                             <span class="badge-icon">🏆</span>
                             <div>
@@ -540,7 +524,6 @@ require_once __DIR__ . '/includes/navbar.php';
                             </div>
                         </div>
 
-                        <!-- Floating Badge: PIN Game -->
                         <div class="floating-badge badge-bottom-left">
                             <span class="badge-icon">⚡</span>
                             <div>
@@ -549,7 +532,6 @@ require_once __DIR__ . '/includes/navbar.php';
                             </div>
                         </div>
 
-                        <!-- Live pill indicator -->
                         <div class="live-pill">
                             <span class="live-dot"></span> LIVE GAME
                         </div>
@@ -565,7 +547,6 @@ require_once __DIR__ . '/includes/navbar.php';
     </div>
 </div>
 
-<!-- ================= HOW IT WORKS ================= -->
 <div class="how-it-works">
     <div class="container">
         <div class="text-center mb-5">
@@ -613,7 +594,6 @@ require_once __DIR__ . '/includes/navbar.php';
     </div>
 </div>
 
-<!-- ================= STATS ================= -->
 <div class="stats-section">
     <div class="container">
         <div class="row">
@@ -645,7 +625,6 @@ require_once __DIR__ . '/includes/navbar.php';
     </div>
 </div>
 
-<!-- ================= 4 TÍNH NĂNG NỔI BẬT ================= -->
 <div class="feature-cards-section">
     <div class="container">
         <div class="text-center mb-5">
@@ -654,7 +633,7 @@ require_once __DIR__ . '/includes/navbar.php';
         </div>
 
         <div class="row">
-            <!-- Khối 1: Đỏ - Xác thực & Tổng quan -->
+
             <div class="col-md-6 col-lg-3 mb-4">
                 <div class="card h-100 border-0 shadow-sm text-white feature-card-enhanced" style="background: linear-gradient(145deg, #e21b3c, #b3142e); border-radius: 16px;">
                     <div class="card-body p-4 text-center d-flex flex-column justify-content-between">
@@ -675,7 +654,6 @@ require_once __DIR__ . '/includes/navbar.php';
                 </div>
             </div>
 
-            <!-- Khối 2: Xanh dương - Bộ đề Quiz -->
             <div class="col-md-6 col-lg-3 mb-4">
                 <div class="card h-100 border-0 shadow-sm text-white feature-card-enhanced" style="background: linear-gradient(145deg, #1368ce, #0c4da0); border-radius: 16px;">
                     <div class="card-body p-4 text-center d-flex flex-column justify-content-between">
@@ -696,7 +674,6 @@ require_once __DIR__ . '/includes/navbar.php';
                 </div>
             </div>
 
-            <!-- Khối 3: Vàng - Host Máy chiếu & Bảng xếp hạng -->
             <div class="col-md-6 col-lg-3 mb-4">
                 <div class="card h-100 border-0 shadow-sm text-white feature-card-enhanced" style="background: linear-gradient(145deg, #d89e00, #a97c00); border-radius: 16px;">
                     <div class="card-body p-4 text-center d-flex flex-column justify-content-between">
@@ -717,7 +694,6 @@ require_once __DIR__ . '/includes/navbar.php';
                 </div>
             </div>
 
-            <!-- Khối 4: Xanh lá - Giao diện Player -->
             <div class="col-md-6 col-lg-3 mb-4">
                 <div class="card h-100 border-0 shadow-sm text-white feature-card-enhanced" style="background: linear-gradient(145deg, #26890c, #1a6207); border-radius: 16px;">
                     <div class="card-body p-4 text-center d-flex flex-column justify-content-between">
@@ -740,7 +716,6 @@ require_once __DIR__ . '/includes/navbar.php';
         </div>
     </div>
 
-<!-- ================= VIDEO SHOWCASE (HOME.MP4) ================= -->
 <div class="video-showcase-section">
     <div class="container">
         <div class="text-center mb-5">
@@ -751,7 +726,6 @@ require_once __DIR__ . '/includes/navbar.php';
             <p class="text-muted" style="max-width: 620px; margin: 0 auto;">Discover how Kahoot transforms ordinary lessons into vibrant, interactive knowledge arenas.</p>
         </div>
 
-        <!-- Khung chiếu video dạng macOS Cinema Window -->
         <div class="video-cinema-frame">
             <div class="video-window-header">
                 <div class="window-dots">
@@ -772,7 +746,6 @@ require_once __DIR__ . '/includes/navbar.php';
             </div>
         </div>
 
-        <!-- 3 Điểm nhấn giá trị trải nghiệm -->
         <div class="row text-center mt-4">
             <div class="col-md-4 mb-4">
                 <div class="video-feature-pill">
@@ -799,7 +772,6 @@ require_once __DIR__ . '/includes/navbar.php';
     </div>
 </div>
 
-<!-- ================= CTA SECTION ================= -->
 <div class="cta-section text-center">
     <div class="container position-relative" style="z-index: 1;">
         <h2 class="font-weight-bold mb-3" style="font-size: 2.2rem;">Ready to get started?</h2>

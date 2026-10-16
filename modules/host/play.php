@@ -1,7 +1,5 @@
 <?php
-/**
- * THÀNH VIÊN 3: Màn hình Máy chiếu Câu hỏi & Kết quả từng câu (Host Play)
- */
+
 require_once __DIR__ . '/../../includes/auth_check.php';
 require_once __DIR__ . '/../../config/database.php';
 
@@ -14,21 +12,17 @@ if (!$room) {
 
 $status = $room['status'];
 
-// Nếu đang ở trạng thái waiting -> chuyển về lobby
 if ($status === 'waiting') {
     redirect('modules/host/lobby.php');
 }
 
-// Nếu đã finished -> chuyển về leaderboard tổng kết
 if ($status === 'finished') {
     redirect('modules/host/leaderboard.php?final=true');
 }
 
-// Lấy danh sách toàn bộ câu hỏi trong quiz
 $allQuestions = db_fetch_all("SELECT * FROM questions WHERE id_quiz = :q ORDER BY id_question ASC", [':q' => $room['id_quiz']]);
 $totalQuestions = count($allQuestions);
 
-// Xử lý Host chuyển sang Kết quả câu hiện tại
 if (isset($_GET['action']) && $_GET['action'] === 'show_result') {
     if (is_numeric($status)) {
         db_execute("UPDATE room SET status = :s WHERE id_room = :r", [
@@ -39,7 +33,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'show_result') {
     redirect('modules/host/play.php');
 }
 
-// Xử lý Host chuyển sang Câu tiếp theo
 if (isset($_GET['action']) && $_GET['action'] === 'next_question') {
     $currentQId = intval(str_replace('res_', '', $status));
     $nextQ = null;
@@ -63,33 +56,28 @@ if (isset($_GET['action']) && $_GET['action'] === 'next_question') {
         ]);
         redirect('modules/host/play.php');
     } else {
-        // Hết câu hỏi -> Kết thúc game
+
         db_execute("UPDATE room SET status = 'finished' WHERE id_room = :r", [':r' => $roomId]);
         redirect('modules/host/leaderboard.php?final=true');
     }
 }
 
-// Xác định xem đang ở pha "Trả lời" (Question Phase) hay "Kết quả" (Result Phase)
 $isResultPhase = (strpos($status, 'res_') === 0);
 $qId = $isResultPhase ? intval(str_replace('res_', '', $status)) : intval($status);
 
-// Lấy thông tin câu hỏi hiện tại
 $currentQuestion = db_fetch_one("SELECT * FROM questions WHERE id_question = :qid", [':qid' => $qId]);
 $answers = db_fetch_all("SELECT * FROM answers WHERE id_question = :qid ORDER BY id_answer ASC", [':qid' => $qId]);
 
-// Đếm số người chơi và số câu trả lời đã nộp
 $totalPlayers = db_count('players', 'id_room = :r', [':r' => $roomId]);
 $votedCount = db_fetch_one(
-    "SELECT COUNT(DISTINCT v.id_player) as total 
-     FROM votes v JOIN answers a ON v.id_answer = a.id_answer 
+    "SELECT COUNT(DISTINCT v.id_player) as total
+     FROM votes v JOIN answers a ON v.id_answer = a.id_answer
      WHERE a.id_question = :qid AND v.id_player IN (SELECT id_player FROM players WHERE id_room = :r)",
     [':qid' => $qId, ':r' => $roomId]
 )['total'] ?? 0;
 
-// Tính thời gian đếm ngược
-// Tính thời gian đếm ngược
 $timeLimit = intval($currentQuestion['time_limit'] ?? 20);
-// Chuẩn hóa thời gian chỉ cho phép 10, 20, 30, 60
+
 if (!in_array($timeLimit, [10, 20, 30, 60])) {
     if ($timeLimit <= 10) $timeLimit = 10;
     elseif ($timeLimit <= 20) $timeLimit = 20;
@@ -101,7 +89,6 @@ $startTime = !empty($room['question_start_time']) ? intval($room['question_start
 $elapsed = time() - $startTime;
 $remainingSeconds = max(0, $timeLimit - $elapsed);
 
-// Thứ tự câu hỏi hiện tại (1-based)
 $questionNumber = 1;
 foreach ($allQuestions as $idx => $q) {
     if ($q['id_question'] == $qId) {
@@ -110,7 +97,6 @@ foreach ($allQuestions as $idx => $q) {
     }
 }
 
-// Tìm file nhạc countdown tương ứng với thời gian của câu hỏi (10s, 20s, 30s, 60s)
 $questionAudioFile = null;
 if (!$isResultPhase) {
     $audioDir = __DIR__ . '/../../assets/audio';
@@ -125,13 +111,12 @@ if (!$isResultPhase) {
             }
         }
         if (!empty($matchedAudios)) {
-            // Luân phiên các bài nếu có nhiều bài nhạc cùng thời lượng
+
             $questionAudioFile = $matchedAudios[($questionNumber - 1) % count($matchedAudios)];
         }
     }
 }
 
-// Bảng màu & icon Kahoot
 $colors = [KAHOOT_COLOR_RED, KAHOOT_COLOR_BLUE, KAHOOT_COLOR_YELLOW, KAHOOT_COLOR_GREEN];
 $icons  = [KAHOOT_ICON_RED, KAHOOT_ICON_BLUE, KAHOOT_ICON_YELLOW, KAHOOT_ICON_GREEN];
 
@@ -141,13 +126,12 @@ require_once __DIR__ . '/../../includes/header.php';
 ?>
 
 <?php if (!$isResultPhase && $questionAudioFile): ?>
-<!-- Nhạc nền đếm ngược tương ứng cho câu hỏi <?= $timeLimit ?>s -->
+
 <audio id="questionAudio" preload="auto">
     <source src="<?= BASE_URL ?>assets/audio/<?= rawurlencode($questionAudioFile) ?>" type="audio/mpeg">
 </audio>
 <?php endif; ?>
 
-<!-- Header Host điều khiển -->
 <nav class="navbar navbar-dark bg-dark px-4 py-2 d-flex justify-content-between align-items-center">
     <div class="d-flex align-items-center">
         <img src="<?= BASE_URL ?>assets/img/logo.png" alt="Logo" style="max-height: 32px; filter: brightness(100);" class="mr-3">
@@ -156,7 +140,7 @@ require_once __DIR__ . '/../../includes/header.php';
     </div>
     <div class="d-flex align-items-center">
         <?php if (!$isResultPhase && $questionAudioFile): ?>
-            <!-- Nút bật/tắt nhạc đếm ngược -->
+
             <button type="button" id="audioToggleBtn" class="btn btn-sm btn-light font-weight-bold shadow-sm rounded-pill mr-2 px-3" onclick="toggleQuestionAudio()" title="Toggle countdown music">
                 <i class="fas fa-volume-up text-success mr-1" id="audioIcon"></i>
                 <span id="audioLabel">Music: ON</span>
@@ -179,14 +163,13 @@ require_once __DIR__ . '/../../includes/header.php';
 </nav>
 
 <div class="container my-3" style="max-width: 1050px;">
-    <!-- Tiêu đề câu hỏi -->
+
     <div class="question-card-banner">
         <h2 class="font-weight-bold text-dark mb-0">
             <?= htmlspecialchars($currentQuestion['text']) ?>
         </h2>
     </div>
 
-    <!-- Thanh đếm ngược tự động chuyển sang Bảng Điểm khi ở pha kết quả -->
     <?php if ($isResultPhase): ?>
         <div class="card border-0 shadow-sm mx-auto my-3" style="max-width: 600px; background: rgba(255,255,255,0.95); border-radius: 14px;">
             <div class="card-body py-2 px-4 text-center">
@@ -205,9 +188,8 @@ require_once __DIR__ . '/../../includes/header.php';
         </div>
     <?php endif; ?>
 
-    <!-- Thanh trung tâm: Đồng hồ đếm ngược + Trạng thái đã nộp -->
     <div class="d-flex justify-content-between align-items-center my-3 px-3">
-        <!-- Đồng hồ tròn -->
+
         <div>
             <?php if (!$isResultPhase): ?>
                 <div id="timerBox" class="timer-circle <?= $remainingSeconds <= 5 ? 'warning' : '' ?>">
@@ -220,7 +202,6 @@ require_once __DIR__ . '/../../includes/header.php';
             <?php endif; ?>
         </div>
 
-        <!-- Trạng thái câu trả lời -->
         <div class="text-center">
             <?php if (!$isResultPhase): ?>
                 <div class="bg-white rounded-pill px-4 py-2 shadow-sm font-weight-bold text-dark" style="font-size: 1.2rem;">
@@ -235,19 +216,18 @@ require_once __DIR__ . '/../../includes/header.php';
         </div>
     </div>
 
-    <!-- 4 Khối phương án trả lời -->
     <div class="row">
-        <?php 
-        // Thống kê số lượng votes theo từng answer trong pha kết quả (chỉ tính người chơi trong phòng này)
+        <?php
+
         $voteStats = [];
         if ($isResultPhase && !empty($answers)) {
             $ansIds = array_column($answers, 'id_answer');
             $inClause = implode(',', array_map('intval', $ansIds));
             $statsRows = db_fetch_all(
-                "SELECT v.id_answer, COUNT(v.id_vote) as cnt 
-                 FROM votes v 
-                 JOIN players p ON v.id_player = p.id_player 
-                 WHERE p.id_room = :r AND v.id_answer IN ($inClause) 
+                "SELECT v.id_answer, COUNT(v.id_vote) as cnt
+                 FROM votes v
+                 JOIN players p ON v.id_player = p.id_player
+                 WHERE p.id_room = :r AND v.id_answer IN ($inClause)
                  GROUP BY v.id_answer",
                 [':r' => $roomId]
             );
@@ -257,14 +237,14 @@ require_once __DIR__ . '/../../includes/header.php';
         }
         ?>
 
-        <?php foreach ($answers as $idx => $a): 
+        <?php foreach ($answers as $idx => $a):
             $cIdx = $idx % 4;
             $isCorrect = ($a['is_correct'] == 1);
             $opacity = ($isResultPhase && !$isCorrect) ? 'opacity: 0.35;' : 'opacity: 1;';
             $ansCount = $voteStats[$a['id_answer']] ?? 0;
         ?>
             <div class="col-md-6 mb-3">
-                <div class="answer-box shadow-sm d-flex justify-content-between align-items-center" 
+                <div class="answer-box shadow-sm d-flex justify-content-between align-items-center"
                      style="background-color: <?= $colors[$cIdx] ?>; <?= $opacity ?> cursor: default;">
                     <div class="d-flex align-items-center">
                         <span class="symbol mr-3" style="font-size: 2rem;"><?= $icons[$cIdx] ?></span>
@@ -292,7 +272,7 @@ require_once __DIR__ . '/../../includes/header.php';
 <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
 <?php if ($isResultPhase): ?>
 <script>
-// Đợi 5 giây rồi tự động chuyển sang Bảng Điểm
+
 let autoSec = 5;
 const autoTimer = setInterval(function() {
     autoSec--;
@@ -307,14 +287,13 @@ const autoTimer = setInterval(function() {
 </script>
 <?php else: ?>
 <script>
-// ==================== QUẢN LÝ NHẠC ĐẾM NGƯỢC CÂU HỎI ====================
+
 const qAudio = document.getElementById('questionAudio');
 let isAudioPlaying = false;
 
 function playQuestionAudio() {
     if (!qAudio) return;
 
-    // Đồng bộ thời gian bắt đầu phát nhạc với đồng hồ câu hỏi
     const elapsed = <?= $elapsed ?>;
     const timeLimit = <?= $timeLimit ?>;
     if (elapsed > 0 && elapsed < timeLimit) {
@@ -329,7 +308,7 @@ function playQuestionAudio() {
     }).catch(function() {
         isAudioPlaying = false;
         updateAudioUI(false);
-        // Tự động phát khi có tương tác đầu tiên của người dùng trên trang
+
         $(document).one('click keydown', function() {
             if (qAudio && qAudio.paused) {
                 try {
@@ -389,19 +368,17 @@ $(document).ready(function() {
     playQuestionAudio();
 });
 
-// ==================== ĐẾM NGƯỢC VÀ POLLING KẾT QUẢ ====================
 let remaining = <?= $remainingSeconds ?>;
 const roomId = <?= $roomId ?>;
 const qId = <?= $qId ?>;
 
-// Đếm ngược đồng hồ
 const timerInterval = setInterval(function() {
     remaining--;
     if (remaining <= 0) {
         clearInterval(timerInterval);
         stopQuestionAudio();
         $('#timerSeconds').text('0');
-        // Tự động chuyển sang xem kết quả
+
         window.location.href = 'play.php?action=show_result';
     } else {
         $('#timerSeconds').text(remaining);
@@ -411,12 +388,11 @@ const timerInterval = setInterval(function() {
     }
 }, 1000);
 
-// Polling kiểm tra số người đã nộp bài
 const pollInterval = setInterval(function() {
     $.getJSON('<?= BASE_URL ?>modules/api/game_state.php?action=get_question_status&id_room=' + roomId + '&id_question=' + qId, function(data) {
         if (data && data.success) {
             $('#voteCount').text(data.voted_count);
-            // Nếu tất cả người chơi đều đã trả lời xong -> lập tức dừng nhạc và hiện kết quả
+
             if (data.total_players > 0 && data.voted_count >= data.total_players) {
                 clearInterval(pollInterval);
                 clearInterval(timerInterval);

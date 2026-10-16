@@ -1,11 +1,6 @@
-/**
- * JavaScript chung cho dự án BTN - Kahoot Clone
- */
 
 const KahootApp = {
-    /**
-     * Tự động ẩn các Alert sau 4 giây
-     */
+
     initAlerts: function() {
         setTimeout(function() {
             $('.alert-auto-dismiss').fadeOut(500, function() {
@@ -14,9 +9,6 @@ const KahootApp = {
         }, 4000);
     },
 
-    /**
-     * Gửi request JSON tiện lợi
-     */
     fetchJson: async function(url, data = null) {
         try {
             const options = {

@@ -1,7 +1,5 @@
 <?php
-/**
- * THÀNH VIÊN 2: Xóa bộ đề (Quiz)
- */
+
 require_once __DIR__ . '/../../includes/auth_check.php';
 require_once __DIR__ . '/../../config/database.php';
 

@@ -1,7 +1,5 @@
 <?php
-/**
- * THÀNH VIÊN 1: Dashboard Thống kê và Quản lý chung của Creator
- */
+
 require_once __DIR__ . '/../../includes/auth_check.php';
 require_once __DIR__ . '/../../config/database.php';
 
@@ -11,7 +9,6 @@ require_once __DIR__ . '/../../includes/navbar.php';
 
 $creatorId = intval($_SESSION['id_creator']);
 
-// Thống kê nhanh
 $totalQuizzes = db_count('quiz', 'id_creator = :c', [':c' => $creatorId]);
 $totalRooms   = db_count('room', 'id_creator = :c', [':c' => $creatorId]);
 $totalPlayers = db_fetch_one(
@@ -19,18 +16,17 @@ $totalPlayers = db_fetch_one(
     [':c' => $creatorId]
 )['total'] ?? 0;
 
-// Lấy danh sách Quizzes của người dùng
 $quizzes = db_fetch_all(
-    "SELECT q.*, (SELECT COUNT(*) FROM questions WHERE id_quiz = q.id_quiz) as question_count 
-     FROM quiz q 
-     WHERE q.id_creator = :c 
+    "SELECT q.*, (SELECT COUNT(*) FROM questions WHERE id_quiz = q.id_quiz) as question_count
+     FROM quiz q
+     WHERE q.id_creator = :c
      ORDER BY q.id_quiz DESC",
     [':c' => $creatorId]
 );
 ?>
 
 <div class="container my-4">
-    <!-- Header Dashboard -->
+
     <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
         <div>
             <h2 class="font-weight-bold mb-1" style="color: var(--kahoot-purple);">
@@ -45,7 +41,6 @@ $quizzes = db_fetch_all(
         </div>
     </div>
 
-    <!-- 3 Thẻ thống kê nhanh -->
     <div class="row mb-4">
         <div class="col-md-4 mb-3">
             <div class="card border-0 shadow-sm text-white" style="background: linear-gradient(135deg, #46178F, #6a2cc9); border-radius: 10px;">
@@ -90,7 +85,6 @@ $quizzes = db_fetch_all(
         </div>
     </div>
 
-    <!-- Danh sách Kahoots -->
     <div class="card border-0 shadow-sm" style="border-radius: 12px;">
         <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
             <h5 class="font-weight-bold mb-0 text-dark">
@@ -139,15 +133,15 @@ $quizzes = db_fetch_all(
                                     </td>
                                     <td class="text-center">
                                         <div class="btn-group" role="group">
-                                            <!-- Chơi ngay (Host phòng) -->
+
                                             <a href="<?= BASE_URL ?>modules/host/create_room.php?id_quiz=<?= $q['id_quiz'] ?>" class="btn btn-sm btn-primary font-weight-bold px-3" title="Host game room">
                                                 <i class="fas fa-play mr-1"></i> Play
                                             </a>
-                                            <!-- Chỉnh sửa câu hỏi -->
+
                                             <a href="<?= BASE_URL ?>modules/quiz/edit.php?id=<?= $q['id_quiz'] ?>" class="btn btn-sm btn-success font-weight-bold px-3" title="Edit quiz">
                                                 <i class="fas fa-edit mr-1"></i> Edit
                                             </a>
-                                            <!-- Xóa -->
+
                                             <a href="<?= BASE_URL ?>modules/quiz/delete.php?id=<?= $q['id_quiz'] ?>" class="btn btn-sm btn-danger font-weight-bold px-3" onclick="return confirm('Are you sure you want to delete this quiz and all its questions?');" title="Delete quiz">
                                                 <i class="fas fa-trash-alt"></i>
                                             </a>

@@ -1,7 +1,5 @@
 <?php
-/**
- * THÀNH VIÊN 1: Xử lý Đăng nhập
- */
+
 require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../config/database.php';
 
@@ -15,7 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     try {
-        // Tìm tài khoản theo username hoặc email
+
         $user = db_fetch_one("SELECT * FROM creators WHERE username = :u OR email = :e LIMIT 1", [
             ':u' => $username,
             ':e' => $username
@@ -26,9 +24,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect('index.php');
         }
 
-        // Kiểm tra mật khẩu (hỗ trợ cả hash SHA512, password_verify và plain)
         $sha512 = hash('sha512', $password);
-        $isValid = ($user['password'] === $sha512) 
+        $isValid = ($user['password'] === $sha512)
                    || password_verify($password, $user['password'])
                    || ($user['password'] === $password);
 
@@ -37,7 +34,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect('index.php');
         }
 
-        // Lưu thông tin vào Session
         $_SESSION['id_creator'] = $user['id_creator'];
         $_SESSION['nameCreator'] = $user['name'];
         $_SESSION['username'] = $user['username'];

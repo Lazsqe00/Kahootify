@@ -1,16 +1,9 @@
--- ==============================================================
--- CƠ SỞ DỮ LIỆU BÀI TẬP NHÓM: DỰ ÁN KAHOOT CLONE (BTN)
--- Tương thích 100% với XAMPP (MariaDB 10.4+ / MySQL 5.7, 8.0)
--- ==============================================================
 
 CREATE DATABASE IF NOT EXISTS `kahoot_btn` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE `kahoot_btn`;
 
 SET FOREIGN_KEY_CHECKS = 0;
 
--- --------------------------------------------------------
--- 1. Bảng `roles`: Vai trò người dùng (Giáo viên, Học sinh, Admin)
--- --------------------------------------------------------
 DROP TABLE IF EXISTS `roles`;
 CREATE TABLE `roles` (
   `id_role` bigint(6) NOT NULL AUTO_INCREMENT,
@@ -24,9 +17,6 @@ INSERT INTO `roles` (`id_role`, `name_role`) VALUES
 (3, 'Socially'),
 (4, 'Work');
 
--- --------------------------------------------------------
--- 2. Bảng `creators`: Người tạo đề / Quản trị viên (Host)
--- --------------------------------------------------------
 DROP TABLE IF EXISTS `creators`;
 CREATE TABLE `creators` (
   `id_creator` bigint(6) NOT NULL AUTO_INCREMENT,
@@ -44,15 +34,10 @@ CREATE TABLE `creators` (
   CONSTRAINT `FK_Role_creator` FOREIGN KEY (`role`) REFERENCES `roles` (`id_role`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Mật khẩu mặc định: '123456'
--- SHA512('123456') = ba3253876aed6bc22d4a6ff53d8406c6ad864195ed144ab5c87621b6c233b548baeae6956df346ec8c17f5ea10f35ee3cbc514797ed7ddd3145464e2a0bab413
 INSERT INTO `creators` (`id_creator`, `role`, `username`, `name`, `email`, `password`, `confirmation_email`) VALUES
 (1, 1, 'admin', 'Admin Teacher', 'admin@kahoot.local', 'ba3253876aed6bc22d4a6ff53d8406c6ad864195ed144ab5c87621b6c233b548baeae6956df346ec8c17f5ea10f35ee3cbc514797ed7ddd3145464e2a0bab413', '1'),
 (2, 1, 'teacher', 'Teacher John', 'teacher@kahoot.local', 'ba3253876aed6bc22d4a6ff53d8406c6ad864195ed144ab5c87621b6c233b548baeae6956df346ec8c17f5ea10f35ee3cbc514797ed7ddd3145464e2a0bab413', '1');
 
--- --------------------------------------------------------
--- 3. Bảng `quiz`: Bộ đề trắc nghiệm
--- --------------------------------------------------------
 DROP TABLE IF EXISTS `quiz`;
 CREATE TABLE `quiz` (
   `id_quiz` bigint(6) NOT NULL AUTO_INCREMENT,
@@ -68,9 +53,6 @@ CREATE TABLE `quiz` (
 INSERT INTO `quiz` (`id_quiz`, `id_creator`, `name`, `description`) VALUES
 (1, 1, 'IT & Technology Trivia', 'General knowledge quiz on computer science and programming');
 
--- --------------------------------------------------------
--- 4. Bảng `questions`: Các câu hỏi trong Quiz
--- --------------------------------------------------------
 DROP TABLE IF EXISTS `questions`;
 CREATE TABLE `questions` (
   `id_question` bigint(6) NOT NULL AUTO_INCREMENT,
@@ -92,9 +74,6 @@ INSERT INTO `questions` (`id_question`, `id_quiz`, `text`, `points`, `time_limit
 (1, 1, 'Which programming language runs natively in web browsers?', 1000, 20, NULL),
 (2, 1, 'PHP is a recursive acronym for what?', 1000, 20, NULL);
 
--- --------------------------------------------------------
--- 5. Bảng `answers`: 4 đáp án cho mỗi câu hỏi
--- --------------------------------------------------------
 DROP TABLE IF EXISTS `answers`;
 CREATE TABLE `answers` (
   `id_answer` bigint(6) NOT NULL AUTO_INCREMENT,
@@ -108,30 +87,25 @@ CREATE TABLE `answers` (
   CONSTRAINT `FK_QUESTION_ANSWER` FOREIGN KEY (`id_question`) REFERENCES `questions` (`id_question`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 4 phương án cho Câu 1:
 INSERT INTO `answers` (`id_answer`, `id_question`, `is_correct`, `text`) VALUES
 (1, 1, 0, 'C++'),
 (2, 1, 1, 'JavaScript'),
 (3, 1, 0, 'Python'),
 (4, 1, 0, 'Java');
 
--- 4 phương án cho Câu 2:
 INSERT INTO `answers` (`id_answer`, `id_question`, `is_correct`, `text`) VALUES
 (5, 2, 1, 'PHP: Hypertext Preprocessor'),
 (6, 2, 0, 'Personal Home Page'),
 (7, 2, 0, 'Private Home Page'),
 (8, 2, 0, 'Preprocessed Hypertext Processor');
 
--- --------------------------------------------------------
--- 6. Bảng `room`: Phòng chơi (Game session) do Host tạo
--- --------------------------------------------------------
 DROP TABLE IF EXISTS `room`;
 CREATE TABLE `room` (
   `id_room` bigint(11) NOT NULL AUTO_INCREMENT,
   `id_quiz` bigint(11) NOT NULL,
   `id_creator` bigint(11) NOT NULL,
   `pin` varchar(20) DEFAULT NULL,
-  `status` varchar(50) DEFAULT 'waiting', -- 'waiting', question id, 'res_questionid', 'finished'
+  `status` varchar(50) DEFAULT 'waiting',
   `question_start_time` int(11) DEFAULT NULL,
   `roomadd` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `roomupdate` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -142,9 +116,6 @@ CREATE TABLE `room` (
   CONSTRAINT `room2` FOREIGN KEY (`id_creator`) REFERENCES `creators` (`id_creator`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- --------------------------------------------------------
--- 7. Bảng `players`: Người chơi tham gia phòng bằng mã PIN
--- --------------------------------------------------------
 DROP TABLE IF EXISTS `players`;
 CREATE TABLE `players` (
   `id_player` bigint(6) NOT NULL AUTO_INCREMENT,
@@ -159,9 +130,6 @@ CREATE TABLE `players` (
   CONSTRAINT `pla1` FOREIGN KEY (`id_room`) REFERENCES `room` (`id_room`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- --------------------------------------------------------
--- 8. Bảng `votes`: Ghi nhận câu trả lời và điểm của người chơi
--- --------------------------------------------------------
 DROP TABLE IF EXISTS `votes`;
 CREATE TABLE `votes` (
   `id_vote` bigint(6) NOT NULL AUTO_INCREMENT,

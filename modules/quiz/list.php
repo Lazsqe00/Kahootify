@@ -1,15 +1,13 @@
 <?php
-/**
- * THÀNH VIÊN 2: Danh sách bộ câu hỏi (My Kahoots)
- */
+
 require_once __DIR__ . '/../../includes/auth_check.php';
 require_once __DIR__ . '/../../config/database.php';
 
 $creatorId = intval($_SESSION['id_creator']);
 $quizzes = db_fetch_all(
-    "SELECT q.*, (SELECT COUNT(*) FROM questions WHERE id_quiz = q.id_quiz) as question_count 
-     FROM quiz q 
-     WHERE q.id_creator = :c 
+    "SELECT q.*, (SELECT COUNT(*) FROM questions WHERE id_quiz = q.id_quiz) as question_count
+     FROM quiz q
+     WHERE q.id_creator = :c
      ORDER BY q.id_quiz DESC",
     [':c' => $creatorId]
 );

@@ -1,14 +1,12 @@
 <?php
-/**
- * Thanh điều hướng Navbar chuẩn Kahoot
- */
+
 $isLoggedIn = !empty($_SESSION['id_creator']);
 $creatorName = $_SESSION['nameCreator'] ?? 'Creator';
 $creatorAvatar = $_SESSION['avatar'] ?? 'default.png';
 ?>
 <nav class="navbar navbar-expand-md navbar-dark navbar-kahoot">
     <div class="container-fluid">
-        <!-- Logo Kahoot -->
+
         <a class="navbar-brand d-flex align-items-center" href="<?= BASE_URL ?>">
             <img src="<?= BASE_URL ?>assets/img/logo.png" alt="Kahoot! Logo" class="mr-2">
         </a>
@@ -19,7 +17,7 @@ $creatorAvatar = $_SESSION['avatar'] ?? 'default.png';
 
         <div class="collapse navbar-collapse" id="kahootNavbar">
             <ul class="navbar-nav ml-auto align-items-center">
-                <!-- Nút Nhập mã PIN (Dành cho người chơi) -->
+
                 <li class="nav-item mr-2">
                     <a href="<?= BASE_URL ?>modules/player/join.php" class="nav-link font-weight-bold text-white px-3 py-1 rounded" style="background: rgba(255,255,255,0.15);">
                         <i class="fas fa-gamepad mr-1"></i> Enter PIN
@@ -27,7 +25,7 @@ $creatorAvatar = $_SESSION['avatar'] ?? 'default.png';
                 </li>
 
                 <?php if ($isLoggedIn): ?>
-                    <!-- Menu dành cho Creator đã đăng nhập -->
+
                     <li class="nav-item mr-2">
                         <a href="<?= BASE_URL ?>modules/quiz/list.php" class="nav-link text-light font-weight-bold">
                             <i class="fas fa-th-list mr-1"></i> My Kahoots
@@ -39,7 +37,6 @@ $creatorAvatar = $_SESSION['avatar'] ?? 'default.png';
                         </a>
                     </li>
 
-                    <!-- Dropdown Profile người dùng -->
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle d-flex align-items-center text-white" href="#" id="userDropdown" role="button" data-toggle="dropdown">
                             <img src="<?= BASE_URL ?>assets/img/imatges_perfil/default.png" alt="Avatar" class="rounded-circle mr-2 border border-light" style="width: 32px; height: 32px; object-fit: cover;">
@@ -59,7 +56,7 @@ $creatorAvatar = $_SESSION['avatar'] ?? 'default.png';
                         </div>
                     </li>
                 <?php else: ?>
-                    <!-- Menu khi chưa đăng nhập -->
+
                     <li class="nav-item mr-2">
                         <button type="button" class="btn btn-success nav-pill-btn font-weight-bold" data-toggle="modal" data-target="#signUpModal">
                             Sign Up! - It's free
@@ -76,7 +73,6 @@ $creatorAvatar = $_SESSION['avatar'] ?? 'default.png';
     </div>
 </nav>
 
-<!-- Vùng thông báo Flash message nếu có -->
 <?php $flash = get_flash_message(); if ($flash): ?>
     <div class="container mt-3">
         <div class="alert alert-<?= htmlspecialchars($flash['type']) ?> alert-dismissible fade show alert-auto-dismiss shadow-sm" role="alert">

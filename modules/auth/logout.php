@@ -1,7 +1,5 @@
 <?php
-/**
- * THÀNH VIÊN 1: Đăng xuất
- */
+
 require_once __DIR__ . '/../../config/config.php';
 
 unset($_SESSION['id_creator']);

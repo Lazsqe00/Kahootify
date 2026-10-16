@@ -1,7 +1,5 @@
 <?php
-/**
- * THÀNH VIÊN 4: Đặt Nickname cho người chơi
- */
+
 require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../config/database.php';
 
@@ -25,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $nickname = trim($_POST['nickname'] ?? '');
 
     if (!empty($nickname)) {
-        // Kiểm tra nickname trùng trong phòng
+
         $existing = db_fetch_one("SELECT id_player FROM players WHERE id_room = :r AND nickname = :nick LIMIT 1", [
             ':r'    => $roomId,
             ':nick' => $nickname

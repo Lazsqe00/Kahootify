@@ -1,7 +1,3 @@
-/* =======================================================
-   KAHOOT THEME STYLESHEET - DỰ ÁN BTN (NHÓM 4 NGƯỜI)
-   Kế thừa giao diện đặc trưng Kahoot!
-   ======================================================= */
 
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800;900&family=Poppins:wght@300;400;500;600;700&display=swap');
 
@@ -31,7 +27,6 @@ h1, h2, h3, h4, h5, h6, .brand-font {
   font-weight: 700;
 }
 
-/* Nền đổi màu động đặc trưng màn hình Game / PIN */
 .backgroundColorChanges {
   width: 100%;
   min-height: 100vh;
@@ -48,7 +43,6 @@ h1, h2, h3, h4, h5, h6, .brand-font {
   100% { background-color: #46178F; }
 }
 
-/* Thanh điều hướng Navbar */
 .navbar-kahoot {
   background-color: var(--kahoot-purple-dark) !important;
   box-shadow: 0 2px 10px rgba(0,0,0,0.15);
@@ -67,7 +61,6 @@ h1, h2, h3, h4, h5, h6, .brand-font {
   transition: all 0.2s ease-in-out;
 }
 
-/* Nút bấm phong cách Game 3D Kahoot */
 .btn-kahoot {
   font-family: 'Montserrat', sans-serif;
   font-weight: 700;
@@ -115,7 +108,6 @@ h1, h2, h3, h4, h5, h6, .brand-font {
   box-shadow: 0 4px 0 #966e00;
 }
 
-/* 4 Màu ô đáp án trắc nghiệm kinh điển Kahoot */
 .answer-box {
   border-radius: 8px;
   padding: 20px;
@@ -166,7 +158,6 @@ h1, h2, h3, h4, h5, h6, .brand-font {
   margin-right: 15px;
 }
 
-/* Thẻ Card câu hỏi trên máy chiếu Host */
 .question-card-banner {
   background: #ffffff;
   border-radius: 12px;
@@ -176,7 +167,6 @@ h1, h2, h3, h4, h5, h6, .brand-font {
   margin-bottom: 25px;
 }
 
-/* Đồng hồ tròn đếm ngược */
 .timer-circle {
   width: 90px;
   height: 90px;
@@ -205,7 +195,6 @@ h1, h2, h3, h4, h5, h6, .brand-font {
   100% { transform: scale(1); }
 }
 
-/* Thùng chứa mã PIN to giữa màn hình cho người chơi nhập */
 .pin-card-box {
   background: #ffffff;
   border-radius: 14px;
@@ -233,7 +222,6 @@ h1, h2, h3, h4, h5, h6, .brand-font {
   box-shadow: 0 0 0 0.2rem rgba(70, 23, 143, 0.25);
 }
 
-/* Màn hình điện thoại người chơi: 4 nút màu không chữ (Icon to) */
 .player-buttons-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -264,7 +252,6 @@ h1, h2, h3, h4, h5, h6, .brand-font {
 .player-btn.yellow { background-color: var(--kahoot-yellow); }
 .player-btn.green { background-color: var(--kahoot-green); }
 
-/* Bảng xếp hạng Leaderboard */
 .leaderboard-item {
   background: #ffffff;
   border-radius: 10px;
@@ -291,7 +278,6 @@ h1, h2, h3, h4, h5, h6, .brand-font {
   color: var(--kahoot-green);
 }
 
-/* Bục nhận giải Top 3 Podium */
 .podium-container {
   display: flex;
   align-items: flex-end;

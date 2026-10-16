@@ -1,10 +1,7 @@
 <?php
-/**
- * Footer chung kèm Modal Đăng nhập & Đăng ký cho BTN
- */
+
 ?>
 
-<!-- ================= MODAL ĐĂNG NHẬP ================= -->
 <div class="modal fade" id="loginModal" tabindex="-1" role="dialog" aria-labelledby="loginModalTitle" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered" role="document">
         <div class="modal-content border-0 shadow-lg">
@@ -41,7 +38,7 @@
                     <button type="submit" class="btn btn-kahoot btn-kahoot-purple btn-block mt-3">
                         <i class="fas fa-sign-in-alt mr-2"></i> Log In Now
                     </button>
-                    
+
                     <div class="text-center mt-3">
                         <span class="text-muted">Don't have an account?</span>
                         <a href="#" data-dismiss="modal" data-toggle="modal" data-target="#signUpModal" class="font-weight-bold" style="color: var(--kahoot-purple);">
@@ -54,7 +51,6 @@
     </div>
 </div>
 
-<!-- ================= MODAL ĐĂNG KÝ ================= -->
 <div class="modal fade" id="signUpModal" tabindex="-1" role="dialog" aria-labelledby="signUpModalTitle" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered" role="document">
         <div class="modal-content border-0 shadow-lg">
@@ -110,7 +106,6 @@
     </div>
 </div>
 
-<!-- Scripts -->
 <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
 <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>

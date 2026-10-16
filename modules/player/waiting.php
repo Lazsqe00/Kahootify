@@ -1,7 +1,5 @@
 <?php
-/**
- * THÀNH VIÊN 4: Màn hình người chơi chờ Host bắt đầu trận đấu
- */
+
 require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../config/database.php';
 
@@ -55,15 +53,13 @@ const roomId = <?= $roomId ?>;
 const playerId = <?= $playerId ?>;
 const playerToken = '<?= htmlspecialchars($token) ?>';
 
-// Lưu vào sessionStorage tab này
 sessionStorage.setItem('kahoot_pid', playerId);
 sessionStorage.setItem('kahoot_token', playerToken);
 
-// Polling kiểm tra trạng thái phòng mỗi 1 giây
 setInterval(function() {
     $.getJSON('<?= BASE_URL ?>modules/api/game_state.php?action=get_room_status&id_room=' + roomId, function(res) {
         if (res && res.success) {
-            // Khi phòng chuyển sang câu hỏi (status là ID câu hỏi)
+
             if (res.status !== 'waiting' && res.status !== 'finished') {
                 window.location.href = '<?= BASE_URL ?>modules/player/play.php?pid=' + playerId + '&token=' + playerToken;
             }

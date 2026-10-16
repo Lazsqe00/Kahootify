@@ -1,7 +1,5 @@
 <?php
-/**
- * Middleware kiểm tra phiên đăng nhập của Giáo viên / Host
- */
+
 require_once __DIR__ . '/../config/config.php';
 
 if (empty($_SESSION['id_creator'])) {

@@ -1,7 +1,5 @@
 <?php
-/**
- * THÀNH VIÊN 4: Màn hình Nhập mã PIN tham gia trò chơi
- */
+
 require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../config/database.php';
 

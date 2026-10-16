@@ -1,7 +1,5 @@
 <?php
-/**
- * THÀNH VIÊN 4: Giao diện bấm 4 nút màu & Kết quả của Người chơi
- */
+
 require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../config/database.php';
 
@@ -23,7 +21,6 @@ if ($roomId <= 0 || $playerId <= 0 || !$player) {
     redirect('modules/player/join.php');
 }
 
-// Lấy thông tin phòng
 $room = db_fetch_one("SELECT * FROM room WHERE id_room = :r", [':r' => $roomId]);
 
 if (!$room) {
@@ -32,12 +29,10 @@ if (!$room) {
 
 $status = $room['status'];
 
-// Nếu Host chưa bắt đầu
 if ($status === 'waiting') {
     redirect('modules/player/waiting.php?pid=' . $playerId . '&token=' . urlencode($token));
 }
 
-// Nếu trận đấu đã kết thúc
 if ($status === 'finished') {
     $leaderboard = get_room_leaderboard($roomId);
     $myRank = 1;
@@ -52,7 +47,7 @@ if ($status === 'finished') {
     require_once __DIR__ . '/../../includes/header.php';
     ?>
     <div class="container py-4 text-white" style="max-width: 650px;">
-        <!-- Card tổng kết kết quả của người chơi -->
+
         <div class="card border-0 shadow-lg text-dark mb-4 text-center" style="border-radius: 18px; overflow: hidden;">
             <div class="py-4 text-white" style="background: linear-gradient(135deg, #46178F, #300d66);">
                 <div style="font-size: 4rem;">
@@ -81,7 +76,6 @@ if ($status === 'finished') {
             </div>
         </div>
 
-        <!-- BẢNG XẾP HẠNG TOÀN BỘ PHÒNG (PLAYER VIEW) -->
         <div class="card border-0 shadow-lg text-dark mb-4" style="border-radius: 18px;">
             <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between">
                 <h5 class="font-weight-bold mb-0 text-dark">
@@ -92,12 +86,12 @@ if ($status === 'finished') {
                 </span>
             </div>
             <div class="card-body p-3">
-                <?php foreach ($leaderboard as $idx => $p): 
+                <?php foreach ($leaderboard as $idx => $p):
                     $rank = $idx + 1;
                     $isMe = ($p['id_player'] == $playerId);
                     $itemClass = $isMe ? 'border-warning bg-warning-light shadow-sm' : 'border-light bg-light';
                 ?>
-                    <div class="d-flex align-items-center justify-content-between p-3 mb-2 rounded <?= $itemClass ?>" 
+                    <div class="d-flex align-items-center justify-content-between p-3 mb-2 rounded <?= $itemClass ?>"
                          style="border: <?= $isMe ? '2px solid #ffca28' : '1px solid #e9ecef' ?>; background-color: <?= $isMe ? '#fffde7' : '#ffffff' ?>;">
                         <div class="d-flex align-items-center" style="gap: 12px; overflow: hidden;">
                             <div class="font-weight-bold text-center" style="width: 35px; font-size: 1.2rem;">
@@ -132,7 +126,6 @@ if ($status === 'finished') {
         </div>
     </div>
 
-    <!-- Hiệu ứng pháo hoa Confetti chúc mừng -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
     <script>
     window.addEventListener('DOMContentLoaded', function() {
@@ -150,31 +143,27 @@ if ($status === 'finished') {
     exit;
 }
 
-// Xác định pha
 $isResultPhase = (strpos($status, 'res_') === 0);
 $qId = $isResultPhase ? intval(str_replace('res_', '', $status)) : intval($status);
 
-// Lấy 4 đáp án của câu hỏi này
 $answers = db_fetch_all("SELECT * FROM answers WHERE id_question = :qid ORDER BY id_answer ASC", [':qid' => $qId]);
 
-// Kiểm tra xem người chơi đã nộp câu trả lời cho câu hỏi này chưa
 $myVote = db_fetch_one(
-    "SELECT v.*, a.is_correct 
-     FROM votes v JOIN answers a ON v.id_answer = a.id_answer 
+    "SELECT v.*, a.is_correct
+     FROM votes v JOIN answers a ON v.id_answer = a.id_answer
      WHERE v.id_player = :pid AND a.id_question = :qid LIMIT 1",
     [':pid' => $playerId, ':qid' => $qId]
 );
 
-// Lấy danh sách bảng xếp hạng phòng chơi trong pha kết quả
 $leaderboard = [];
 $myRank = 1;
 if ($isResultPhase) {
     $leaderboardSql = "
-        SELECT p.*, 
+        SELECT p.*,
                COALESCE(v.points_earned, 0) as points_gained,
                COALESCE(a.is_correct, 0) as is_round_correct
         FROM players p
-        LEFT JOIN votes v ON v.id_player = p.id_player 
+        LEFT JOIN votes v ON v.id_player = p.id_player
              AND v.id_answer IN (SELECT id_answer FROM answers WHERE id_question = :qid)
         LEFT JOIN answers a ON v.id_answer = a.id_answer
         WHERE p.id_room = :r
@@ -197,7 +186,6 @@ $bodyClass = "backgroundColorChanges";
 require_once __DIR__ . '/../../includes/header.php';
 ?>
 
-<!-- Thanh thông tin Player trên cùng -->
 <div class="d-flex justify-content-between align-items-center px-3 py-2 text-white shadow-sm" style="background-color: var(--kahoot-purple-dark);">
     <div class="font-weight-bold">
         <i class="fas fa-user mr-1 text-warning"></i> <?= htmlspecialchars($nickname) ?>
@@ -208,14 +196,14 @@ require_once __DIR__ . '/../../includes/header.php';
 </div>
 
 <?php if ($isResultPhase): ?>
-    <!-- ================= MÀN HÌNH KẾT QUẢ & BẢNG XẾP HẠNG CỦA NGƯỜI CHƠI ================= -->
+
     <?php
     $isCorrect = ($myVote && $myVote['is_correct'] == 1);
     $pointsEarned = $myVote ? intval($myVote['points_earned']) : 0;
     ?>
     <div class="container py-3" style="max-width: 650px;">
-        <!-- Banner thông báo Đúng / Sai cá nhân -->
-        <div class="card border-0 shadow text-white text-center mb-3" 
+
+        <div class="card border-0 shadow text-white text-center mb-3"
              style="background: <?= $isCorrect ? 'linear-gradient(135deg, #26890c, #1a6207)' : 'linear-gradient(135deg, #e21b3c, #9c1228)' ?>; border-radius: 16px;">
             <div class="card-body py-3 px-4">
                 <div class="d-flex align-items-center justify-content-center" style="gap: 15px;">
@@ -234,7 +222,6 @@ require_once __DIR__ . '/../../includes/header.php';
             </div>
         </div>
 
-        <!-- Thẻ thứ hạng hiện tại của bạn -->
         <div class="card border-0 shadow-sm mb-3 text-center" style="border-radius: 14px; background: #ffffff;">
             <div class="card-body py-2 px-3">
                 <div class="d-flex justify-content-around align-items-center">
@@ -255,7 +242,6 @@ require_once __DIR__ . '/../../includes/header.php';
             </div>
         </div>
 
-        <!-- BẢNG XẾP HẠNG TOÀN PHÒNG HIỂN THỊ TRÊN MÀN HÌNH NGƯỜI CHƠI -->
         <div class="card border-0 shadow-sm mb-3" style="border-radius: 16px; background: #ffffff;">
             <div class="card-header bg-white py-2 px-3 border-bottom d-flex align-items-center justify-content-between">
                 <h6 class="font-weight-bold mb-0 text-dark">
@@ -266,13 +252,13 @@ require_once __DIR__ . '/../../includes/header.php';
                 </small>
             </div>
             <div class="card-body p-2" style="max-height: 360px; overflow-y: auto;">
-                <?php foreach ($leaderboard as $idx => $p): 
+                <?php foreach ($leaderboard as $idx => $p):
                     $rank = $idx + 1;
                     $isMe = ($p['id_player'] == $playerId);
                     $gained = intval($p['points_gained'] ?? 0);
                     $startScore = max(0, intval($p['score']) - $gained);
                 ?>
-                    <div class="d-flex align-items-center justify-content-between p-2 mb-2 rounded" 
+                    <div class="d-flex align-items-center justify-content-between p-2 mb-2 rounded"
                          style="border: <?= $isMe ? '2px solid #f59f00' : '1px solid #e9ecef' ?>; background-color: <?= $isMe ? '#fff9db' : '#f8f9fa' ?>;">
                         <div class="d-flex align-items-center" style="gap: 8px; overflow: hidden;">
                             <div class="font-weight-bold text-center" style="width: 30px; font-size: 1.1rem;">
@@ -296,9 +282,9 @@ require_once __DIR__ . '/../../includes/header.php';
                             </div>
                         </div>
                         <div class="text-right pl-2" style="min-width: 85px;">
-                            <span class="font-weight-bold text-dark score-jump" 
-                                  data-start="<?= $startScore ?>" 
-                                  data-target="<?= intval($p['score']) ?>" 
+                            <span class="font-weight-bold text-dark score-jump"
+                                  data-start="<?= $startScore ?>"
+                                  data-target="<?= intval($p['score']) ?>"
                                   data-gained="<?= $gained ?>"
                                   style="font-size: 1.05rem;">
                                 <?= number_format($p['score']) ?>
@@ -314,7 +300,6 @@ require_once __DIR__ . '/../../includes/header.php';
             </div>
         </div>
 
-        <!-- Trạng thái chờ câu tiếp theo -->
         <div class="text-center text-white py-2">
             <div class="spinner-grow spinner-grow-sm text-light mr-1" role="status"></div>
             <span class="font-weight-bold" style="font-size: 0.95rem; text-shadow: 1px 1px 2px rgba(0,0,0,0.5);">
@@ -323,7 +308,6 @@ require_once __DIR__ . '/../../includes/header.php';
         </div>
     </div>
 
-    <!-- Hiệu ứng nhảy số điểm cho bảng xếp hạng người chơi -->
     <script>
     window.addEventListener('DOMContentLoaded', function() {
         setTimeout(function() {
@@ -335,7 +319,7 @@ require_once __DIR__ . '/../../includes/header.php';
                 if (gainedVal > 0 && targetVal > startVal) {
                     el.classList.add('text-success');
                     let startTime = null;
-                    const duration = 1200; // 1.2s
+                    const duration = 1200;
 
                     function step(timestamp) {
                         if (!startTime) startTime = timestamp;
@@ -358,7 +342,7 @@ require_once __DIR__ . '/../../includes/header.php';
     </script>
 
 <?php elseif ($myVote): ?>
-    <!-- ================= MÀN HÌNH ĐÃ NỘP BÀI (CHỜ HẾT GIỜ) ================= -->
+
     <div class="d-flex align-items-center justify-content-center text-center text-white backgroundColorChanges" style="min-height: calc(100vh - 55px);">
         <div class="p-4">
             <div style="font-size: 4rem;" class="mb-3">⏳</div>
@@ -369,21 +353,21 @@ require_once __DIR__ . '/../../includes/header.php';
     </div>
 
 <?php else: ?>
-    <!-- ================= 4 NÚT MÀU KAHOOT ĐỂ BẤM TRẢ LỜI ================= -->
+
     <div class="player-buttons-grid">
-        <!-- Nút Đỏ 1 -->
+
         <div class="player-btn red" onclick="submitAnswer(<?= $answers[0]['id_answer'] ?? 0 ?>)">
             <span class="text-white">🔺</span>
         </div>
-        <!-- Nút Xanh dương 2 -->
+
         <div class="player-btn blue" onclick="submitAnswer(<?= $answers[1]['id_answer'] ?? 0 ?>)">
             <span class="text-white">🔷</span>
         </div>
-        <!-- Nút Vàng 3 -->
+
         <div class="player-btn yellow" onclick="submitAnswer(<?= $answers[2]['id_answer'] ?? 0 ?>)">
             <span class="text-white">🟡</span>
         </div>
-        <!-- Nút Xanh lá 4 -->
+
         <div class="player-btn green" onclick="submitAnswer(<?= $answers[3]['id_answer'] ?? 0 ?>)">
             <span class="text-white">🟩</span>
         </div>
@@ -397,7 +381,6 @@ const playerId = <?= $playerId ?>;
 const playerToken = '<?= htmlspecialchars($token) ?>';
 const currentStatus = '<?= $status ?>';
 
-// Ghi nhớ thông tin tab này
 sessionStorage.setItem('kahoot_pid', playerId);
 sessionStorage.setItem('kahoot_token', playerToken);
 
@@ -405,11 +388,9 @@ function refreshPlayerPage() {
     window.location.href = 'play.php?pid=' + playerId + '&token=' + encodeURIComponent(playerToken);
 }
 
-// Hàm gửi đáp án khi người chơi click/chạm vào nút màu
 function submitAnswer(answerId) {
     if (!answerId) return;
 
-    // Vô hiệu hóa click chống bấm liên tục
     $('.player-btn').css('pointer-events', 'none').css('opacity', '0.7');
 
     $.ajax({
@@ -432,7 +413,6 @@ function submitAnswer(answerId) {
     });
 }
 
-// Polling kiểm tra xem Host có chuyển câu hỏi hoặc chuyển trạng thái không
 setInterval(function() {
     $.getJSON('<?= BASE_URL ?>modules/api/game_state.php?action=get_room_status&id_room=' + roomId, function(res) {
         if (res && res.success) {

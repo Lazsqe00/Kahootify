@@ -1,7 +1,5 @@
 <?php
-/**
- * THÀNH VIÊN 3: Bảng xếp hạng điểm số (Leaderboard) & Bục vinh danh Podium Top 3
- */
+
 require_once __DIR__ . '/../../includes/auth_check.php';
 require_once __DIR__ . '/../../config/database.php';
 
@@ -14,13 +12,11 @@ if (!$room) {
 
 $isFinal = (isset($_GET['final']) && $_GET['final'] === 'true') || ($room['status'] === 'finished');
 
-// Xác định câu hỏi vừa qua để tính điểm tăng (nhảy số)
 $currentQId = intval($_GET['qid'] ?? 0);
 if ($currentQId <= 0 && !$isFinal) {
     $currentQId = intval(str_replace('res_', '', $room['status']));
 }
 
-// Kiểm tra xem còn câu hỏi tiếp theo không
 $allQuestions = db_fetch_all("SELECT id_question FROM questions WHERE id_quiz = :q ORDER BY id_question ASC", [':q' => $room['id_quiz']]);
 $hasNextQuestion = false;
 $foundCurrent = false;
@@ -34,16 +30,15 @@ foreach ($allQuestions as $q) {
     }
 }
 
-// Lấy danh sách bảng xếp hạng kèm số điểm tăng trong câu vừa rồi
 if (!$isFinal && $currentQId > 0) {
-    $sql = "SELECT p.*, 
+    $sql = "SELECT p.*,
                    COALESCE(v.points_earned, 0) as points_gained,
                    COALESCE(a.is_correct, 0) as is_round_correct,
                    (SELECT COUNT(*) FROM votes v2 JOIN answers a2 ON v2.id_answer = a2.id_answer WHERE v2.id_player = p.id_player AND a2.is_correct = 1) as correct_count
-            FROM players p 
+            FROM players p
             LEFT JOIN votes v ON v.id_player = p.id_player AND v.id_answer IN (SELECT id_answer FROM answers WHERE id_question = :qid)
             LEFT JOIN answers a ON v.id_answer = a.id_answer
-            WHERE p.id_room = :id_room 
+            WHERE p.id_room = :id_room
             ORDER BY p.score DESC, p.playeradd ASC";
     $leaderboard = db_fetch_all($sql, [':id_room' => $roomId, ':qid' => $currentQId]);
 } else {
@@ -55,7 +50,6 @@ $bodyClass = "backgroundColorChanges";
 require_once __DIR__ . '/../../includes/header.php';
 ?>
 
-<!-- Header Host điều khiển -->
 <nav class="navbar navbar-dark bg-dark px-4 py-2 d-flex justify-content-between">
     <div class="d-flex align-items-center">
         <img src="<?= BASE_URL ?>assets/img/logo.png" alt="Logo" style="max-height: 32px; filter: brightness(100);" class="mr-3">
@@ -77,7 +71,7 @@ require_once __DIR__ . '/../../includes/header.php';
 
 <div class="container my-4" style="max-width: 850px;">
     <?php if ($isFinal): ?>
-        <!-- ================= BỤC VINH DANH PODIUM TOP 3 ================= -->
+
         <div class="text-center text-white mb-4">
             <h1 class="display-4 font-weight-bold" style="text-shadow: 2px 2px 5px rgba(0,0,0,0.4);">
                 🎉 CONGRATULATIONS! 🎉
@@ -85,13 +79,13 @@ require_once __DIR__ . '/../../includes/header.php';
             <p class="lead font-weight-bold" style="text-shadow: 1px 1px 3px rgba(0,0,0,0.4);">Celebrating our top champions</p>
         </div>
 
-        <?php if (count($leaderboard) > 0): 
+        <?php if (count($leaderboard) > 0):
             $top1 = $leaderboard[0] ?? null;
             $top2 = $leaderboard[1] ?? null;
             $top3 = $leaderboard[2] ?? null;
         ?>
             <div class="podium-container mb-5">
-                <!-- Hạng 2 (Bạc) -->
+
                 <?php if ($top2): ?>
                     <div class="podium-step rank-2">
                         <div class="mb-2"><i class="fas fa-medal fa-2x text-light"></i></div>
@@ -101,7 +95,6 @@ require_once __DIR__ . '/../../includes/header.php';
                     </div>
                 <?php endif; ?>
 
-                <!-- Hạng 1 (Vàng) -->
                 <?php if ($top1): ?>
                     <div class="podium-step rank-1">
                         <div class="mb-2"><i class="fas fa-crown fa-3x text-warning"></i></div>
@@ -111,7 +104,6 @@ require_once __DIR__ . '/../../includes/header.php';
                     </div>
                 <?php endif; ?>
 
-                <!-- Hạng 3 (Đồng) -->
                 <?php if ($top3): ?>
                     <div class="podium-step rank-3">
                         <div class="mb-2"><i class="fas fa-award fa-2x text-light"></i></div>
@@ -123,10 +115,9 @@ require_once __DIR__ . '/../../includes/header.php';
             </div>
         <?php endif; ?>
 
-        <!-- Danh sách toàn bộ thứ hạng sau khi kết thúc -->
         <div class="card border-0 shadow-lg p-3" style="border-radius: 14px; background: rgba(255,255,255,0.95);">
             <h5 class="font-weight-bold text-dark mb-3 px-2">Final Standings:</h5>
-            <?php foreach ($leaderboard as $idx => $p): 
+            <?php foreach ($leaderboard as $idx => $p):
                 $rank = $idx + 1;
                 $badgeClass = ($rank == 1) ? 'badge-warning text-dark' : (($rank == 2) ? 'badge-secondary' : (($rank == 3) ? 'badge-danger' : 'badge-light text-dark'));
             ?>
@@ -148,14 +139,13 @@ require_once __DIR__ . '/../../includes/header.php';
         </div>
 
     <?php else: ?>
-        <!-- ================= BẢNG XẾP HẠNG TẠM THỜI (TỰ ĐỘNG CHUYỂN CÂU) ================= -->
+
         <div class="text-center text-white mb-3">
             <h2 class="font-weight-bold" style="text-shadow: 2px 2px 4px rgba(0,0,0,0.4);">
                 <i class="fas fa-chart-line mr-2"></i>Interim Leaderboard
             </h2>
         </div>
 
-        <!-- Thanh đếm ngược tự động 5s -->
         <div class="card border-0 shadow-sm mx-auto mb-3" style="max-width: 600px; background: rgba(255,255,255,0.95); border-radius: 14px;">
             <div class="card-body py-2 px-4 text-center">
                 <div class="d-flex justify-content-between align-items-center mb-1">
@@ -180,7 +170,7 @@ require_once __DIR__ . '/../../includes/header.php';
                     No scores recorded yet.
                 </div>
             <?php else: ?>
-                <?php foreach ($leaderboard as $idx => $p): 
+                <?php foreach ($leaderboard as $idx => $p):
                     $rank = $idx + 1;
                     $badgeClass = ($rank == 1) ? 'badge-warning text-dark' : (($rank == 2) ? 'badge-secondary' : (($rank == 3) ? 'badge-danger' : 'badge-light text-dark'));
                     $currScore = intval($p['score']);
@@ -202,10 +192,10 @@ require_once __DIR__ . '/../../includes/header.php';
                             <?php endif; ?>
                         </div>
                         <div class="text-right">
-                            <span class="leaderboard-score score-counter font-weight-bold text-primary" 
-                                  style="font-size: 1.4rem;" 
-                                  data-start="<?= $prevScore ?>" 
-                                  data-target="<?= $currScore ?>" 
+                            <span class="leaderboard-score score-counter font-weight-bold text-primary"
+                                  style="font-size: 1.4rem;"
+                                  data-start="<?= $prevScore ?>"
+                                  data-target="<?= $currScore ?>"
                                   data-gained="<?= $gained ?>">
                                 <?= number_format($prevScore) ?>
                             </span>
@@ -236,15 +226,14 @@ $(document).ready(function() {
 <?php else: ?>
 <script>
 $(document).ready(function() {
-    // 1. Hiệu ứng điểm nhảy số (Counter Animation) sau 500ms
+
     setTimeout(function() {
-        // Hiện badge số điểm cộng thêm
+
         $('.gained-badge').css({
             'opacity': '1',
             'transform': 'scale(1)'
         });
 
-        // Nhảy số điểm từ điểm cũ lên điểm mới
         $('.score-counter').each(function() {
             const el = this;
             const startVal = parseInt($(el).attr('data-start')) || 0;
@@ -254,12 +243,12 @@ $(document).ready(function() {
             if (gainedVal > 0 && targetVal > startVal) {
                 $(el).addClass('text-success').removeClass('text-primary');
                 let startTime = null;
-                const duration = 1200; // 1.2 giây
+                const duration = 1200;
 
                 function step(timestamp) {
                     if (!startTime) startTime = timestamp;
                     const progress = Math.min((timestamp - startTime) / duration, 1);
-                    const ease = 1 - Math.pow(1 - progress, 3); // easeOutCubic
+                    const ease = 1 - Math.pow(1 - progress, 3);
                     const currentVal = Math.round(startVal + (targetVal - startVal) * ease);
                     el.textContent = currentVal.toLocaleString('en-US');
 
@@ -274,7 +263,6 @@ $(document).ready(function() {
         });
     }, 500);
 
-    // 2. Đếm ngược 5 giây rồi tự động chuyển sang câu tiếp theo hoặc kết thúc
     let autoNextSec = 5;
     const autoNextTimer = setInterval(function() {
         autoNextSec--;

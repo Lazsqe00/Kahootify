@@ -1,7 +1,5 @@
 <?php
-/**
- * THÀNH VIÊN 1: Quản lý thông tin cá nhân & Đổi mật khẩu
- */
+
 require_once __DIR__ . '/../../includes/auth_check.php';
 require_once __DIR__ . '/../../config/database.php';
 
