@@ -3,6 +3,7 @@
 header('Content-Type: application/json; charset=utf-8');
 require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../includes/room_access.php';
 
 $action = $_GET['action'] ?? '';
 $roomId = intval($_GET['id_room'] ?? 0);
@@ -13,11 +14,12 @@ if ($roomId <= 0) {
 }
 
 if ($action === 'get_room_status') {
-    $room = db_fetch_one("SELECT status, question_start_time FROM room WHERE id_room = :r", [':r' => $roomId]);
+    $room = db_fetch_one("SELECT id_room, pin, status, question_start_time FROM room WHERE id_room = :r", [':r' => $roomId]);
     if ($room) {
         echo json_encode([
             'success' => true,
             'status'  => $room['status'],
+            'is_locked' => room_is_locked($room),
             'start_time' => $room['question_start_time']
         ]);
     } else {
@@ -27,10 +29,16 @@ if ($action === 'get_room_status') {
 }
 
 if ($action === 'get_players') {
+    $room = db_fetch_one('SELECT id_room, pin FROM room WHERE id_room = :r', [':r' => $roomId]);
+    if (!$room) {
+        echo json_encode(['success' => false, 'message' => 'Room does not exist']);
+        exit;
+    }
     $players = db_fetch_all("SELECT id_player, nickname, score FROM players WHERE id_room = :r ORDER BY id_player ASC", [':r' => $roomId]);
     echo json_encode([
         'success' => true,
         'players' => $players,
+        'is_locked' => room_is_locked($room),
         'count'   => count($players)
     ]);
     exit;

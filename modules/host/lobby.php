@@ -2,14 +2,39 @@
 
 require_once __DIR__ . '/../../includes/auth_check.php';
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../includes/room_access.php';
 
 $roomId = intval($_SESSION['id_room'] ?? 0);
-$room = db_fetch_one("SELECT r.*, q.name as quiz_name FROM room r JOIN quiz q ON r.id_quiz = q.id_quiz WHERE r.id_room = :r", [':r' => $roomId]);
+$creatorId = intval($_SESSION['id_creator']);
+$room = db_fetch_one("SELECT r.*, q.name as quiz_name FROM room r JOIN quiz q ON r.id_quiz = q.id_quiz WHERE r.id_room = :r AND r.id_creator = :c", [':r' => $roomId, ':c' => $creatorId]);
 
 if (!$room || $room['status'] === 'finished') {
     set_flash_message('danger', 'Game room does not exist or has already finished!');
     redirect('modules/auth/dashboard.php');
 }
+
+if ($room['status'] !== 'waiting') {
+    redirect('modules/host/play.php');
+}
+
+if (empty($_SESSION['room_lock_token'])) {
+    $_SESSION['room_lock_token'] = bin2hex(random_bytes(32));
+}
+$roomLockError = '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['set_room_lock'])) {
+    $token = $_POST['room_lock_token'] ?? '';
+    if (!is_string($token) || !hash_equals($_SESSION['room_lock_token'], $token)) {
+        http_response_code(403);
+        $roomLockError = 'Your request could not be verified. Refresh the page and try again.';
+    } elseif (($_POST['lock_room_id'] ?? '') !== (string)$roomId || !in_array($_POST['set_room_lock'], ['0', '1'], true)) {
+        http_response_code(400);
+        $roomLockError = 'Invalid room lock setting.';
+    } else {
+        set_room_locked($room, $_POST['set_room_lock'] === '1');
+        redirect('modules/host/lobby.php');
+    }
+}
+$isLocked = room_is_locked($room);
 
 if (isset($_GET['start_game'])) {
     $firstQ = db_fetch_one("SELECT id_question FROM questions WHERE id_quiz = :q ORDER BY id_question ASC LIMIT 1", [':q' => $room['id_quiz']]);
@@ -96,6 +121,18 @@ require_once __DIR__ . '/../../includes/header.php';
         <div class="lobby-pin-number">
             <?= htmlspecialchars($room['pin']) ?>
         </div>
+        <form action="<?= BASE_URL ?>modules/host/lobby.php" method="POST" class="mt-3">
+            <input type="hidden" name="room_lock_token" value="<?= htmlspecialchars($_SESSION['room_lock_token'], ENT_QUOTES, 'UTF-8') ?>">
+            <input type="hidden" name="lock_room_id" value="<?= $roomId ?>">
+            <button type="submit" name="set_room_lock" value="<?= $isLocked ? '0' : '1' ?>" id="roomLockButton" class="btn <?= $isLocked ? 'btn-warning' : 'btn-outline-dark' ?> font-weight-bold" aria-describedby="roomLockState">
+                <i id="roomLockIcon" class="fas <?= $isLocked ? 'fa-lock' : 'fa-lock-open' ?> mr-1" aria-hidden="true"></i>
+                <span id="roomLockLabel"><?= $isLocked ? 'Unlock room' : 'Lock room' ?></span>
+            </button>
+        </form>
+        <p id="roomLockState" class="small font-weight-bold mt-2 mb-0 <?= $isLocked ? 'text-danger' : 'text-muted' ?>" role="status" aria-live="polite"><?= $isLocked ? 'Room locked. New players cannot join.' : 'Room open. Players can join using the Game PIN or a join link.' ?></p>
+        <?php if ($roomLockError !== ''): ?>
+            <div class="alert alert-danger small mt-3 mb-0" role="alert"><?= htmlspecialchars($roomLockError) ?></div>
+        <?php endif; ?>
     </div>
 
     <div class="d-flex justify-content-center align-items-center my-4" style="gap: 20px;">
@@ -195,6 +232,7 @@ let previousCount = <?= count($players) ?>;
 function checkLobbyPlayers() {
     $.getJSON('<?= BASE_URL ?>modules/api/game_state.php?action=get_players&id_room=' + roomId, function(res) {
         if (res && res.success) {
+            updateRoomLockUI(res.is_locked);
             const players = res.players;
             $('#playerCount').text(players.length);
 
@@ -217,6 +255,17 @@ function checkLobbyPlayers() {
             }
         }
     });
+}
+
+function updateRoomLockUI(isLocked) {
+    $('#roomLockButton').val(isLocked ? '0' : '1')
+        .toggleClass('btn-warning', isLocked).toggleClass('btn-outline-dark', !isLocked);
+    $('#roomLockIcon').toggleClass('fa-lock', isLocked).toggleClass('fa-lock-open', !isLocked);
+    $('#roomLockLabel').text(isLocked ? 'Unlock room' : 'Lock room');
+    $('#roomLockState').text(isLocked
+        ? 'Room locked. New players cannot join.'
+        : 'Room open. Players can join using the Game PIN or a join link.')
+        .toggleClass('text-danger', isLocked).toggleClass('text-muted', !isLocked);
 }
 
 function escapeHtml(text) {
