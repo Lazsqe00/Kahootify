@@ -4,7 +4,7 @@ require_once __DIR__ . '/../../includes/auth_check.php';
 require_once __DIR__ . '/../../config/database.php';
 
 $roomId = intval($_SESSION['id_room'] ?? 0);
-$room = db_fetch_one("SELECT * FROM room WHERE id_room = :r", [':r' => $roomId]);
+$room = db_fetch_one("SELECT * FROM room WHERE id_room = :r AND id_creator = :c", [':r' => $roomId, ':c' => (int)$_SESSION['id_creator']]);
 
 if (!$room) {
     redirect('modules/auth/dashboard.php');
@@ -40,7 +40,7 @@ if (!$isFinal && $currentQId > 0) {
             LEFT JOIN answers a ON v.id_answer = a.id_answer
             WHERE p.id_room = :id_room
             ORDER BY p.score DESC, p.playeradd ASC";
-    $leaderboard = db_fetch_all($sql, [':id_room' => $roomId, ':qid' => $currentQId]);
+    $leaderboard = filter_room_players($roomId, db_fetch_all($sql, [':id_room' => $roomId, ':qid' => $currentQId]));
 } else {
     $leaderboard = get_room_leaderboard($roomId);
 }

@@ -42,6 +42,14 @@ require_once __DIR__ . '/../../includes/header.php';
             </div>
         <?php endif; ?>
 
+        <?php if (isset($_GET['removed'])): ?>
+            <div class="alert alert-warning font-weight-bold small py-2" role="alert">You were removed from the game by the host.</div>
+            <script>
+                sessionStorage.removeItem('kahoot_pid');
+                sessionStorage.removeItem('kahoot_token');
+            </script>
+        <?php endif; ?>
+
         <form action="<?= BASE_URL ?>modules/player/join.php" method="POST">
             <div class="form-group mb-3">
                 <input type="text" name="pin" class="form-control pin-input text-center" maxlength="6" pattern="[0-9]*" inputmode="numeric" placeholder="Game PIN" required autofocus autocomplete="off">

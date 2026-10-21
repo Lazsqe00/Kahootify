@@ -55,7 +55,7 @@ if (isset($_GET['cancel_game'])) {
     redirect('modules/auth/dashboard.php');
 }
 
-$players = db_fetch_all("SELECT * FROM players WHERE id_room = :r ORDER BY id_player ASC", [':r' => $roomId]);
+$players = filter_room_players($roomId, db_fetch_all("SELECT * FROM players WHERE id_room = :r ORDER BY id_player ASC", [':r' => $roomId]));
 
 $pageTitle = "Lobby - Game PIN: " . htmlspecialchars($room['pin']);
 $bodyClass = "backgroundColorChanges";
@@ -152,22 +152,7 @@ require_once __DIR__ . '/../../includes/header.php';
         <h5 class="font-weight-bold mb-3" style="text-shadow: 1px 1px 3px rgba(0,0,0,0.5);">
             Waiting for players to join:
         </h5>
-        <div id="playersContainer" class="d-flex flex-wrap justify-content-center" style="gap: 12px;">
-            <?php if (empty($players)): ?>
-                <div id="waitingMsg" class="py-4">
-                    <div class="spinner-border text-light mb-3" role="status"></div>
-                    <p class="font-weight-bold" style="font-size: 1.2rem; text-shadow: 1px 1px 2px rgba(0,0,0,0.5);">
-                        Waiting for players to enter PIN...
-                    </p>
-                </div>
-            <?php else: ?>
-                <?php foreach ($players as $p): ?>
-                    <div class="badge badge-light px-3 py-2 text-dark font-weight-bold shadow-sm" style="font-size: 1.1rem; border-radius: 8px;">
-                        <i class="fas fa-user-circle text-primary mr-1"></i> <?= htmlspecialchars($p['nickname']) ?>
-                    </div>
-                <?php endforeach; ?>
-            <?php endif; ?>
-        </div>
+        <?php require __DIR__ . '/../../includes/host_players.php'; ?>
     </div>
 </div>
 
@@ -226,36 +211,14 @@ $(document).ready(function() {
     tryPlayAudio();
 });
 
-const roomId = <?= $roomId ?>;
-let previousCount = <?= count($players) ?>;
-
-function checkLobbyPlayers() {
-    $.getJSON('<?= BASE_URL ?>modules/api/game_state.php?action=get_players&id_room=' + roomId, function(res) {
-        if (res && res.success) {
-            updateRoomLockUI(res.is_locked);
-            const players = res.players;
-            $('#playerCount').text(players.length);
-
-            if (players.length > 0) {
-                $('#btnStartGame').css({'pointer-events': 'auto', 'opacity': '1'});
-                $('#waitingMsg').remove();
-            } else {
-                $('#btnStartGame').css({'pointer-events': 'none', 'opacity': '0.6'});
-            }
-
-            if (players.length !== previousCount) {
-                previousCount = players.length;
-                let html = '';
-                players.forEach(function(p) {
-                    html += `<div class="badge badge-light px-3 py-2 text-dark font-weight-bold shadow-sm" style="font-size: 1.1rem; border-radius: 8px;">
-                                <i class="fas fa-user-circle text-primary mr-1"></i> ${escapeHtml(p.nickname)}
-                             </div>`;
-                });
-                $('#playersContainer').html(html);
-            }
-        }
-    });
-}
+document.addEventListener('roomplayerschange', function (event) {
+    const data = event.detail;
+    updateRoomLockUI(data.is_locked);
+    $('#playerCount').text(data.players.length);
+    $('#btnStartGame').css(data.players.length > 0
+        ? {'pointer-events': 'auto', 'opacity': '1'}
+        : {'pointer-events': 'none', 'opacity': '0.6'});
+});
 
 function updateRoomLockUI(isLocked) {
     $('#roomLockButton').val(isLocked ? '0' : '1')
@@ -268,13 +231,6 @@ function updateRoomLockUI(isLocked) {
         .toggleClass('text-danger', isLocked).toggleClass('text-muted', !isLocked);
 }
 
-function escapeHtml(text) {
-    var div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-setInterval(checkLobbyPlayers, 1500);
 </script>
 </body>
 </html>

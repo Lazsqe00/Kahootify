@@ -1,7 +1,6 @@
 <?php
 
-// Database helpers are loaded by the calling page. Room lock state lives only
-// in server-side files; no database column or status value is needed.
+// Room locks and removed players are stored on the server without DB changes.
 
 function with_room_access_lock($room, $callback, $exclusive = true) {
     $key = hash('sha256', $room['id_room'] . ':' . $room['pin']);
@@ -20,20 +19,98 @@ function with_room_access_lock($room, $callback, $exclusive = true) {
     }
 }
 
-function read_room_lock($handle) {
+function read_room_access_state($handle) {
     rewind($handle);
     $value = stream_get_contents($handle);
     if ($value === false) {
         throw new RuntimeException('Unable to read room lock state.');
     }
-    return trim($value) === '1';
+    $value = trim($value);
+    // Keep files created by the original room-lock feature compatible.
+    if (in_array($value, ['', '0', '1'], true)) {
+        return ['locked' => $value === '1', 'kicked' => []];
+    }
+    $state = json_decode($value, true);
+    if (!is_array($state) || !isset($state['locked'], $state['kicked']) || !is_bool($state['locked']) || !is_array($state['kicked'])) {
+        throw new RuntimeException('Invalid room access state.');
+    }
+    return $state;
+}
+
+function write_room_access_state($handle, $state) {
+    $value = json_encode($state, JSON_THROW_ON_ERROR);
+    rewind($handle);
+    if (fwrite($handle, $value) !== strlen($value) || !ftruncate($handle, strlen($value)) || !fflush($handle)) {
+        throw new RuntimeException('Unable to save room lock state.');
+    }
+}
+
+function read_room_lock($handle) {
+    return read_room_access_state($handle)['locked'];
 }
 
 function write_room_lock($handle, $isLocked) {
-    rewind($handle);
-    if (fwrite($handle, $isLocked ? '1' : '0') !== 1 || !ftruncate($handle, 1) || !fflush($handle)) {
-        throw new RuntimeException('Unable to save room lock state.');
+    $state = read_room_access_state($handle);
+    $state['locked'] = (bool)$isLocked;
+    write_room_access_state($handle, $state);
+}
+
+function get_room_access_state($room) {
+    return with_room_access_lock($room, 'read_room_access_state', false);
+}
+
+function player_is_kicked($room, $playerId) {
+    return !empty(get_room_access_state($room)['kicked'][$playerId]);
+}
+
+function filter_room_players($roomId, $players, $state = null) {
+    if ($state === null) {
+        $room = db_fetch_one('SELECT id_room, pin FROM room WHERE id_room = :r', [':r' => $roomId]);
+        if (!$room) return [];
+        $state = get_room_access_state($room);
     }
+    return array_values(array_filter($players, function ($player) use ($state) {
+        return empty($state['kicked'][$player['id_player']]);
+    }));
+}
+
+function room_question_counts($room, $questionId, $state = null) {
+    $players = filter_room_players($room['id_room'], db_fetch_all(
+        'SELECT id_player FROM players WHERE id_room = :r', [':r' => $room['id_room']]
+    ), $state);
+    $answered = db_fetch_all(
+        'SELECT DISTINCT v.id_player FROM votes v JOIN answers a ON a.id_answer = v.id_answer JOIN players p ON p.id_player = v.id_player WHERE p.id_room = :r AND a.id_question = :q',
+        [':r' => $room['id_room'], ':q' => $questionId]
+    );
+    return [
+        'total_players' => count($players),
+        'voted_count' => count(array_intersect(array_column($players, 'id_player'), array_column($answered, 'id_player')))
+    ];
+}
+
+function kick_room_player($room, $creatorId, $playerId) {
+    return with_room_access_lock($room, function ($handle) use ($room, $creatorId, $playerId) {
+        $currentRoom = db_fetch_one("SELECT id_room FROM room WHERE id_room = :r AND id_creator = :c AND status != 'finished'", [':r' => $room['id_room'], ':c' => $creatorId]);
+        $player = db_fetch_one('SELECT id_player FROM players WHERE id_room = :r AND id_player = :p', [':r' => $room['id_room'], ':p' => $playerId]);
+        if (!$currentRoom || !$player) return false;
+        $state = read_room_access_state($handle);
+        $state['kicked'][$playerId] = true;
+        write_room_access_state($handle, $state);
+        return true;
+    });
+}
+
+function player_request_is_valid($playerId, $roomId, $token) {
+    if ((int)($_SESSION['id_player'] ?? 0) === (int)$playerId && (int)($_SESSION['player_room_id'] ?? 0) === (int)$roomId) return true;
+    $expected = substr(md5($playerId . '_' . $roomId . '_kahoot_secret_2026'), 0, 16);
+    return is_string($token) && hash_equals($expected, $token);
+}
+
+function redirect_removed_player($playerId) {
+    if ((int)($_SESSION['id_player'] ?? 0) === (int)$playerId) {
+        unset($_SESSION['id_player'], $_SESSION['player_room_id'], $_SESSION['player_pin'], $_SESSION['player_nickname']);
+    }
+    redirect('modules/player/join.php?removed=1');
 }
 
 function room_is_locked($room) {
