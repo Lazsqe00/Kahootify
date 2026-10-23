@@ -58,6 +58,9 @@ require_once __DIR__ . '/../../includes/header.php';
     </div>
     <div>
         <?php if ($isFinal): ?>
+            <a href="<?= BASE_URL ?>modules/reports/detail.php?id_room=<?= $roomId ?>" class="btn btn-kahoot btn-kahoot-blue font-weight-bold mr-2">
+                <i class="fas fa-chart-bar mr-1"></i> Xem báo cáo chi tiết
+            </a>
             <a href="<?= BASE_URL ?>modules/auth/dashboard.php" class="btn btn-kahoot btn-kahoot-green font-weight-bold">
                 <i class="fas fa-home mr-1"></i> Return to Dashboard
             </a>
@@ -136,6 +139,15 @@ require_once __DIR__ . '/../../includes/header.php';
                     </div>
                 </div>
             <?php endforeach; ?>
+        </div>
+
+        <div class="text-center my-4">
+            <a href="<?= BASE_URL ?>modules/reports/detail.php?id_room=<?= $roomId ?>" class="btn btn-kahoot btn-kahoot-purple btn-lg shadow font-weight-bold mr-2 mb-2">
+                <i class="fas fa-chart-line mr-2"></i> Xem báo cáo & Thống kê chi tiết
+            </a>
+            <a href="<?= BASE_URL ?>modules/reports/export_csv.php?id_room=<?= $roomId ?>" class="btn btn-light btn-lg shadow font-weight-bold mb-2">
+                <i class="fas fa-file-csv text-success mr-2"></i> Xuất bảng điểm (CSV)
+            </a>
         </div>
 
     <?php else: ?>
