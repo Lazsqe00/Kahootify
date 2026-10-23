@@ -17,22 +17,21 @@ if ($currentQId <= 0 && !$isFinal) {
     $currentQId = intval(str_replace('res_', '', $room['status']));
 }
 
-$allQuestions = db_fetch_all("SELECT id_question FROM questions WHERE id_quiz = :q ORDER BY id_question ASC", [':q' => $room['id_quiz']]);
+$selectedQIds = !empty($room['question_order']) ? json_decode($room['question_order'], true) : null;
+if (!is_array($selectedQIds) || empty($selectedQIds)) {
+    $fallbackQuestions = db_fetch_all("SELECT id_question FROM questions WHERE id_quiz = :q ORDER BY id_question ASC", [':q' => $room['id_quiz']]);
+    $selectedQIds = array_column($fallbackQuestions, 'id_question');
+}
+
 $hasNextQuestion = false;
-$foundCurrent = false;
-foreach ($allQuestions as $q) {
-    if ($foundCurrent) {
-        $hasNextQuestion = true;
-        break;
-    }
-    if ($q['id_question'] == $currentQId) {
-        $foundCurrent = true;
-    }
+$currentIdx = array_search($currentQId, $selectedQIds);
+if ($currentIdx !== false && isset($selectedQIds[$currentIdx + 1])) {
+    $hasNextQuestion = true;
 }
 
 if (!$isFinal && $currentQId > 0) {
     $sql = "SELECT p.*,
-                   COALESCE(v.points_earned, 0) as points_gained,
+                   COALESCE(v.points_earned + v.streak_bonus, 0) as points_gained,
                    COALESCE(a.is_correct, 0) as is_round_correct,
                    (SELECT COUNT(*) FROM votes v2 JOIN answers a2 ON v2.id_answer = a2.id_answer WHERE v2.id_player = p.id_player AND a2.is_correct = 1) as correct_count
             FROM players p
@@ -58,6 +57,9 @@ require_once __DIR__ . '/../../includes/header.php';
     </div>
     <div>
         <?php if ($isFinal): ?>
+            <a href="<?= BASE_URL ?>modules/reports/detail.php?id_room=<?= $roomId ?>" class="btn btn-kahoot btn-kahoot-blue font-weight-bold mr-2">
+                <i class="fas fa-chart-bar mr-1"></i> Xem báo cáo chi tiết
+            </a>
             <a href="<?= BASE_URL ?>modules/auth/dashboard.php" class="btn btn-kahoot btn-kahoot-green font-weight-bold">
                 <i class="fas fa-home mr-1"></i> Return to Dashboard
             </a>
@@ -89,7 +91,14 @@ require_once __DIR__ . '/../../includes/header.php';
                 <?php if ($top2): ?>
                     <div class="podium-step rank-2">
                         <div class="mb-2"><i class="fas fa-medal fa-2x text-light"></i></div>
-                        <h5 class="font-weight-bold mb-1"><?= htmlspecialchars($top2['nickname']) ?></h5>
+                        <h5 class="font-weight-bold mb-1">
+                            <?= htmlspecialchars($top2['nickname']) ?>
+                            <?php if (intval($top2['current_streak'] ?? 0) >= 2): ?>
+                                <span class="badge badge-danger ml-1 font-weight-bold" style="font-size: 0.8rem;" title="<?= intval($top2['current_streak']) ?> câu đúng liên tiếp!">
+                                    <i class="fas fa-fire streak-fire-anim"></i> <?= intval($top2['current_streak']) ?>
+                                </span>
+                            <?php endif; ?>
+                        </h5>
                         <div class="badge badge-light text-dark font-weight-bold mb-3"><?= number_format($top2['score']) ?> pts</div>
                         <h2 class="font-weight-bold">2</h2>
                     </div>
@@ -98,7 +107,14 @@ require_once __DIR__ . '/../../includes/header.php';
                 <?php if ($top1): ?>
                     <div class="podium-step rank-1">
                         <div class="mb-2"><i class="fas fa-crown fa-3x text-warning"></i></div>
-                        <h4 class="font-weight-bold mb-1"><?= htmlspecialchars($top1['nickname']) ?></h4>
+                        <h4 class="font-weight-bold mb-1">
+                            <?= htmlspecialchars($top1['nickname']) ?>
+                            <?php if (intval($top1['current_streak'] ?? 0) >= 2): ?>
+                                <span class="badge badge-danger ml-1 font-weight-bold" style="font-size: 0.85rem;" title="<?= intval($top1['current_streak']) ?> câu đúng liên tiếp!">
+                                    <i class="fas fa-fire streak-fire-anim"></i> <?= intval($top1['current_streak']) ?>
+                                </span>
+                            <?php endif; ?>
+                        </h4>
                         <div class="badge badge-light text-dark font-weight-bold mb-3" style="font-size: 1.1rem;"><?= number_format($top1['score']) ?> pts</div>
                         <h1 class="display-3 font-weight-bold">1</h1>
                     </div>
@@ -107,7 +123,14 @@ require_once __DIR__ . '/../../includes/header.php';
                 <?php if ($top3): ?>
                     <div class="podium-step rank-3">
                         <div class="mb-2"><i class="fas fa-award fa-2x text-light"></i></div>
-                        <h5 class="font-weight-bold mb-1"><?= htmlspecialchars($top3['nickname']) ?></h5>
+                        <h5 class="font-weight-bold mb-1">
+                            <?= htmlspecialchars($top3['nickname']) ?>
+                            <?php if (intval($top3['current_streak'] ?? 0) >= 2): ?>
+                                <span class="badge badge-danger ml-1 font-weight-bold" style="font-size: 0.8rem;" title="<?= intval($top3['current_streak']) ?> câu đúng liên tiếp!">
+                                    <i class="fas fa-fire streak-fire-anim"></i> <?= intval($top3['current_streak']) ?>
+                                </span>
+                            <?php endif; ?>
+                        </h5>
                         <div class="badge badge-light text-dark font-weight-bold mb-3"><?= number_format($top3['score']) ?> pts</div>
                         <h2 class="font-weight-bold">3</h2>
                     </div>
@@ -129,6 +152,11 @@ require_once __DIR__ . '/../../includes/header.php';
                         <span class="font-weight-bold text-dark" style="font-size: 1.15rem;">
                             <?= htmlspecialchars($p['nickname']) ?>
                         </span>
+                        <?php if (intval($p['current_streak'] ?? 0) >= 2): ?>
+                            <span class="badge badge-danger ml-2 font-weight-bold" title="<?= intval($p['current_streak']) ?> câu đúng liên tiếp!">
+                                <i class="fas fa-fire streak-fire-anim"></i> <?= intval($p['current_streak']) ?>
+                            </span>
+                        <?php endif; ?>
                     </div>
                     <div class="text-right">
                         <span class="font-weight-bold text-success" style="font-size: 1.2rem;"><?= number_format($p['score']) ?> pts</span>
@@ -136,6 +164,15 @@ require_once __DIR__ . '/../../includes/header.php';
                     </div>
                 </div>
             <?php endforeach; ?>
+        </div>
+
+        <div class="text-center my-4">
+            <a href="<?= BASE_URL ?>modules/reports/detail.php?id_room=<?= $roomId ?>" class="btn btn-kahoot btn-kahoot-purple btn-lg shadow font-weight-bold mr-2 mb-2">
+                <i class="fas fa-chart-line mr-2"></i> Xem báo cáo & Thống kê chi tiết
+            </a>
+            <a href="<?= BASE_URL ?>modules/reports/export_csv.php?id_room=<?= $roomId ?>" class="btn btn-light btn-lg shadow font-weight-bold mb-2">
+                <i class="fas fa-file-csv text-success mr-2"></i> Xuất bảng điểm (CSV)
+            </a>
         </div>
 
     <?php else: ?>
@@ -185,6 +222,11 @@ require_once __DIR__ . '/../../includes/header.php';
                             <span class="font-weight-bold text-dark" style="font-size: 1.25rem;">
                                 <?= htmlspecialchars($p['nickname']) ?>
                             </span>
+                            <?php if (intval($p['current_streak'] ?? 0) >= 2): ?>
+                                <span class="badge badge-danger ml-2 font-weight-bold" title="<?= intval($p['current_streak']) ?> câu đúng liên tiếp!">
+                                    <i class="fas fa-fire streak-fire-anim"></i> <?= intval($p['current_streak']) ?>
+                                </span>
+                            <?php endif; ?>
                             <?php if ($gained > 0): ?>
                                 <span class="badge badge-success ml-2 py-1 px-2 font-weight-bold gained-badge" style="opacity: 0; transform: scale(0.6); transition: all 0.4s ease; font-size: 0.95rem;">
                                     +<?= number_format($gained) ?>

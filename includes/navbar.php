@@ -31,6 +31,11 @@ $creatorAvatar = $_SESSION['avatar'] ?? 'default.png';
                             <i class="fas fa-th-list mr-1"></i> My Kahoots
                         </a>
                     </li>
+                    <li class="nav-item mr-2">
+                        <a href="<?= BASE_URL ?>modules/reports/list.php" class="nav-link text-light font-weight-bold">
+                            <i class="fas fa-chart-bar mr-1"></i> Reports
+                        </a>
+                    </li>
                     <li class="nav-item mr-3">
                         <a href="<?= BASE_URL ?>modules/quiz/create.php" class="btn btn-sm btn-success font-weight-bold">
                             <i class="fas fa-plus-circle mr-1"></i> Create New Quiz
@@ -45,6 +50,9 @@ $creatorAvatar = $_SESSION['avatar'] ?? 'default.png';
                         <div class="dropdown-menu dropdown-menu-right shadow" aria-labelledby="userDropdown">
                             <a class="dropdown-item" href="<?= BASE_URL ?>modules/auth/dashboard.php">
                                 <i class="fas fa-tachometer-alt mr-2 text-primary"></i> Dashboard
+                            </a>
+                            <a class="dropdown-item" href="<?= BASE_URL ?>modules/reports/list.php">
+                                <i class="fas fa-chart-bar mr-2 text-success"></i> Reports & Analytics
                             </a>
                             <a class="dropdown-item" href="<?= BASE_URL ?>modules/auth/profile.php">
                                 <i class="fas fa-user-cog mr-2 text-info"></i> Profile Settings

@@ -20,8 +20,12 @@ if ($status === 'finished') {
     redirect('modules/host/leaderboard.php?final=true');
 }
 
-$allQuestions = db_fetch_all("SELECT * FROM questions WHERE id_quiz = :q ORDER BY id_question ASC", [':q' => $room['id_quiz']]);
-$totalQuestions = count($allQuestions);
+$selectedQIds = !empty($room['question_order']) ? json_decode($room['question_order'], true) : null;
+if (!is_array($selectedQIds) || empty($selectedQIds)) {
+    $fallbackQuestions = db_fetch_all("SELECT id_question FROM questions WHERE id_quiz = :q ORDER BY id_question ASC", [':q' => $room['id_quiz']]);
+    $selectedQIds = array_column($fallbackQuestions, 'id_question');
+}
+$totalQuestions = count($selectedQIds);
 
 if (isset($_GET['action']) && $_GET['action'] === 'show_result') {
     if (is_numeric($status)) {
@@ -35,28 +39,17 @@ if (isset($_GET['action']) && $_GET['action'] === 'show_result') {
 
 if (isset($_GET['action']) && $_GET['action'] === 'next_question') {
     $currentQId = intval(str_replace('res_', '', $status));
-    $nextQ = null;
-    $foundCurrent = false;
+    $currentIdx = array_search($currentQId, $selectedQIds);
 
-    foreach ($allQuestions as $idx => $q) {
-        if ($foundCurrent) {
-            $nextQ = $q;
-            $_SESSION['question_index'] = $idx;
-            break;
-        }
-        if ($q['id_question'] == $currentQId) {
-            $foundCurrent = true;
-        }
-    }
-
-    if ($nextQ) {
+    if ($currentIdx !== false && isset($selectedQIds[$currentIdx + 1])) {
+        $nextQId = intval($selectedQIds[$currentIdx + 1]);
+        $_SESSION['question_index'] = $currentIdx + 1;
         db_execute("UPDATE room SET status = :s, question_start_time = UNIX_TIMESTAMP() WHERE id_room = :r", [
-            ':s' => (string)$nextQ['id_question'],
+            ':s' => (string)$nextQId,
             ':r' => $roomId
         ]);
         redirect('modules/host/play.php');
     } else {
-
         db_execute("UPDATE room SET status = 'finished' WHERE id_room = :r", [':r' => $roomId]);
         redirect('modules/host/leaderboard.php?final=true');
     }
@@ -89,13 +82,8 @@ $startTime = !empty($room['question_start_time']) ? intval($room['question_start
 $elapsed = time() - $startTime;
 $remainingSeconds = max(0, $timeLimit - $elapsed);
 
-$questionNumber = 1;
-foreach ($allQuestions as $idx => $q) {
-    if ($q['id_question'] == $qId) {
-        $questionNumber = $idx + 1;
-        break;
-    }
-}
+$currentIdx = array_search($qId, $selectedQIds);
+$questionNumber = ($currentIdx !== false) ? ($currentIdx + 1) : 1;
 
 $questionAudioFile = null;
 if (!$isResultPhase) {
