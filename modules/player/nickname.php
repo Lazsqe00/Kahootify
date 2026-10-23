@@ -50,13 +50,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $pdo->beginTransaction();
             $playerId = db_insert(
-                "INSERT INTO players (id_room, nickname, score, answers_correct) VALUES (:r, :nick, 0, 0)",
+                "INSERT INTO players (id_room, nickname, score, answers_correct, character_id, accessory_id) VALUES (:r, :nick, 0, 0, :char, :acc)",
                 [
                     ':r'    => $roomId,
-                    ':nick' => $nickname
+                    ':nick' => $nickname,
+                    ':char' => $selectedCharacter,
+                    ':acc'  => $selectedAccessory
                 ]
             );
-            save_player_character($room, (int) $playerId, $selectedCharacter, $selectedAccessory);
             $pdo->commit();
 
             $playerToken = substr(md5($playerId . '_' . $roomId . '_kahoot_secret_2026'), 0, 16);

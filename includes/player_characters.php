@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/../config/database.php';
+
 function player_character_catalog(): array {
     static $characters = null;
     if ($characters === null) {
@@ -42,8 +44,8 @@ function player_accessory_catalog(): array {
 }
 
 function player_character_file(array $room, int $playerId): string {
-    $key = hash('sha256', $room['id_room'] . ':' . $room['pin'] . ':' . $playerId);
-    return __DIR__ . '/../storage/player-characters/' . $key . '.json';
+    // Deprecated: Character appearances are saved directly in MySQL (players table).
+    return '';
 }
 
 function save_player_character(array $room, int $playerId, string $characterId, string $accessoryId = ''): void {
@@ -53,15 +55,18 @@ function save_player_character(array $room, int $playerId, string $characterId, 
     if ($accessoryId !== '' && !isset(player_accessory_catalog()[$accessoryId])) {
         throw new InvalidArgumentException('Invalid player accessory.');
     }
-    $file = player_character_file($room, $playerId);
-    $directory = dirname($file);
-    if (!is_dir($directory) && !@mkdir($directory, 0775, true) && !is_dir($directory)) {
-        throw new RuntimeException('Unable to create character storage.');
+    $roomId = is_array($room) ? (int)($room['id_room'] ?? 0) : (int)$room;
+    $sql = 'UPDATE players SET character_id = :char, accessory_id = :acc WHERE id_player = :pid';
+    $params = [
+        ':char' => $characterId,
+        ':acc'  => $accessoryId,
+        ':pid'  => $playerId,
+    ];
+    if ($roomId > 0) {
+        $sql .= ' AND id_room = :r';
+        $params[':r'] = $roomId;
     }
-    $json = json_encode(['character_id' => $characterId, 'accessory_id' => $accessoryId], JSON_THROW_ON_ERROR);
-    if (@file_put_contents($file, $json, LOCK_EX) !== strlen($json)) {
-        throw new RuntimeException('Unable to save player character.');
-    }
+    db_execute($sql, $params);
 }
 
 function get_player_character(array $room, int $playerId): string {
@@ -70,21 +75,26 @@ function get_player_character(array $room, int $playerId): string {
 
 function get_player_appearance(array $room, int $playerId): array {
     $fallback = ['character_id' => default_player_character(), 'accessory_id' => ''];
-    $file = player_character_file($room, $playerId);
-    if (!is_file($file)) return $fallback;
-    $handle = @fopen($file, 'rb');
-    if (!$handle) return $fallback;
-    try {
-        if (!flock($handle, LOCK_SH)) return $fallback;
-        $state = json_decode(stream_get_contents($handle), true);
-        $id = $state['character_id'] ?? null;
-        if (!is_string($id) || !isset(player_character_catalog()[$id])) return $fallback;
-        $accessory = $state['accessory_id'] ?? '';
-        return ['character_id' => $id, 'accessory_id' => is_string($accessory) && isset(player_accessory_catalog()[$accessory]) ? $accessory : ''];
-    } finally {
-        flock($handle, LOCK_UN);
-        fclose($handle);
+    if ($playerId <= 0) return $fallback;
+    $roomId = is_array($room) ? (int)($room['id_room'] ?? 0) : (int)$room;
+    $sql = 'SELECT character_id, accessory_id FROM players WHERE id_player = :pid';
+    $params = [':pid' => $playerId];
+    if ($roomId > 0) {
+        $sql .= ' AND id_room = :r';
+        $params[':r'] = $roomId;
     }
+    $sql .= ' LIMIT 1';
+    $player = db_fetch_one($sql, $params);
+    if (!$player) return $fallback;
+    $id = $player['character_id'] ?? null;
+    if (!is_string($id) || !isset(player_character_catalog()[$id])) {
+        $id = default_player_character();
+    }
+    $accessory = $player['accessory_id'] ?? '';
+    if (!is_string($accessory) || !isset(player_accessory_catalog()[$accessory])) {
+        $accessory = '';
+    }
+    return ['character_id' => $id, 'accessory_id' => $accessory];
 }
 
 function player_appearance_image(array $appearance, string $class = ''): string {
