@@ -18,5 +18,9 @@ $bodyClass = $bodyClass ?? '';
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 
     <link rel="stylesheet" href="<?= BASE_URL ?>assets/css/kahoot-theme.css">
+    <link rel="stylesheet" href="<?= BASE_URL ?>assets/css/character-avatar.css">
+    <?php foreach (($pageStyles ?? []) as $stylesheet): ?>
+        <link rel="stylesheet" href="<?= htmlspecialchars(BASE_URL . $stylesheet, ENT_QUOTES, 'UTF-8') ?>">
+    <?php endforeach; ?>
 </head>
 <body class="<?= htmlspecialchars($bodyClass) ?>">

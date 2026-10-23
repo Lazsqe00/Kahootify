@@ -75,6 +75,6 @@ function get_room_leaderboard($id_room) {
             (SELECT COUNT(*) FROM votes v JOIN answers a ON v.id_answer = a.id_answer WHERE v.id_player = p.id_player AND a.is_correct = 1) as correct_count
             FROM players p
             WHERE p.id_room = :id_room
-            ORDER BY p.score DESC, p.playeradd ASC";
+            ORDER BY p.score DESC, p.playeradd ASC, p.id_player ASC";
     return db_fetch_all($sql, [':id_room' => $id_room]);
 }

@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/../../includes/auth_check.php';
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../includes/player_characters.php';
 
 $roomId = intval($_SESSION['id_room'] ?? 0);
 $room = db_fetch_one("SELECT r.*, q.name as quiz_name FROM room r JOIN quiz q ON r.id_quiz = q.id_quiz WHERE r.id_room = :r", [':r' => $roomId]);
@@ -126,7 +127,7 @@ require_once __DIR__ . '/../../includes/header.php';
             <?php else: ?>
                 <?php foreach ($players as $p): ?>
                     <div class="badge badge-light px-3 py-2 text-dark font-weight-bold shadow-sm" style="font-size: 1.1rem; border-radius: 8px;">
-                        <i class="fas fa-user-circle text-primary mr-1"></i> <?= htmlspecialchars($p['nickname']) ?>
+                        <?= player_appearance_image(get_player_appearance($room, (int) $p['id_player']), 'lobby-character') ?> <?= htmlspecialchars($p['nickname']) ?>
                     </div>
                 <?php endforeach; ?>
             <?php endif; ?>
@@ -190,7 +191,7 @@ $(document).ready(function() {
 });
 
 const roomId = <?= $roomId ?>;
-let previousCount = <?= count($players) ?>;
+let previousPlayers = '';
 
 function checkLobbyPlayers() {
     $.getJSON('<?= BASE_URL ?>modules/api/game_state.php?action=get_players&id_room=' + roomId, function(res) {
@@ -205,12 +206,13 @@ function checkLobbyPlayers() {
                 $('#btnStartGame').css({'pointer-events': 'none', 'opacity': '0.6'});
             }
 
-            if (players.length !== previousCount) {
-                previousCount = players.length;
+            const playerSignature = JSON.stringify(players);
+            if (playerSignature !== previousPlayers) {
+                previousPlayers = playerSignature;
                 let html = '';
                 players.forEach(function(p) {
                     html += `<div class="badge badge-light px-3 py-2 text-dark font-weight-bold shadow-sm" style="font-size: 1.1rem; border-radius: 8px;">
-                                <i class="fas fa-user-circle text-primary mr-1"></i> ${escapeHtml(p.nickname)}
+                                ${p.character_svg || ''} ${escapeHtml(p.nickname)}
                              </div>`;
                 });
                 $('#playersContainer').html(html);
