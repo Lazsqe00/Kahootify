@@ -4,11 +4,14 @@ require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../config/database.php';
 
 $error = '';
+$pin = '';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $pin = trim($_POST['pin'] ?? '');
+// A scanned QR link follows the same validation as a manually entered PIN.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' || isset($_GET['pin'])) {
+    $submittedPin = $_SERVER['REQUEST_METHOD'] === 'POST' ? ($_POST['pin'] ?? '') : $_GET['pin'];
+    $pin = is_string($submittedPin) ? trim($submittedPin) : '';
 
-    if (!empty($pin)) {
+    if (preg_match('/\A[0-9]{6}\z/', $pin)) {
         $room = db_fetch_one("SELECT * FROM room WHERE pin = :pin AND status != 'finished' LIMIT 1", [':pin' => $pin]);
 
         if ($room) {
@@ -19,7 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'Invalid Game PIN or room has closed!';
         }
     } else {
-        $error = 'Please enter a Game PIN!';
+        $error = $pin === '' ? 'Please enter a Game PIN!' : 'Game PIN must contain exactly 6 digits!';
     }
 }
 
@@ -40,9 +43,9 @@ require_once __DIR__ . '/../../includes/header.php';
             </div>
         <?php endif; ?>
 
-        <form action="" method="POST">
+        <form action="<?= BASE_URL ?>modules/player/join.php" method="POST">
             <div class="form-group mb-3">
-                <input type="text" name="pin" class="form-control pin-input text-center" maxlength="6" pattern="[0-9]*" inputmode="numeric" placeholder="Game PIN" required autofocus autocomplete="off">
+                <input type="text" name="pin" class="form-control pin-input text-center" maxlength="6" pattern="[0-9]{6}" inputmode="numeric" placeholder="Game PIN" aria-label="Game PIN" value="<?= htmlspecialchars($pin, ENT_QUOTES, 'UTF-8') ?>" required autofocus autocomplete="off">
             </div>
             <button type="submit" class="btn btn-kahoot btn-block text-white font-weight-bold py-3" style="background-color: #333333; font-size: 1.15rem;">
                 Enter
