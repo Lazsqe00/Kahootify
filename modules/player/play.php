@@ -17,7 +17,7 @@ if ($playerId > 0) {
     }
 }
 
-if ($roomId <= 0 || $playerId <= 0 || !$player) {
+if ($roomId <= 0 || $playerId <= 0 || !$player || !player_request_is_valid($playerId, $roomId, $token)) {
     redirect('modules/player/join.php');
 }
 
@@ -28,6 +28,7 @@ if (!$room) {
 }
 
 $status = $room['status'];
+if (player_is_kicked($room, $playerId)) redirect_removed_player($playerId);
 
 if ($status === 'waiting') {
     redirect('modules/player/waiting.php?pid=' . $playerId . '&token=' . urlencode($token));
@@ -173,6 +174,7 @@ if ($isResultPhase) {
     if (empty($leaderboard)) {
         $leaderboard = db_fetch_all("SELECT * FROM players WHERE id_room = :r ORDER BY score DESC, playeradd ASC", [':r' => $roomId]);
     }
+    $leaderboard = filter_room_players($roomId, $leaderboard);
     foreach ($leaderboard as $idx => $p) {
         if ($p['id_player'] == $playerId) {
             $myRank = $idx + 1;
@@ -414,7 +416,11 @@ function submitAnswer(answerId) {
 }
 
 setInterval(function() {
-    $.getJSON('<?= BASE_URL ?>modules/api/game_state.php?action=get_room_status&id_room=' + roomId, function(res) {
+    $.getJSON('<?= BASE_URL ?>modules/api/game_state.php?action=get_room_status&id_room=' + roomId + '&pid=' + playerId + '&token=' + encodeURIComponent(playerToken), function(res) {
+        if (res && res.kicked) {
+            refreshPlayerPage();
+            return;
+        }
         if (res && res.success) {
             if (res.status !== currentStatus) {
                 refreshPlayerPage();

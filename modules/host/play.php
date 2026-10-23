@@ -4,7 +4,7 @@ require_once __DIR__ . '/../../includes/auth_check.php';
 require_once __DIR__ . '/../../config/database.php';
 
 $roomId = intval($_SESSION['id_room'] ?? 0);
-$room = db_fetch_one("SELECT r.*, q.name as quiz_name FROM room r JOIN quiz q ON r.id_quiz = q.id_quiz WHERE r.id_room = :r", [':r' => $roomId]);
+$room = db_fetch_one("SELECT r.*, q.name as quiz_name FROM room r JOIN quiz q ON r.id_quiz = q.id_quiz WHERE r.id_room = :r AND r.id_creator = :c", [':r' => $roomId, ':c' => (int)$_SESSION['id_creator']]);
 
 if (!$room) {
     redirect('modules/auth/dashboard.php');
@@ -68,13 +68,9 @@ $qId = $isResultPhase ? intval(str_replace('res_', '', $status)) : intval($statu
 $currentQuestion = db_fetch_one("SELECT * FROM questions WHERE id_question = :qid", [':qid' => $qId]);
 $answers = db_fetch_all("SELECT * FROM answers WHERE id_question = :qid ORDER BY id_answer ASC", [':qid' => $qId]);
 
-$totalPlayers = db_count('players', 'id_room = :r', [':r' => $roomId]);
-$votedCount = db_fetch_one(
-    "SELECT COUNT(DISTINCT v.id_player) as total
-     FROM votes v JOIN answers a ON v.id_answer = a.id_answer
-     WHERE a.id_question = :qid AND v.id_player IN (SELECT id_player FROM players WHERE id_room = :r)",
-    [':qid' => $qId, ':r' => $roomId]
-)['total'] ?? 0;
+$counts = room_question_counts($room, $qId);
+$totalPlayers = $counts['total_players'];
+$votedCount = $counts['voted_count'];
 
 $timeLimit = intval($currentQuestion['time_limit'] ?? 20);
 
@@ -164,6 +160,11 @@ require_once __DIR__ . '/../../includes/header.php';
 
 <div class="container my-3" style="max-width: 1050px;">
 
+    <details class="text-white mb-3">
+        <summary class="font-weight-bold">Manage players</summary>
+        <div class="text-center mt-3"><?php $reloadAfterKick = true; require __DIR__ . '/../../includes/host_players.php'; ?></div>
+    </details>
+
     <div class="question-card-banner">
         <h2 class="font-weight-bold text-dark mb-0">
             <?= htmlspecialchars($currentQuestion['text']) ?>
@@ -206,7 +207,7 @@ require_once __DIR__ . '/../../includes/header.php';
             <?php if (!$isResultPhase): ?>
                 <div class="bg-white rounded-pill px-4 py-2 shadow-sm font-weight-bold text-dark" style="font-size: 1.2rem;">
                     <i class="fas fa-paper-plane text-primary mr-1"></i>
-                    <span id="voteCount"><?= $votedCount ?></span> / <?= $totalPlayers ?> Answers
+                    <span id="voteCount"><?= $votedCount ?></span> / <span id="totalPlayerCount"><?= $totalPlayers ?></span> Answers
                 </div>
             <?php else: ?>
                 <span class="badge badge-light px-4 py-2 font-weight-bold" style="font-size: 1.1rem;">
@@ -224,15 +225,14 @@ require_once __DIR__ . '/../../includes/header.php';
             $ansIds = array_column($answers, 'id_answer');
             $inClause = implode(',', array_map('intval', $ansIds));
             $statsRows = db_fetch_all(
-                "SELECT v.id_answer, COUNT(v.id_vote) as cnt
+                "SELECT v.id_answer, v.id_player
                  FROM votes v
                  JOIN players p ON v.id_player = p.id_player
-                 WHERE p.id_room = :r AND v.id_answer IN ($inClause)
-                 GROUP BY v.id_answer",
+                 WHERE p.id_room = :r AND v.id_answer IN ($inClause)",
                 [':r' => $roomId]
             );
-            foreach ($statsRows as $sr) {
-                $voteStats[$sr['id_answer']] = intval($sr['cnt']);
+            foreach (filter_room_players($roomId, $statsRows) as $sr) {
+                $voteStats[$sr['id_answer']] = ($voteStats[$sr['id_answer']] ?? 0) + 1;
             }
         }
         ?>
@@ -392,6 +392,7 @@ const pollInterval = setInterval(function() {
     $.getJSON('<?= BASE_URL ?>modules/api/game_state.php?action=get_question_status&id_room=' + roomId + '&id_question=' + qId, function(data) {
         if (data && data.success) {
             $('#voteCount').text(data.voted_count);
+            $('#totalPlayerCount').text(data.total_players);
 
             if (data.total_players > 0 && data.voted_count >= data.total_players) {
                 clearInterval(pollInterval);

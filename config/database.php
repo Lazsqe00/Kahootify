@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/../includes/room_access.php';
 
 if (!function_exists('getDB')) {
     function getDB() {
@@ -76,5 +77,5 @@ function get_room_leaderboard($id_room) {
             FROM players p
             WHERE p.id_room = :id_room
             ORDER BY p.score DESC, p.playeradd ASC";
-    return db_fetch_all($sql, [':id_room' => $id_room]);
+    return filter_room_players($id_room, db_fetch_all($sql, [':id_room' => $id_room]));
 }
