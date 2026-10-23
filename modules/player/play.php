@@ -249,6 +249,8 @@ $bodyClass = "backgroundColorChanges";
 require_once __DIR__ . '/../../includes/header.php';
 ?>
 
+<audio id="submitSfx" preload="auto" src="<?= BASE_URL ?>assets/audio/<?= rawurlencode('submit_answer_tension_002.mp3') ?>"></audio>
+
 <div class="d-flex justify-content-between align-items-center px-3 py-2 text-white shadow-sm" style="background-color: var(--kahoot-purple-dark);">
     <div class="font-weight-bold d-flex align-items-center">
         <i class="fas fa-user mr-1 text-warning"></i> <?= htmlspecialchars($nickname) ?>
@@ -275,6 +277,13 @@ require_once __DIR__ . '/../../includes/header.php';
     $totalRoundPoints = $pointsEarned + $streakBonus;
     $currentStreak = intval($player['current_streak'] ?? 0);
 
+    // Audio công bố kết quả câu hỏi (SFX)
+    $correctAudios = ['correct_01.mp3', 'correct_02.mp3', 'correct_03.mp3', 'correct_04.mp3', 'correct_high.mp3'];
+    $incorrectAudios = ['incorrect_01.mp3', 'incorrect_02.mp3', 'incorrect_03.mp3', 'incorrect_04.mp3', 'incorrect_low.mp3'];
+    $resultAudioFile = $isCorrect
+        ? $correctAudios[array_rand($correctAudios)]
+        : $incorrectAudios[array_rand($incorrectAudios)];
+
     // Kiểm tra mất chuỗi (Streak Lost): Nếu câu này sai và trước đó có chuỗi >= 2
     $streakLost = false;
     if (!$isCorrect && $myVote) {
@@ -299,6 +308,9 @@ require_once __DIR__ . '/../../includes/header.php';
         }
     }
     ?>
+    <audio id="resultSfx" preload="auto" src="<?= BASE_URL ?>assets/audio/<?= rawurlencode($resultAudioFile) ?>"></audio>
+    <audio id="pointsSfx" preload="auto" src="<?= BASE_URL ?>assets/audio/<?= rawurlencode('points.mp3') ?>"></audio>
+
     <div class="container py-3" style="max-width: 650px;">
 
         <div class="card border-0 shadow text-white text-center mb-3"
@@ -438,13 +450,33 @@ require_once __DIR__ . '/../../includes/header.php';
 
     <script>
     window.addEventListener('DOMContentLoaded', function() {
+        const resAudio = document.getElementById('resultSfx');
+        if (resAudio) {
+            resAudio.volume = 0.8;
+            resAudio.play().catch(function() {
+                $(document).one('click touchstart', function() {
+                    if (resAudio) resAudio.play().catch(function() {});
+                });
+            });
+        }
+
         setTimeout(function() {
+            let pointsAudioPlayed = false;
             document.querySelectorAll('.score-jump').forEach(function(el) {
                 const startVal = parseInt(el.getAttribute('data-start')) || 0;
                 const targetVal = parseInt(el.getAttribute('data-target')) || 0;
                 const gainedVal = parseInt(el.getAttribute('data-gained')) || 0;
 
                 if (gainedVal > 0 && targetVal > startVal) {
+                    if (!pointsAudioPlayed) {
+                        pointsAudioPlayed = true;
+                        const pointsAudio = document.getElementById('pointsSfx');
+                        if (pointsAudio) {
+                            pointsAudio.volume = 0.7;
+                            pointsAudio.currentTime = 0;
+                            pointsAudio.play().catch(function() {});
+                        }
+                    }
                     el.classList.add('text-success');
                     let startTime = null;
                     const duration = 1200;
@@ -569,6 +601,16 @@ function refreshPlayerPage() {
 
 function submitAnswer(answerId) {
     if (!answerId) return;
+
+    // Phát âm thanh submit tension ngay khi chạm/click vào đáp án
+    const submitAudio = document.getElementById('submitSfx');
+    if (submitAudio) {
+        try {
+            submitAudio.volume = 0.8;
+            submitAudio.currentTime = 0;
+            submitAudio.play().catch(function() {});
+        } catch(e) {}
+    }
 
     $('.answer-box, .player-btn').css('pointer-events', 'none').css('opacity', '0.7');
 

@@ -49,22 +49,49 @@ $bodyClass = "backgroundColorChanges";
 require_once __DIR__ . '/../../includes/header.php';
 ?>
 
-<nav class="navbar navbar-dark bg-dark px-4 py-2 d-flex justify-content-between">
+<?php if ($isFinal): ?>
+    <audio id="podiumAudio" loop preload="auto" src="<?= BASE_URL ?>assets/audio/<?= rawurlencode('podium.mp3') ?>"></audio>
+    <audio id="podium3rdAudio" preload="auto" src="<?= BASE_URL ?>assets/audio/<?= rawurlencode('podium-3rd.mp3') ?>"></audio>
+    <audio id="podium2ndAudio" preload="auto" src="<?= BASE_URL ?>assets/audio/<?= rawurlencode('podium-2nd.mp3') ?>"></audio>
+    <audio id="podium1stAudio" preload="auto" src="<?= BASE_URL ?>assets/audio/<?= rawurlencode('podium-1st.mp3') ?>"></audio>
+    <audio id="crowdCheerAudio" preload="auto" src="<?= BASE_URL ?>assets/audio/<?= rawurlencode('crowd-cheer.mp3') ?>"></audio>
+<?php else: ?>
+    <audio id="interimAudio" preload="auto" src="<?= BASE_URL ?>assets/audio/<?= rawurlencode('fanfare.mp3') ?>"></audio>
+<?php endif; ?>
+
+<style>
+.podium-step {
+    opacity: 0;
+    transform: translateY(40px) scale(0.95);
+    transition: opacity 0.7s cubic-bezier(0.175, 0.885, 0.32, 1.275),
+                transform 0.7s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.podium-step.revealed {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+</style>
+
+<nav class="navbar navbar-dark bg-dark px-4 py-2 d-flex justify-content-between align-items-center">
     <div class="d-flex align-items-center">
         <img src="<?= BASE_URL ?>assets/img/logo.png" alt="Logo" style="max-height: 32px; filter: brightness(100);" class="mr-3">
         <span class="badge badge-light font-weight-bold mr-2">PIN: <?= htmlspecialchars($room['pin']) ?></span>
         <span class="text-white font-weight-bold"><?= $isFinal ? 'FINAL RESULTS' : 'LEADERBOARD' ?></span>
     </div>
-    <div>
+    <div class="d-flex align-items-center">
         <?php if ($isFinal): ?>
-            <a href="<?= BASE_URL ?>modules/reports/detail.php?id_room=<?= $roomId ?>" class="btn btn-kahoot btn-kahoot-blue font-weight-bold mr-2">
+            <button type="button" id="audioToggleBtn" class="btn btn-sm btn-light font-weight-bold shadow-sm rounded-pill mr-2 px-3" onclick="togglePodiumAudio()" title="Toggle podium music">
+                <i class="fas fa-volume-up text-success mr-1" id="audioIcon"></i>
+                <span id="audioLabel">Music: ON</span>
+            </button>
+            <a href="<?= BASE_URL ?>modules/reports/detail.php?id_room=<?= $roomId ?>" class="btn btn-kahoot btn-kahoot-blue font-weight-bold mr-2" onclick="stopAllAudio()">
                 <i class="fas fa-chart-bar mr-1"></i> Xem báo cáo chi tiết
             </a>
-            <a href="<?= BASE_URL ?>modules/auth/dashboard.php" class="btn btn-kahoot btn-kahoot-green font-weight-bold">
+            <a href="<?= BASE_URL ?>modules/auth/dashboard.php" class="btn btn-kahoot btn-kahoot-green font-weight-bold" onclick="stopAllAudio()">
                 <i class="fas fa-home mr-1"></i> Return to Dashboard
             </a>
         <?php else: ?>
-            <a href="<?= BASE_URL ?>modules/host/play.php?action=next_question" class="btn btn-kahoot btn-kahoot-green font-weight-bold">
+            <a href="<?= BASE_URL ?>modules/host/play.php?action=next_question" class="btn btn-kahoot btn-kahoot-green font-weight-bold" onclick="stopAllAudio()">
                 <?= $hasNextQuestion ? 'Next Question &raquo;' : 'Final Results 🏆' ?>
             </a>
         <?php endif; ?>
@@ -167,10 +194,10 @@ require_once __DIR__ . '/../../includes/header.php';
         </div>
 
         <div class="text-center my-4">
-            <a href="<?= BASE_URL ?>modules/reports/detail.php?id_room=<?= $roomId ?>" class="btn btn-kahoot btn-kahoot-purple btn-lg shadow font-weight-bold mr-2 mb-2">
+            <a href="<?= BASE_URL ?>modules/reports/detail.php?id_room=<?= $roomId ?>" class="btn btn-kahoot btn-kahoot-purple btn-lg shadow font-weight-bold mr-2 mb-2" onclick="stopAllAudio()">
                 <i class="fas fa-chart-line mr-2"></i> Xem báo cáo & Thống kê chi tiết
             </a>
-            <a href="<?= BASE_URL ?>modules/reports/export_csv.php?id_room=<?= $roomId ?>" class="btn btn-light btn-lg shadow font-weight-bold mb-2">
+            <a href="<?= BASE_URL ?>modules/reports/export_csv.php?id_room=<?= $roomId ?>" class="btn btn-light btn-lg shadow font-weight-bold mb-2" onclick="stopAllAudio()">
                 <i class="fas fa-file-csv text-success mr-2"></i> Xuất bảng điểm (CSV)
             </a>
         </div>
@@ -191,7 +218,7 @@ require_once __DIR__ . '/../../includes/header.php';
                         <?= $hasNextQuestion ? 'Next question in: ' : 'Final results in: ' ?>
                         <span id="autoNextTimer" class="badge badge-success px-2 py-1 font-weight-bold" style="font-size: 1.1rem;">5</span>s
                     </span>
-                    <a href="<?= BASE_URL ?>modules/host/play.php?action=next_question" class="btn btn-sm btn-primary font-weight-bold">
+                    <a href="<?= BASE_URL ?>modules/host/play.php?action=next_question" class="btn btn-sm btn-primary font-weight-bold" onclick="stopAllAudio()">
                         <?= $hasNextQuestion ? 'Next now &raquo;' : 'View results &raquo;' ?>
                     </a>
                 </div>
@@ -255,22 +282,161 @@ require_once __DIR__ . '/../../includes/header.php';
 <?php if ($isFinal): ?>
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 <script>
-$(document).ready(function() {
+const podiumAudio = document.getElementById('podiumAudio');
+const audio3rd = document.getElementById('podium3rdAudio');
+const audio2nd = document.getElementById('podium2ndAudio');
+const audio1st = document.getElementById('podium1stAudio');
+const crowdCheer = document.getElementById('crowdCheerAudio');
+
+function stopAllAudio() {
+    const audios = [podiumAudio, audio3rd, audio2nd, audio1st, crowdCheer];
+    audios.forEach(function(a) {
+        if (a) {
+            try {
+                a.pause();
+                a.currentTime = 0;
+            } catch(e) {}
+        }
+    });
+}
+window.addEventListener('beforeunload', stopAllAudio);
+
+function updateAudioUI(isPlaying) {
+    const icon = document.getElementById('audioIcon');
+    const label = document.getElementById('audioLabel');
+    const btn = document.getElementById('audioToggleBtn');
+    if (!icon || !label || !btn) return;
+    if (isPlaying) {
+        icon.className = 'fas fa-volume-up text-success mr-1';
+        label.textContent = 'Music: ON';
+        btn.className = 'btn btn-sm btn-light font-weight-bold shadow-sm rounded-pill mr-2 px-3';
+    } else {
+        icon.className = 'fas fa-volume-mute text-danger mr-1';
+        label.textContent = 'Music: OFF';
+        btn.className = 'btn btn-sm btn-outline-light font-weight-bold shadow-sm rounded-pill mr-2 px-3';
+    }
+}
+
+function togglePodiumAudio() {
+    if (!podiumAudio) return;
+    if (podiumAudio.paused) {
+        podiumAudio.play().then(function() {
+            updateAudioUI(true);
+        }).catch(function(e) {
+            console.log('Audio play error:', e);
+        });
+    } else {
+        podiumAudio.pause();
+        updateAudioUI(false);
+    }
+}
+
+function startPodiumBGM() {
+    if (!podiumAudio) return;
+    podiumAudio.volume = 0.5;
+    podiumAudio.play().then(function() {
+        updateAudioUI(true);
+    }).catch(function() {
+        updateAudioUI(false);
+        $(document).one('click keydown', function() {
+            podiumAudio.play().then(function() {
+                updateAudioUI(true);
+            }).catch(function() {});
+        });
+    });
+}
+
+function triggerChampionConfetti() {
     if (typeof confetti === 'function') {
-        confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
+        confetti({ particleCount: 90, spread: 70, origin: { y: 0.6 } });
         setTimeout(function() {
-            confetti({ particleCount: 50, angle: 60, spread: 55, origin: { x: 0 } });
-            confetti({ particleCount: 50, angle: 120, spread: 55, origin: { x: 1 } });
+            confetti({ particleCount: 60, angle: 60, spread: 60, origin: { x: 0 } });
+            confetti({ particleCount: 60, angle: 120, spread: 60, origin: { x: 1 } });
         }, 400);
+        setTimeout(function() {
+            confetti({ particleCount: 80, spread: 100, origin: { y: 0.5 } });
+        }, 800);
+    }
+}
+
+$(document).ready(function() {
+    startPodiumBGM();
+
+    const step3 = $('.podium-step.rank-3');
+    const step2 = $('.podium-step.rank-2');
+    const step1 = $('.podium-step.rank-1');
+
+    let delay = 600;
+
+    if (step3.length) {
+        setTimeout(function() {
+            step3.addClass('revealed');
+            if (audio3rd) {
+                audio3rd.volume = 0.8;
+                audio3rd.currentTime = 0;
+                audio3rd.play().catch(function() {});
+            }
+        }, delay);
+        delay += 1200;
+    }
+
+    if (step2.length) {
+        setTimeout(function() {
+            step2.addClass('revealed');
+            if (audio2nd) {
+                audio2nd.volume = 0.8;
+                audio2nd.currentTime = 0;
+                audio2nd.play().catch(function() {});
+            }
+        }, delay);
+        delay += 1200;
+    }
+
+    if (step1.length) {
+        setTimeout(function() {
+            step1.addClass('revealed');
+            if (audio1st) {
+                audio1st.volume = 0.85;
+                audio1st.currentTime = 0;
+                audio1st.play().catch(function() {});
+            }
+            if (crowdCheer) {
+                crowdCheer.volume = 0.75;
+                crowdCheer.currentTime = 0;
+                crowdCheer.play().catch(function() {});
+            }
+            triggerChampionConfetti();
+        }, delay);
+    } else {
+        triggerChampionConfetti();
     }
 });
 </script>
 <?php else: ?>
 <script>
+const interimAudio = document.getElementById('interimAudio');
+
+function stopAllAudio() {
+    if (interimAudio) {
+        try {
+            interimAudio.pause();
+            interimAudio.currentTime = 0;
+        } catch(e) {}
+    }
+}
+window.addEventListener('beforeunload', stopAllAudio);
+
 $(document).ready(function() {
+    if (interimAudio) {
+        interimAudio.volume = 0.6;
+        interimAudio.play().catch(function() {
+            $(document).one('click keydown', function() {
+                if (interimAudio) interimAudio.play().catch(function() {});
+            });
+        });
+    }
 
     setTimeout(function() {
-
         $('.gained-badge').css({
             'opacity': '1',
             'transform': 'scale(1)'
@@ -310,6 +476,7 @@ $(document).ready(function() {
         autoNextSec--;
         if (autoNextSec <= 0) {
             clearInterval(autoNextTimer);
+            stopAllAudio();
             window.location.href = '<?= BASE_URL ?>modules/host/play.php?action=next_question';
         } else {
             $('#autoNextTimer').text(autoNextSec);
