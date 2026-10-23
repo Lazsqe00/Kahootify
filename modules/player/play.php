@@ -46,6 +46,15 @@ if ($status === 'finished') {
     $bodyClass = "backgroundColorChanges";
     require_once __DIR__ . '/../../includes/header.php';
     ?>
+    <nav class="navbar navbar-dark bg-dark px-4 py-2 d-flex justify-content-between align-items-center shadow-sm">
+        <a href="<?= BASE_URL ?>index.php" class="d-flex align-items-center text-decoration-none">
+            <img src="<?= BASE_URL ?>assets/img/logo.png" alt="Logo" style="max-height: 32px; filter: brightness(100);" class="mr-2">
+        </a>
+        <a href="<?= BASE_URL ?>index.php" class="btn btn-sm btn-outline-light font-weight-bold shadow-sm rounded-pill px-3">
+            <i class="fas fa-home mr-1"></i> Trang chủ
+        </a>
+    </nav>
+
     <div class="container py-4 text-white" style="max-width: 650px;">
 
         <div class="card border-0 shadow-lg text-dark mb-4 text-center" style="border-radius: 18px; overflow: hidden;">
@@ -70,9 +79,18 @@ if ($status === 'finished') {
                     </div>
                 </div>
 
-                <a href="<?= BASE_URL ?>modules/player/join.php" class="btn btn-kahoot btn-kahoot-green btn-block py-3 font-weight-bold">
-                    <i class="fas fa-redo mr-2"></i> Join Another Game
-                </a>
+                <div class="row">
+                    <div class="col-sm-6 mb-2 mb-sm-0">
+                        <a href="<?= BASE_URL ?>modules/player/join.php" class="btn btn-kahoot btn-kahoot-green btn-block py-3 font-weight-bold">
+                            <i class="fas fa-redo mr-2"></i> Join Another Game
+                        </a>
+                    </div>
+                    <div class="col-sm-6">
+                        <a href="<?= BASE_URL ?>index.php" class="btn btn-kahoot btn-kahoot-purple btn-block py-3 font-weight-bold">
+                            <i class="fas fa-home mr-2"></i> Quay về trang chủ
+                        </a>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -148,6 +166,29 @@ $qId = $isResultPhase ? intval(str_replace('res_', '', $status)) : intval($statu
 
 $answers = db_fetch_all("SELECT * FROM answers WHERE id_question = :qid ORDER BY id_answer ASC", [':qid' => $qId]);
 
+$currentQuestion = db_fetch_one("SELECT * FROM questions WHERE id_question = :qid", [':qid' => $qId]);
+$timeLimit = intval($currentQuestion['time_limit'] ?? 20);
+if ($timeLimit <= 0) {
+    $timeLimit = 20;
+}
+
+$startTime = !empty($room['question_start_time']) ? intval($room['question_start_time']) : time();
+$elapsed = max(0, time() - $startTime);
+$remainingSeconds = max(0, $timeLimit - $elapsed);
+
+$showOnDevice = !empty($room['show_questions_on_players']);
+
+$hasQuestionImage = false;
+$questionImageUrl = '';
+if (!empty($currentQuestion['image'])) {
+    $imgFilename = basename($currentQuestion['image']);
+    $imgPath = dirname(__DIR__, 2) . '/assets/img/questions/' . $imgFilename;
+    if (file_exists($imgPath)) {
+        $hasQuestionImage = true;
+        $questionImageUrl = BASE_URL . 'assets/img/questions/' . rawurlencode($imgFilename);
+    }
+}
+
 $myVote = db_fetch_one(
     "SELECT v.*, a.is_correct
      FROM votes v JOIN answers a ON v.id_answer = a.id_answer
@@ -187,11 +228,16 @@ require_once __DIR__ . '/../../includes/header.php';
 ?>
 
 <div class="d-flex justify-content-between align-items-center px-3 py-2 text-white shadow-sm" style="background-color: var(--kahoot-purple-dark);">
-    <div class="font-weight-bold">
+    <div class="font-weight-bold d-flex align-items-center">
         <i class="fas fa-user mr-1 text-warning"></i> <?= htmlspecialchars($nickname) ?>
     </div>
-    <div class="font-weight-bold badge badge-light text-dark px-3 py-2" style="font-size: 0.95rem;">
-        Score: <?= number_format($player['score']) ?>
+    <div class="d-flex align-items-center" style="gap: 10px;">
+        <div class="font-weight-bold badge badge-light text-dark px-3 py-2" style="font-size: 0.95rem;">
+            Score: <?= number_format($player['score']) ?>
+        </div>
+        <a href="<?= BASE_URL ?>index.php" class="btn btn-sm btn-outline-light font-weight-bold rounded-pill px-3" onclick="return confirm('Bạn có chắc muốn rời phòng và quay về trang chủ không?');" title="Rời phòng về trang chủ">
+            <i class="fas fa-home mr-1"></i> Trang chủ
+        </a>
     </div>
 </div>
 
@@ -354,24 +400,75 @@ require_once __DIR__ . '/../../includes/header.php';
 
 <?php else: ?>
 
-    <div class="player-buttons-grid">
+    <?php if (!$showOnDevice): ?>
+        <div class="player-buttons-grid">
+            <div class="player-btn red" onclick="submitAnswer(<?= $answers[0]['id_answer'] ?? 0 ?>)">
+                <span class="text-white">🔺</span>
+            </div>
 
-        <div class="player-btn red" onclick="submitAnswer(<?= $answers[0]['id_answer'] ?? 0 ?>)">
-            <span class="text-white">🔺</span>
-        </div>
+            <div class="player-btn blue" onclick="submitAnswer(<?= $answers[1]['id_answer'] ?? 0 ?>)">
+                <span class="text-white">🔷</span>
+            </div>
 
-        <div class="player-btn blue" onclick="submitAnswer(<?= $answers[1]['id_answer'] ?? 0 ?>)">
-            <span class="text-white">🔷</span>
-        </div>
+            <div class="player-btn yellow" onclick="submitAnswer(<?= $answers[2]['id_answer'] ?? 0 ?>)">
+                <span class="text-white">🟡</span>
+            </div>
 
-        <div class="player-btn yellow" onclick="submitAnswer(<?= $answers[2]['id_answer'] ?? 0 ?>)">
-            <span class="text-white">🟡</span>
+            <div class="player-btn green" onclick="submitAnswer(<?= $answers[3]['id_answer'] ?? 0 ?>)">
+                <span class="text-white">🟩</span>
+            </div>
         </div>
+    <?php else: ?>
+        <div class="container my-3" style="max-width: 1050px;">
+            <div class="question-card-banner">
+                <h2 class="font-weight-bold text-dark mb-0">
+                    <?= htmlspecialchars($currentQuestion['text'] ?? '') ?>
+                </h2>
+                <?php if ($hasQuestionImage): ?>
+                    <div class="text-center mt-3">
+                        <img src="<?= htmlspecialchars($questionImageUrl) ?>" alt="Question Illustration" class="img-fluid rounded player-thumb-img shadow-sm" style="max-height: 280px; object-fit: contain;">
+                    </div>
+                <?php endif; ?>
+            </div>
 
-        <div class="player-btn green" onclick="submitAnswer(<?= $answers[3]['id_answer'] ?? 0 ?>)">
-            <span class="text-white">🟩</span>
+            <div class="d-flex justify-content-between align-items-center my-3 px-2">
+                <div>
+                    <div id="playerTimerBox" class="timer-circle <?= $remainingSeconds <= 5 ? 'warning' : '' ?>">
+                        <span id="playerTimer"><?= $remainingSeconds ?></span>
+                    </div>
+                </div>
+
+                <div class="text-right">
+                    <span class="badge badge-light px-4 py-2 font-weight-bold text-dark shadow-sm" style="font-size: 1.1rem; border-radius: 50px;">
+                        <i class="fas fa-hand-pointer text-primary mr-1"></i> Chọn 1 đáp án
+                    </span>
+                </div>
+            </div>
+
+            <div class="row">
+                <?php
+                $colors = [KAHOOT_COLOR_RED, KAHOOT_COLOR_BLUE, KAHOOT_COLOR_YELLOW, KAHOOT_COLOR_GREEN];
+                $icons  = [KAHOOT_ICON_RED, KAHOOT_ICON_BLUE, KAHOOT_ICON_YELLOW, KAHOOT_ICON_GREEN];
+                $colorClasses = ['red', 'blue', 'yellow', 'green'];
+
+                foreach ($answers as $idx => $a):
+                    $cIdx = $idx % 4;
+                    $ansId = intval($a['id_answer'] ?? 0);
+                ?>
+                    <div class="col-md-6 mb-3">
+                        <div class="answer-box shadow-sm d-flex justify-content-between align-items-center <?= $colorClasses[$cIdx] ?>"
+                             onclick="submitAnswer(<?= $ansId ?>)">
+                            <div class="d-flex align-items-center">
+                                <span class="symbol mr-3" style="font-size: 2rem;"><?= $icons[$cIdx] ?></span>
+                                <span style="font-size: 1.3rem;"><?= htmlspecialchars($a['text'] ?? '') ?></span>
+                            </div>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
         </div>
-    </div>
+    <?php endif; ?>
+
 <?php endif; ?>
 
 <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
@@ -391,7 +488,7 @@ function refreshPlayerPage() {
 function submitAnswer(answerId) {
     if (!answerId) return;
 
-    $('.player-btn').css('pointer-events', 'none').css('opacity', '0.7');
+    $('.answer-box, .player-btn').css('pointer-events', 'none').css('opacity', '0.7');
 
     $.ajax({
         url: '<?= BASE_URL ?>modules/api/submit_answer.php',
@@ -412,6 +509,31 @@ function submitAnswer(answerId) {
         }
     });
 }
+
+<?php if ($showOnDevice && !$isResultPhase && !$myVote): ?>
+let playerSeconds = <?= intval($remainingSeconds) ?>;
+const timerEl = document.getElementById('playerTimer');
+const timerBox = document.getElementById('playerTimerBox');
+
+if (playerSeconds <= 0) {
+    $('.answer-box, .player-btn').css('pointer-events', 'none').css('opacity', '0.6');
+} else if (timerEl) {
+    const playerCountdown = setInterval(function() {
+        playerSeconds--;
+        if (playerSeconds <= 0) {
+            playerSeconds = 0;
+            clearInterval(playerCountdown);
+            timerEl.textContent = '0';
+            $('.answer-box, .player-btn').css('pointer-events', 'none').css('opacity', '0.6');
+        } else {
+            timerEl.textContent = playerSeconds;
+            if (playerSeconds <= 5 && timerBox) {
+                timerBox.classList.add('warning');
+            }
+        }
+    }, 1000);
+}
+<?php endif; ?>
 
 setInterval(function() {
     $.getJSON('<?= BASE_URL ?>modules/api/game_state.php?action=get_room_status&id_room=' + roomId, function(res) {

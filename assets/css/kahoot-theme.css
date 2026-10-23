@@ -122,6 +122,9 @@ h1, h2, h3, h4, h5, h6, .brand-font {
   transition: transform 0.15s, opacity 0.2s;
   cursor: pointer;
   user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  word-break: break-word;
 }
 
 .answer-box:hover {
@@ -193,6 +196,32 @@ h1, h2, h3, h4, h5, h6, .brand-font {
   0% { transform: scale(1); }
   50% { transform: scale(1.08); }
   100% { transform: scale(1); }
+}
+
+@media (max-width: 768px) {
+  .question-card-banner {
+    padding: 16px;
+    margin-bottom: 15px;
+  }
+  .question-card-banner h2 {
+    font-size: 1.35rem;
+  }
+  .answer-box {
+    padding: 14px 18px;
+    min-height: 72px;
+    font-size: 1.15rem;
+    margin-bottom: 12px;
+  }
+  .answer-box .symbol {
+    font-size: 1.6rem;
+    margin-right: 12px;
+  }
+  .timer-circle {
+    width: 70px;
+    height: 70px;
+    font-size: 1.8rem;
+    border-width: 5px;
+  }
 }
 
 .pin-card-box {
@@ -298,3 +327,180 @@ h1, h2, h3, h4, h5, h6, .brand-font {
 .podium-step.rank-1 { height: 260px; background: linear-gradient(180deg, #ffc107, #d89e00); order: 2; }
 .podium-step.rank-2 { height: 200px; background: linear-gradient(180deg, #b0bec5, #78909c); order: 1; }
 .podium-step.rank-3 { height: 160px; background: linear-gradient(180deg, #ffb74d, #e65100); order: 3; }
+
+/* ==========================================================
+   Lobby Game Settings Bar
+   ========================================================== */
+.lobby-device-toggle-pill {
+  background: #ffffff;
+  border-radius: 50px;
+  padding: 10px 22px;
+  border: 2px solid #ffffff;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+  display: inline-flex;
+  align-items: center;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.lobby-device-toggle-pill:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+}
+
+@media (max-width: 576px) {
+  .lobby-device-toggle-pill {
+    padding: 8px 16px;
+    border-radius: 20px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+}
+
+/* ==========================================================
+   Player Online/Device Mode Styles (Show Questions & Answers)
+   ========================================================== */
+.player-device-view {
+  width: 100%;
+  padding-left: 12px;
+  padding-right: 12px;
+  box-sizing: border-box;
+}
+
+.player-header-timer {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 20px;
+  padding: 3px 12px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 0.95rem;
+  letter-spacing: 0.5px;
+  color: #ffffff;
+}
+
+.player-question-card {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 18px 20px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.player-question-text {
+  font-family: 'Montserrat', sans-serif;
+  font-size: clamp(1.15rem, 4vw, 1.45rem);
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.player-question-thumb {
+  max-height: 220px;
+  overflow: hidden;
+}
+
+.player-thumb-img {
+  max-height: 200px;
+  max-width: 100%;
+  object-fit: contain;
+  border: 1px solid #dee2e6;
+}
+
+.player-choices-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (min-width: 576px) {
+  .player-choices-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+}
+
+.player-choice-card {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 64px;
+  border: none;
+  border-radius: 12px;
+  padding: 12px 18px;
+  color: #ffffff;
+  text-align: left;
+  cursor: pointer;
+  box-sizing: border-box;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.25);
+  transition: transform 0.1s ease, filter 0.1s ease, box-shadow 0.1s ease;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+  outline: none;
+}
+
+.player-choice-card:hover {
+  filter: brightness(1.05);
+}
+
+.player-choice-card:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
+}
+
+.player-choice-card:focus {
+  outline: none;
+}
+
+.player-choice-card.red {
+  background-color: var(--kahoot-red);
+  border-bottom: 4px solid #a8132c;
+}
+
+.player-choice-card.blue {
+  background-color: var(--kahoot-blue);
+  border-bottom: 4px solid #0d478e;
+}
+
+.player-choice-card.yellow {
+  background-color: var(--kahoot-yellow);
+  border-bottom: 4px solid #946c00;
+}
+
+.player-choice-card.green {
+  background-color: var(--kahoot-green);
+  border-bottom: 4px solid #1a5e08;
+}
+
+.player-choice-card .choice-icon {
+  font-size: 1.6rem;
+  margin-right: 14px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.player-choice-card .choice-text {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  line-height: 1.35;
+  word-break: break-word;
+  flex: 1;
+}
+
+@media (max-width: 480px) {
+  .player-choice-card {
+    min-height: 58px;
+    padding: 10px 14px;
+  }
+  .player-choice-card .choice-icon {
+    font-size: 1.35rem;
+    margin-right: 10px;
+  }
+  .player-choice-card .choice-text {
+    font-size: 1rem;
+  }
+}
+

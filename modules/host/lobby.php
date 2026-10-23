@@ -14,6 +14,13 @@ if (!$room || $room['status'] === 'finished') {
 if (isset($_GET['start_game'])) {
     $firstQ = db_fetch_one("SELECT id_question FROM questions WHERE id_quiz = :q ORDER BY id_question ASC LIMIT 1", [':q' => $room['id_quiz']]);
     if ($firstQ) {
+        if (isset($_GET['show_questions'])) {
+            $showQ = intval($_GET['show_questions']) ? 1 : 0;
+            db_execute("UPDATE room SET show_questions_on_players = :sq WHERE id_room = :r", [
+                ':sq' => $showQ,
+                ':r'  => $roomId
+            ]);
+        }
         db_execute("UPDATE room SET status = :s, question_start_time = UNIX_TIMESTAMP() WHERE id_room = :r", [
             ':s' => (string)$firstQ['id_question'],
             ':r' => $roomId
@@ -32,6 +39,8 @@ if (isset($_GET['cancel_game'])) {
 
 $players = db_fetch_all("SELECT * FROM players WHERE id_room = :r ORDER BY id_player ASC", [':r' => $roomId]);
 
+$showOnPlayers = !empty($room['show_questions_on_players']);
+
 $pageTitle = "Lobby - Game PIN: " . htmlspecialchars($room['pin']);
 $bodyClass = "backgroundColorChanges";
 require_once __DIR__ . '/../../includes/header.php';
@@ -49,6 +58,10 @@ require_once __DIR__ . '/../../includes/header.php';
         <span class="text-white font-weight-bold" style="font-size: 1.1rem;"><?= htmlspecialchars($room['quiz_name']) ?></span>
     </div>
     <div class="d-flex align-items-center" style="gap: 12px;">
+
+        <button type="button" class="btn btn-sm btn-outline-light font-weight-bold shadow-sm rounded-pill px-3" data-toggle="modal" data-target="#gameSettingsModal" title="Cài đặt phòng chơi">
+            <i class="fas fa-cog mr-1"></i> Cài đặt
+        </button>
 
         <button type="button" id="audioToggleBtn" class="btn btn-sm btn-light font-weight-bold shadow-sm rounded-pill px-3" onclick="toggleAudio()" title="Toggle lobby music">
             <i class="fas fa-volume-up text-success mr-1" id="audioIcon"></i>
@@ -98,6 +111,24 @@ require_once __DIR__ . '/../../includes/header.php';
         </div>
     </div>
 
+    <!-- Cài đặt: Hiển thị câu hỏi & đáp án trên máy học sinh (Căn phải, in đậm, rõ ràng, không icon) -->
+    <div class="lobby-settings-bar mx-auto mb-4" style="max-width: 540px; width: 90%;">
+        <div class="d-flex justify-content-end align-items-center">
+            <div class="lobby-device-toggle-pill shadow d-inline-flex align-items-center" style="background: #ffffff; border-radius: 50px; padding: 10px 22px; border: 2px solid #ffffff;">
+                <label for="toggleShowQuestions" class="mb-0 mr-3 text-dark font-weight-bold" style="font-family: 'Montserrat', sans-serif; font-size: 0.98rem; font-weight: 800; color: #111111; cursor: pointer; user-select: none;">
+                    Hiển thị câu hỏi &amp; đáp án trên máy học sinh:
+                </label>
+                <span id="settingStatusLabel" class="badge <?= $showOnPlayers ? 'badge-success' : 'badge-secondary' ?> font-weight-bold mr-3 px-2 py-1" style="font-size: 0.85rem; letter-spacing: 0.5px;">
+                    <?= $showOnPlayers ? 'BẬT' : 'TẮT' ?>
+                </span>
+                <div class="custom-control custom-switch" style="transform: scale(1.3); transform-origin: center center;">
+                    <input type="checkbox" class="custom-control-input" id="toggleShowQuestions" <?= $showOnPlayers ? 'checked' : '' ?> onchange="updateShowQuestions(this.checked)">
+                    <label class="custom-control-label" for="toggleShowQuestions" style="cursor: pointer;"></label>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="d-flex justify-content-center align-items-center my-4" style="gap: 20px;">
         <div class="bg-dark px-4 py-2 rounded-pill shadow">
             <i class="fas fa-users text-success mr-2"></i>
@@ -106,7 +137,7 @@ require_once __DIR__ . '/../../includes/header.php';
             </span>
         </div>
 
-        <a href="lobby.php?start_game=true" id="btnStartGame" class="btn btn-kahoot btn-kahoot-green btn-lg px-5 py-3 shadow" style="<?= count($players) === 0 ? 'pointer-events: none; opacity: 0.6;' : '' ?>">
+        <a href="lobby.php?start_game=true&show_questions=<?= $showOnPlayers ? '1' : '0' ?>" id="btnStartGame" class="btn btn-kahoot btn-kahoot-green btn-lg px-5 py-3 shadow" style="<?= count($players) === 0 ? 'pointer-events: none; opacity: 0.6;' : '' ?>">
             <i class="fas fa-play mr-2"></i> START GAME
         </a>
     </div>
@@ -134,7 +165,50 @@ require_once __DIR__ . '/../../includes/header.php';
     </div>
 </div>
 
+<!-- Modal Cài đặt phòng -->
+<div class="modal fade text-dark" id="gameSettingsModal" tabindex="-1" role="dialog" aria-labelledby="settingsModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
+            <div class="modal-header text-white" style="background-color: var(--kahoot-purple-dark);">
+                <h5 class="modal-title font-weight-bold" id="settingsModalTitle">
+                    <i class="fas fa-sliders-h mr-2"></i>Cài đặt phòng trò chơi
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body p-4 text-left">
+                <div class="p-3 mb-3 rounded" style="background-color: #f8f9fa; border: 1px solid #e9ecef;">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="pr-3">
+                            <h6 class="font-weight-bold mb-1" style="font-family: 'Montserrat', sans-serif; font-weight: 800; color: #111111;">
+                                Hiển thị câu hỏi &amp; đáp án trên máy học sinh
+                            </h6>
+                            <p class="text-muted small mb-0">
+                                Dành cho học Online / Ngồi xa máy chiếu. Khi bật, thiết bị học sinh sẽ thấy đề bài, hình ảnh và chữ trên các nút đáp án.
+                            </p>
+                        </div>
+                        <div class="custom-control custom-switch pl-4" style="transform: scale(1.3); transform-origin: right center;">
+                            <input type="checkbox" class="custom-control-input" id="modalToggleShowQuestions" <?= $showOnPlayers ? 'checked' : '' ?> onchange="updateShowQuestions(this.checked)">
+                            <label class="custom-control-label" for="modalToggleShowQuestions" style="cursor: pointer;"></label>
+                        </div>
+                    </div>
+                </div>
+                <div class="alert alert-info py-2 px-3 small mb-0">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    <strong>Chế độ mặc định (TẮT):</strong> Màn hình học sinh chỉ có 4 ô màu trơn lớn để nhìn lên máy chiếu.
+                </div>
+            </div>
+            <div class="modal-footer bg-light py-2">
+                <button type="button" class="btn btn-secondary font-weight-bold rounded-pill px-4" data-dismiss="modal">Đóng</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
 <script>
 
 const audio = document.getElementById('lobbyAudio');
@@ -188,6 +262,36 @@ function updateAudioUI(isPlaying) {
 $(document).ready(function() {
     tryPlayAudio();
 });
+
+function updateShowQuestions(checked) {
+    const val = checked ? 1 : 0;
+
+    $('#toggleShowQuestions').prop('checked', checked);
+    $('#modalToggleShowQuestions').prop('checked', checked);
+
+    $('#btnStartGame').attr('href', 'lobby.php?start_game=true&show_questions=' + val);
+
+    const label = $('#settingStatusLabel');
+    if (label.length) {
+        label.text(checked ? 'BẬT' : 'TẮT')
+             .removeClass('badge-success badge-secondary')
+             .addClass(checked ? 'badge-success' : 'badge-secondary');
+    }
+
+    $.ajax({
+        url: '<?= BASE_URL ?>modules/api/game_state.php',
+        type: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({
+            action: 'update_settings',
+            id_room: roomId,
+            show_questions_on_players: val
+        }),
+        error: function(err) {
+            console.error('Failed to update room settings:', err);
+        }
+    });
+}
 
 const roomId = <?= $roomId ?>;
 let previousCount = <?= count($players) ?>;

@@ -107,6 +107,7 @@ CREATE TABLE `room` (
   `pin` varchar(20) DEFAULT NULL,
   `status` varchar(50) DEFAULT 'waiting',
   `question_start_time` int(11) DEFAULT NULL,
+  `show_questions_on_players` tinyint(1) NOT NULL DEFAULT 0,
   `roomadd` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `roomupdate` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id_room`),
