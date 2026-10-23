@@ -17,6 +17,6 @@ $bodyClass = $bodyClass ?? '';
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 
-    <link rel="stylesheet" href="<?= BASE_URL ?>assets/css/kahoot-theme.css">
+    <link rel="stylesheet" href="<?= BASE_URL ?>assets/css/kahoot-theme.css?v=<?= file_exists(__DIR__ . '/../assets/css/kahoot-theme.css') ? filemtime(__DIR__ . '/../assets/css/kahoot-theme.css') : '1' ?>">
 </head>
 <body class="<?= htmlspecialchars($bodyClass) ?>">
