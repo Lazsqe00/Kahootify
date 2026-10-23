@@ -42,6 +42,14 @@ if ($status === 'finished') {
             break;
         }
     }
+
+    $selectedQIds = !empty($room['question_order']) ? json_decode($room['question_order'], true) : null;
+    if (!is_array($selectedQIds) || empty($selectedQIds)) {
+        $totalQuestionsPlayed = db_count('questions', 'id_quiz = :q', [':q' => $room['id_quiz']]);
+    } else {
+        $totalQuestionsPlayed = count($selectedQIds);
+    }
+
     $pageTitle = "🏆 Final Results - " . htmlspecialchars($nickname);
     $bodyClass = "backgroundColorChanges";
     require_once __DIR__ . '/../../includes/header.php';
@@ -75,7 +83,7 @@ if ($status === 'finished') {
                     <div class="col-6">
                         <span class="text-muted d-block small font-weight-bold text-uppercase">Total Score</span>
                         <h2 class="font-weight-bold text-success mb-0" style="font-size: 2.2rem;"><?= number_format($player['score']) ?></h2>
-                        <small class="text-muted font-weight-bold"><?= $player['answers_correct'] ?> correct</small>
+                        <small class="text-muted font-weight-bold"><?= intval($player['answers_correct']) ?> / <?= $totalQuestionsPlayed ?> câu đúng</small>
                     </div>
                 </div>
 
@@ -227,7 +235,16 @@ if ($isResultPhase) {
     }
 }
 
-$pageTitle = "Kahoot! | " . htmlspecialchars($nickname);
+$selectedQIds = !empty($room['question_order']) ? json_decode($room['question_order'], true) : null;
+if (!is_array($selectedQIds) || empty($selectedQIds)) {
+    $fallbackQuestions = db_fetch_all("SELECT id_question FROM questions WHERE id_quiz = :q ORDER BY id_question ASC", [':q' => $room['id_quiz']]);
+    $selectedQIds = array_column($fallbackQuestions, 'id_question');
+}
+$totalQuestions = count($selectedQIds);
+$currentQNum = array_search($qId, $selectedQIds);
+$questionNumber = ($currentQNum !== false) ? ($currentQNum + 1) : 1;
+
+$pageTitle = "Question " . $questionNumber . "/" . $totalQuestions . " - Kahoot! | " . htmlspecialchars($nickname);
 $bodyClass = "backgroundColorChanges";
 require_once __DIR__ . '/../../includes/header.php';
 ?>
@@ -235,6 +252,9 @@ require_once __DIR__ . '/../../includes/header.php';
 <div class="d-flex justify-content-between align-items-center px-3 py-2 text-white shadow-sm" style="background-color: var(--kahoot-purple-dark);">
     <div class="font-weight-bold d-flex align-items-center">
         <i class="fas fa-user mr-1 text-warning"></i> <?= htmlspecialchars($nickname) ?>
+        <span class="badge badge-light text-dark font-weight-bold ml-2 px-2 py-1 shadow-sm" style="font-size: 0.85rem;">
+            Question <?= $questionNumber ?> / <?= $totalQuestions ?>
+        </span>
     </div>
     <div class="d-flex align-items-center" style="gap: 10px;">
         <div class="font-weight-bold badge badge-light text-dark px-3 py-2" style="font-size: 0.95rem;">

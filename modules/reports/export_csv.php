@@ -24,8 +24,13 @@ if (!$room) {
     redirect('modules/reports/list.php');
 }
 
-// Lấy tổng số câu hỏi trong quiz
-$totalQuestions = db_count('questions', 'id_quiz = :q', [':q' => $room['id_quiz']]);
+// Lấy tổng số câu hỏi đã chơi trong ván (nếu bốc ngẫu nhiên N câu thì lấy N)
+$selectedQIds = !empty($room['question_order']) ? json_decode($room['question_order'], true) : null;
+if (is_array($selectedQIds) && !empty($selectedQIds)) {
+    $totalQuestions = count($selectedQIds);
+} else {
+    $totalQuestions = db_count('questions', 'id_quiz = :q', [':q' => $room['id_quiz']]);
+}
 
 // Lấy danh sách người chơi xếp hạng
 $sql = "SELECT p.*,

@@ -30,6 +30,16 @@ if ($action === 'update_settings') {
         ':r'   => $roomId
     ]);
 
+    if (isset($jsonData['question_limit']) || isset($_POST['question_limit'])) {
+        $qLimit = isset($jsonData['question_limit']) ? intval($jsonData['question_limit']) : intval($_POST['question_limit'] ?? 0);
+        $qMode = $jsonData['question_mode'] ?? ($_POST['question_mode'] ?? 'all');
+        $saveLimit = ($qMode === 'random' && $qLimit > 0) ? $qLimit : null;
+        db_execute("UPDATE room SET question_limit = :ql WHERE id_room = :r", [
+            ':ql' => $saveLimit,
+            ':r'  => $roomId
+        ]);
+    }
+
     echo json_encode([
         'success' => true,
         'show_questions_on_players' => $showVal,

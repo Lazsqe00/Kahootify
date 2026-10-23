@@ -17,17 +17,16 @@ if ($currentQId <= 0 && !$isFinal) {
     $currentQId = intval(str_replace('res_', '', $room['status']));
 }
 
-$allQuestions = db_fetch_all("SELECT id_question FROM questions WHERE id_quiz = :q ORDER BY id_question ASC", [':q' => $room['id_quiz']]);
+$selectedQIds = !empty($room['question_order']) ? json_decode($room['question_order'], true) : null;
+if (!is_array($selectedQIds) || empty($selectedQIds)) {
+    $fallbackQuestions = db_fetch_all("SELECT id_question FROM questions WHERE id_quiz = :q ORDER BY id_question ASC", [':q' => $room['id_quiz']]);
+    $selectedQIds = array_column($fallbackQuestions, 'id_question');
+}
+
 $hasNextQuestion = false;
-$foundCurrent = false;
-foreach ($allQuestions as $q) {
-    if ($foundCurrent) {
-        $hasNextQuestion = true;
-        break;
-    }
-    if ($q['id_question'] == $currentQId) {
-        $foundCurrent = true;
-    }
+$currentIdx = array_search($currentQId, $selectedQIds);
+if ($currentIdx !== false && isset($selectedQIds[$currentIdx + 1])) {
+    $hasNextQuestion = true;
 }
 
 if (!$isFinal && $currentQId > 0) {

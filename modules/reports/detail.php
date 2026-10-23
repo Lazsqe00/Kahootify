@@ -24,12 +24,22 @@ if (!$room) {
     redirect('modules/auth/dashboard.php');
 }
 
-// 2. Lấy danh sách câu hỏi của bài Quiz
-$questions = db_fetch_all("
-    SELECT * FROM questions 
-    WHERE id_quiz = :q 
-    ORDER BY id_question ASC
-", [':q' => $room['id_quiz']]);
+// 2. Lấy danh sách câu hỏi của ván đấu (nếu bốc ngẫu nhiên N câu thì lấy đúng N câu đã chơi theo thứ tự)
+$selectedQIds = !empty($room['question_order']) ? json_decode($room['question_order'], true) : null;
+if (is_array($selectedQIds) && !empty($selectedQIds)) {
+    $inClause = implode(',', array_map('intval', $selectedQIds));
+    $questions = db_fetch_all("
+        SELECT * FROM questions 
+        WHERE id_question IN ($inClause)
+        ORDER BY FIELD(id_question, $inClause)
+    ");
+} else {
+    $questions = db_fetch_all("
+        SELECT * FROM questions 
+        WHERE id_quiz = :q 
+        ORDER BY id_question ASC
+    ", [':q' => $room['id_quiz']]);
+}
 $totalQuestions = count($questions);
 
 // 3. Lấy danh sách người chơi kèm số câu đúng
