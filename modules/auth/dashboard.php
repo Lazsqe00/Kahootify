@@ -35,6 +35,9 @@ $quizzes = db_fetch_all(
             <p class="text-muted mb-0">Welcome, <b><?= htmlspecialchars($_SESSION['nameCreator']) ?></b>! Manage your quizzes and hosted games.</p>
         </div>
         <div>
+            <a href="<?= BASE_URL ?>modules/reports/list.php" class="btn btn-outline-primary font-weight-bold mr-2">
+                <i class="fas fa-chart-pie mr-1"></i> Báo cáo & Thống kê
+            </a>
             <a href="<?= BASE_URL ?>modules/quiz/create.php" class="btn btn-kahoot btn-kahoot-green">
                 <i class="fas fa-plus-circle mr-2"></i> Create New Kahoot
             </a>
@@ -57,17 +60,20 @@ $quizzes = db_fetch_all(
         </div>
 
         <div class="col-md-4 mb-3">
-            <div class="card border-0 shadow-sm text-white" style="background: linear-gradient(135deg, #1368ce, #2980b9); border-radius: 10px;">
-                <div class="card-body d-flex justify-content-between align-items-center p-4">
-                    <div>
-                        <h6 class="text-uppercase mb-2 font-weight-bold" style="opacity: 0.85;">Hosted Sessions</h6>
-                        <h2 class="display-4 font-weight-bold mb-0"><?= $totalRooms ?></h2>
-                    </div>
-                    <div style="font-size: 3rem; opacity: 0.3;">
-                        <i class="fas fa-broadcast-tower"></i>
+            <a href="<?= BASE_URL ?>modules/reports/list.php" class="text-decoration-none">
+                <div class="card border-0 shadow-sm text-white" style="background: linear-gradient(135deg, #1368ce, #2980b9); border-radius: 10px; transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform='translateY(0)'">
+                    <div class="card-body d-flex justify-content-between align-items-center p-4">
+                        <div>
+                            <h6 class="text-uppercase mb-2 font-weight-bold text-white" style="opacity: 0.85;">Hosted Sessions</h6>
+                            <h2 class="display-4 font-weight-bold mb-0 text-white"><?= $totalRooms ?></h2>
+                            <small class="text-white-50"><i class="fas fa-chart-line mr-1"></i> Xem báo cáo ván đấu &raquo;</small>
+                        </div>
+                        <div style="font-size: 3rem; opacity: 0.3;">
+                            <i class="fas fa-broadcast-tower"></i>
+                        </div>
                     </div>
                 </div>
-            </div>
+            </a>
         </div>
 
         <div class="col-md-4 mb-3">
