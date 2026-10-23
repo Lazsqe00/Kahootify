@@ -3,6 +3,7 @@
 header('Content-Type: application/json; charset=utf-8');
 require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../includes/player_characters.php';
 
 $action = $_GET['action'] ?? '';
 $roomId = intval($_GET['id_room'] ?? 0);
@@ -27,7 +28,14 @@ if ($action === 'get_room_status') {
 }
 
 if ($action === 'get_players') {
+    $characterRoom = db_fetch_one('SELECT id_room, pin FROM room WHERE id_room = :r', [':r' => $roomId]);
     $players = db_fetch_all("SELECT id_player, nickname, score FROM players WHERE id_room = :r ORDER BY id_player ASC", [':r' => $roomId]);
+    foreach ($players as &$lobbyPlayer) {
+        $appearance = $characterRoom ? get_player_appearance($characterRoom, (int) $lobbyPlayer['id_player']) : ['character_id' => default_player_character(), 'accessory_id' => ''];
+        // Markup is produced exclusively from local allowlisted artwork and numeric geometry.
+        $lobbyPlayer['character_svg'] = player_appearance_image($appearance, 'lobby-character');
+    }
+    unset($lobbyPlayer);
     echo json_encode([
         'success' => true,
         'players' => $players,

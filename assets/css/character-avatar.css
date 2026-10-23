@@ -1,0 +1,5 @@
+.player-avatar { display: inline-block; flex-shrink: 0; vertical-align: middle; overflow: visible; }
+.character-preview .avatar-eyes { transform-box: fill-box; transform-origin: center; animation: character-blink 6s infinite; }
+.lobby-character { width: 48px; height: 48px; margin-right: 8px; }
+@keyframes character-blink { 0%, 92%, 96%, 100% { transform: scaleY(1); } 94% { transform: scaleY(.08); } }
+@media (prefers-reduced-motion: reduce) { .character-preview .avatar-eyes { animation: none; } }

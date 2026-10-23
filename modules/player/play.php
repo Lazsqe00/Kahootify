@@ -35,111 +35,8 @@ if ($status === 'waiting') {
 
 if ($status === 'finished') {
     $leaderboard = get_room_leaderboard($roomId);
-    $myRank = 1;
-    foreach ($leaderboard as $idx => $p) {
-        if ($p['id_player'] == $playerId) {
-            $myRank = $idx + 1;
-            break;
-        }
-    }
-    $pageTitle = "🏆 Final Results - " . htmlspecialchars($nickname);
-    $bodyClass = "backgroundColorChanges";
-    require_once __DIR__ . '/../../includes/header.php';
-    ?>
-    <div class="container py-4 text-white" style="max-width: 650px;">
-
-        <div class="card border-0 shadow-lg text-dark mb-4 text-center" style="border-radius: 18px; overflow: hidden;">
-            <div class="py-4 text-white" style="background: linear-gradient(135deg, #46178F, #300d66);">
-                <div style="font-size: 4rem;">
-                    <?= $myRank === 1 ? '🥇' : ($myRank === 2 ? '🥈' : ($myRank === 3 ? '🥉' : '🏆')) ?>
-                </div>
-                <h2 class="font-weight-bold mb-1">Game Over!</h2>
-                <p class="mb-0 text-light opacity-80" style="font-size: 1.1rem;"><?= htmlspecialchars($nickname) ?></p>
-            </div>
-            <div class="card-body p-4">
-                <div class="row mb-3">
-                    <div class="col-6 border-right">
-                        <span class="text-muted d-block small font-weight-bold text-uppercase">Final Standing</span>
-                        <h2 class="font-weight-bold text-warning mb-0" style="font-size: 2.2rem;">Rank #<?= $myRank ?></h2>
-                        <small class="text-muted">out of <?= count($leaderboard) ?> players</small>
-                    </div>
-                    <div class="col-6">
-                        <span class="text-muted d-block small font-weight-bold text-uppercase">Total Score</span>
-                        <h2 class="font-weight-bold text-success mb-0" style="font-size: 2.2rem;"><?= number_format($player['score']) ?></h2>
-                        <small class="text-muted font-weight-bold"><?= $player['answers_correct'] ?> correct</small>
-                    </div>
-                </div>
-
-                <a href="<?= BASE_URL ?>modules/player/join.php" class="btn btn-kahoot btn-kahoot-green btn-block py-3 font-weight-bold">
-                    <i class="fas fa-redo mr-2"></i> Join Another Game
-                </a>
-            </div>
-        </div>
-
-        <div class="card border-0 shadow-lg text-dark mb-4" style="border-radius: 18px;">
-            <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between">
-                <h5 class="font-weight-bold mb-0 text-dark">
-                    <i class="fas fa-trophy mr-2 text-warning"></i>Room Leaderboard
-                </h5>
-                <span class="badge badge-light px-3 py-1 font-weight-bold border">
-                    <?= count($leaderboard) ?> players
-                </span>
-            </div>
-            <div class="card-body p-3">
-                <?php foreach ($leaderboard as $idx => $p):
-                    $rank = $idx + 1;
-                    $isMe = ($p['id_player'] == $playerId);
-                    $itemClass = $isMe ? 'border-warning bg-warning-light shadow-sm' : 'border-light bg-light';
-                ?>
-                    <div class="d-flex align-items-center justify-content-between p-3 mb-2 rounded <?= $itemClass ?>"
-                         style="border: <?= $isMe ? '2px solid #ffca28' : '1px solid #e9ecef' ?>; background-color: <?= $isMe ? '#fffde7' : '#ffffff' ?>;">
-                        <div class="d-flex align-items-center" style="gap: 12px; overflow: hidden;">
-                            <div class="font-weight-bold text-center" style="width: 35px; font-size: 1.2rem;">
-                                <?php if ($rank === 1): ?>
-                                    <span title="Rank 1">🥇</span>
-                                <?php elseif ($rank === 2): ?>
-                                    <span title="Rank 2">🥈</span>
-                                <?php elseif ($rank === 3): ?>
-                                    <span title="Rank 3">🥉</span>
-                                <?php else: ?>
-                                    <span class="text-muted">#<?= $rank ?></span>
-                                <?php endif; ?>
-                            </div>
-                            <div class="text-truncate" style="font-size: 1.05rem;">
-                                <span class="font-weight-bold <?= $isMe ? 'text-dark' : 'text-dark' ?>">
-                                    <?= htmlspecialchars($p['nickname']) ?>
-                                </span>
-                                <?php if ($isMe): ?>
-                                    <span class="badge badge-warning text-dark font-weight-bold ml-1 px-2">YOU</span>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-                        <div class="text-right pl-2" style="min-width: 90px;">
-                            <span class="font-weight-bold text-primary" style="font-size: 1.15rem;">
-                                <?= number_format($p['score']) ?>
-                            </span>
-                            <span class="small text-muted font-weight-bold d-block">pts</span>
-                        </div>
-                    </div>
-                <?php endforeach; ?>
-            </div>
-        </div>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
-    <script>
-    window.addEventListener('DOMContentLoaded', function() {
-        if (typeof confetti === 'function') {
-            confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
-            setTimeout(function() {
-                confetti({ particleCount: 50, angle: 60, spread: 55, origin: { x: 0 } });
-                confetti({ particleCount: 50, angle: 120, spread: 55, origin: { x: 1 } });
-            }, 400);
-        }
-    });
-    </script>
-    </body></html>
-    <?php
+    $resultsPlayerId = $playerId;
+    require __DIR__ . '/../../includes/final_results.php';
     exit;
 }
 
@@ -167,11 +64,11 @@ if ($isResultPhase) {
              AND v.id_answer IN (SELECT id_answer FROM answers WHERE id_question = :qid)
         LEFT JOIN answers a ON v.id_answer = a.id_answer
         WHERE p.id_room = :r
-        ORDER BY p.score DESC, p.playeradd ASC
+        ORDER BY p.score DESC, p.playeradd ASC, p.id_player ASC
     ";
     $leaderboard = db_fetch_all($leaderboardSql, [':r' => $roomId, ':qid' => $qId]);
     if (empty($leaderboard)) {
-        $leaderboard = db_fetch_all("SELECT * FROM players WHERE id_room = :r ORDER BY score DESC, playeradd ASC", [':r' => $roomId]);
+        $leaderboard = db_fetch_all("SELECT * FROM players WHERE id_room = :r ORDER BY score DESC, playeradd ASC, id_player ASC", [':r' => $roomId]);
     }
     foreach ($leaderboard as $idx => $p) {
         if ($p['id_player'] == $playerId) {
