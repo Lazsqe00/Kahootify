@@ -1,86 +1,73 @@
 <?php
 
-// Room locks and removed players are stored on the server without DB changes.
+// Room locks and removed players are stored directly in MySQL (room.is_locked, players.is_kicked)
+// without generating runtime files on disk.
 
 function with_room_access_lock($room, $callback, $exclusive = true) {
-    $key = hash('sha256', $room['id_room'] . ':' . $room['pin']);
-    $handle = fopen(__DIR__ . '/../storage/room-locks/' . $key . '.lock', 'c+');
-    if ($handle === false) {
-        throw new RuntimeException('Unable to open room lock storage.');
-    }
-    try {
-        if (!flock($handle, $exclusive ? LOCK_EX : LOCK_SH)) {
-            throw new RuntimeException('Unable to access room lock storage.');
-        }
-        return $callback($handle);
-    } finally {
-        flock($handle, LOCK_UN);
-        fclose($handle);
-    }
+    // Kept for backward compatibility. Runs the callback directly without file locking.
+    return $callback(null);
 }
 
-function read_room_access_state($handle) {
-    rewind($handle);
-    $value = stream_get_contents($handle);
-    if ($value === false) {
-        throw new RuntimeException('Unable to read room lock state.');
-    }
-    $value = trim($value);
-    // Keep files created by the original room-lock feature compatible.
-    if (in_array($value, ['', '0', '1'], true)) {
-        return ['locked' => $value === '1', 'kicked' => []];
-    }
-    $state = json_decode($value, true);
-    if (!is_array($state) || !isset($state['locked'], $state['kicked']) || !is_bool($state['locked']) || !is_array($state['kicked'])) {
-        throw new RuntimeException('Invalid room access state.');
-    }
-    return $state;
+function read_room_access_state($handle = null) {
+    return ['locked' => false, 'kicked' => []];
 }
 
 function write_room_access_state($handle, $state) {
-    $value = json_encode($state, JSON_THROW_ON_ERROR);
-    rewind($handle);
-    if (fwrite($handle, $value) !== strlen($value) || !ftruncate($handle, strlen($value)) || !fflush($handle)) {
-        throw new RuntimeException('Unable to save room lock state.');
-    }
+    // No-op for file storage compatibility
 }
 
-function read_room_lock($handle) {
-    return read_room_access_state($handle)['locked'];
+function read_room_lock($handle = null) {
+    return false;
 }
 
 function write_room_lock($handle, $isLocked) {
-    $state = read_room_access_state($handle);
-    $state['locked'] = (bool)$isLocked;
-    write_room_access_state($handle, $state);
+    // No-op for file storage compatibility
 }
 
 function get_room_access_state($room) {
-    return with_room_access_lock($room, 'read_room_access_state', false);
+    $roomId = is_array($room) ? (int)($room['id_room'] ?? 0) : (int)$room;
+    $isLocked = room_is_locked($room);
+    $kicked = [];
+    if ($roomId > 0) {
+        $rows = db_fetch_all('SELECT id_player FROM players WHERE id_room = :r AND is_kicked = 1', [':r' => $roomId]);
+        foreach ($rows as $row) {
+            $kicked[$row['id_player']] = true;
+        }
+    }
+    return ['locked' => $isLocked, 'kicked' => $kicked];
 }
 
 function player_is_kicked($room, $playerId) {
-    return !empty(get_room_access_state($room)['kicked'][$playerId]);
+    $roomId = is_array($room) ? (int)($room['id_room'] ?? 0) : (int)$room;
+    if ($roomId <= 0 || (int)$playerId <= 0) return false;
+    $p = db_fetch_one('SELECT is_kicked FROM players WHERE id_room = :r AND id_player = :p LIMIT 1', [
+        ':r' => $roomId,
+        ':p' => (int)$playerId
+    ]);
+    return !empty($p['is_kicked']);
 }
 
 function filter_room_players($roomId, $players, $state = null) {
-    if ($state === null) {
-        $room = db_fetch_one('SELECT id_room, pin FROM room WHERE id_room = :r', [':r' => $roomId]);
-        if (!$room) return [];
-        $state = get_room_access_state($room);
-    }
-    return array_values(array_filter($players, function ($player) use ($state) {
-        return empty($state['kicked'][$player['id_player']]);
+    if (empty($players)) return [];
+    $kickedIds = array_column(
+        db_fetch_all('SELECT id_player FROM players WHERE id_room = :r AND is_kicked = 1', [':r' => (int)$roomId]),
+        'id_player'
+    );
+    if (empty($kickedIds)) return array_values($players);
+    $kickedMap = array_flip($kickedIds);
+    return array_values(array_filter($players, function ($player) use ($kickedMap) {
+        return !isset($kickedMap[$player['id_player']]);
     }));
 }
 
 function room_question_counts($room, $questionId, $state = null) {
-    $players = filter_room_players($room['id_room'], db_fetch_all(
-        'SELECT id_player FROM players WHERE id_room = :r', [':r' => $room['id_room']]
+    $roomId = is_array($room) ? (int)($room['id_room'] ?? 0) : (int)$room;
+    $players = filter_room_players($roomId, db_fetch_all(
+        'SELECT id_player FROM players WHERE id_room = :r', [':r' => $roomId]
     ), $state);
     $answered = db_fetch_all(
-        'SELECT DISTINCT v.id_player FROM votes v JOIN answers a ON a.id_answer = v.id_answer JOIN players p ON p.id_player = v.id_player WHERE p.id_room = :r AND a.id_question = :q',
-        [':r' => $room['id_room'], ':q' => $questionId]
+        'SELECT DISTINCT v.id_player FROM votes v JOIN answers a ON a.id_answer = v.id_answer JOIN players p ON p.id_player = v.id_player WHERE p.id_room = :r AND a.id_question = :q AND p.is_kicked = 0',
+        [':r' => $roomId, ':q' => $questionId]
     );
     return [
         'total_players' => count($players),
@@ -89,15 +76,20 @@ function room_question_counts($room, $questionId, $state = null) {
 }
 
 function kick_room_player($room, $creatorId, $playerId) {
-    return with_room_access_lock($room, function ($handle) use ($room, $creatorId, $playerId) {
-        $currentRoom = db_fetch_one("SELECT id_room FROM room WHERE id_room = :r AND id_creator = :c AND status != 'finished'", [':r' => $room['id_room'], ':c' => $creatorId]);
-        $player = db_fetch_one('SELECT id_player FROM players WHERE id_room = :r AND id_player = :p', [':r' => $room['id_room'], ':p' => $playerId]);
-        if (!$currentRoom || !$player) return false;
-        $state = read_room_access_state($handle);
-        $state['kicked'][$playerId] = true;
-        write_room_access_state($handle, $state);
-        return true;
-    });
+    $roomId = is_array($room) ? (int)($room['id_room'] ?? 0) : (int)$room;
+    $currentRoom = db_fetch_one("SELECT id_room FROM room WHERE id_room = :r AND id_creator = :c AND status != 'finished'", [
+        ':r' => $roomId,
+        ':c' => (int)$creatorId
+    ]);
+    $player = db_fetch_one('SELECT id_player FROM players WHERE id_room = :r AND id_player = :p', [
+        ':r' => $roomId,
+        ':p' => (int)$playerId
+    ]);
+    if (!$currentRoom || !$player) return false;
+    return db_execute(
+        'UPDATE players SET is_kicked = 1 WHERE id_room = :r AND id_player = :p',
+        [':r' => $roomId, ':p' => (int)$playerId]
+    ) > 0;
 }
 
 function player_request_is_valid($playerId, $roomId, $token) {
@@ -114,23 +106,30 @@ function redirect_removed_player($playerId) {
 }
 
 function room_is_locked($room) {
-    return with_room_access_lock($room, function ($handle) {
-        return read_room_lock($handle);
-    }, false);
+    $roomId = is_array($room) ? (int)($room['id_room'] ?? 0) : (int)$room;
+    if ($roomId <= 0) return false;
+    $r = db_fetch_one('SELECT is_locked FROM room WHERE id_room = :r LIMIT 1', [':r' => $roomId]);
+    return !empty($r['is_locked']);
 }
 
 function set_room_locked($room, $isLocked) {
-    return with_room_access_lock($room, function ($handle) use ($room, $isLocked) {
-        $currentRoom = db_fetch_one(
-            "SELECT id_room FROM room WHERE id_room = :r AND pin = :pin AND id_creator = :c AND status = 'waiting'",
-            [':r' => $room['id_room'], ':pin' => $room['pin'], ':c' => $room['id_creator']]
-        );
-        if (!$currentRoom) {
-            return false;
-        }
-        write_room_lock($handle, $isLocked);
-        return true;
-    });
+    $roomId = is_array($room) ? (int)($room['id_room'] ?? 0) : (int)$room;
+    $pin = is_array($room) ? ($room['pin'] ?? '') : '';
+    $creatorId = is_array($room) ? (int)($room['id_creator'] ?? 0) : 0;
+
+    $currentRoom = db_fetch_one(
+        "SELECT id_room FROM room WHERE id_room = :r AND pin = :pin AND id_creator = :c AND status = 'waiting'",
+        [':r' => $roomId, ':pin' => $pin, ':c' => $creatorId]
+    );
+    if (!$currentRoom) {
+        return false;
+    }
+
+    db_execute(
+        'UPDATE room SET is_locked = :l WHERE id_room = :r',
+        [':l' => $isLocked ? 1 : 0, ':r' => $roomId]
+    );
+    return true;
 }
 
 function room_join_error($room, $isLocked = null) {
@@ -149,39 +148,36 @@ function join_room_player($roomId, $pin, $nickname) {
         return ['success' => false, 'message' => room_join_error($room)];
     }
 
-    // Hold the same file lock used by the host until admission has committed.
-    return with_room_access_lock($room, function ($handle) use ($roomId, $pin, $nickname) {
-        $pdo = getDB();
-        $pdo->beginTransaction();
-        try {
-            $currentRoom = db_fetch_one(
-                'SELECT * FROM room WHERE id_room = :r AND pin = :pin FOR UPDATE',
-                [':r' => $roomId, ':pin' => $pin]
-            );
-            $error = room_join_error($currentRoom, read_room_lock($handle));
-            if ($error !== '') {
-                $pdo->rollBack();
-                return ['success' => false, 'message' => $error];
-            }
-
-            $existing = db_fetch_one(
-                'SELECT id_player FROM players WHERE id_room = :r AND nickname = :nick LIMIT 1',
-                [':r' => $roomId, ':nick' => $nickname]
-            );
-            if ($existing) {
-                $nickname .= '_' . mt_rand(10, 99);
-            }
-            $playerId = db_insert(
-                'INSERT INTO players (id_room, nickname, score, answers_correct) VALUES (:r, :nick, 0, 0)',
-                [':r' => $roomId, ':nick' => $nickname]
-            );
-            $pdo->commit();
-            return ['success' => true, 'id_player' => $playerId, 'nickname' => $nickname];
-        } catch (Throwable $error) {
-            if ($pdo->inTransaction()) {
-                $pdo->rollBack();
-            }
-            throw $error;
+    $pdo = getDB();
+    $pdo->beginTransaction();
+    try {
+        $currentRoom = db_fetch_one(
+            'SELECT * FROM room WHERE id_room = :r AND pin = :pin FOR UPDATE',
+            [':r' => $roomId, ':pin' => $pin]
+        );
+        $error = room_join_error($currentRoom);
+        if ($error !== '') {
+            $pdo->rollBack();
+            return ['success' => false, 'message' => $error];
         }
-    });
+
+        $existing = db_fetch_one(
+            'SELECT id_player FROM players WHERE id_room = :r AND nickname = :nick LIMIT 1',
+            [':r' => $roomId, ':nick' => $nickname]
+        );
+        if ($existing) {
+            $nickname .= '_' . mt_rand(10, 99);
+        }
+        $playerId = db_insert(
+            'INSERT INTO players (id_room, nickname, score, answers_correct, is_kicked) VALUES (:r, :nick, 0, 0, 0)',
+            [':r' => $roomId, ':nick' => $nickname]
+        );
+        $pdo->commit();
+        return ['success' => true, 'id_player' => $playerId, 'nickname' => $nickname];
+    } catch (Throwable $error) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $error;
+    }
 }
