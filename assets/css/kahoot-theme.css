@@ -504,3 +504,14 @@ h1, h2, h3, h4, h5, h6, .brand-font {
   }
 }
 
+/* Answer Streak Bonus 🔥 Animation */
+@keyframes fireGlow {
+    0%, 100% { transform: scale(1); filter: drop-shadow(0 0 3px #ff5722); }
+    50% { transform: scale(1.15); filter: drop-shadow(0 0 8px #ff9800); }
+}
+.streak-fire-anim {
+    display: inline-block;
+    animation: fireGlow 1.2s infinite ease-in-out;
+}
+
+

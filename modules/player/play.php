@@ -130,6 +130,11 @@ if ($status === 'finished') {
                                 <?php if ($isMe): ?>
                                     <span class="badge badge-warning text-dark font-weight-bold ml-1 px-2">YOU</span>
                                 <?php endif; ?>
+                                <?php if (intval($p['current_streak'] ?? 0) >= 2): ?>
+                                    <span class="badge badge-danger ml-1 font-weight-bold" style="font-size: 0.8rem;" title="<?= intval($p['current_streak']) ?> câu đúng liên tiếp!">
+                                        <i class="fas fa-fire streak-fire-anim"></i> <?= intval($p['current_streak']) ?>
+                                    </span>
+                                <?php endif; ?>
                             </div>
                         </div>
                         <div class="text-right pl-2" style="min-width: 90px;">
@@ -201,7 +206,7 @@ $myRank = 1;
 if ($isResultPhase) {
     $leaderboardSql = "
         SELECT p.*,
-               COALESCE(v.points_earned, 0) as points_gained,
+               COALESCE(v.points_earned + v.streak_bonus, 0) as points_gained,
                COALESCE(a.is_correct, 0) as is_round_correct
         FROM players p
         LEFT JOIN votes v ON v.id_player = p.id_player
@@ -246,6 +251,33 @@ require_once __DIR__ . '/../../includes/header.php';
     <?php
     $isCorrect = ($myVote && $myVote['is_correct'] == 1);
     $pointsEarned = $myVote ? intval($myVote['points_earned']) : 0;
+    $streakBonus = $myVote ? intval($myVote['streak_bonus'] ?? 0) : 0;
+    $totalRoundPoints = $pointsEarned + $streakBonus;
+    $currentStreak = intval($player['current_streak'] ?? 0);
+
+    // Kiểm tra mất chuỗi (Streak Lost): Nếu câu này sai và trước đó có chuỗi >= 2
+    $streakLost = false;
+    if (!$isCorrect && $myVote) {
+        $prevVotes = db_fetch_all(
+            "SELECT a.is_correct
+             FROM votes v
+             JOIN answers a ON v.id_answer = a.id_answer
+             WHERE v.id_player = :pid AND a.id_question != :qid
+             ORDER BY v.id_vote DESC",
+            [':pid' => $playerId, ':qid' => $qId]
+        );
+        $prevStreak = 0;
+        foreach ($prevVotes as $pv) {
+            if ($pv['is_correct'] == 1) {
+                $prevStreak++;
+            } else {
+                break;
+            }
+        }
+        if ($prevStreak >= 2) {
+            $streakLost = true;
+        }
+    }
     ?>
     <div class="container py-3" style="max-width: 650px;">
 
@@ -260,11 +292,36 @@ require_once __DIR__ . '/../../includes/header.php';
                         <h3 class="font-weight-bold mb-0">
                             <?= $isCorrect ? 'Correct!' : 'Incorrect!' ?>
                         </h3>
-                        <p class="mb-0 font-weight-bold" style="font-size: 1.15rem; color: #fff;">
-                            <?= $isCorrect ? ('+' . number_format($pointsEarned) . ' pts') : '+0 pts' ?>
-                        </p>
+                        <?php if ($isCorrect): ?>
+                            <?php if ($streakBonus > 0): ?>
+                                <p class="mb-0 font-weight-bold" style="font-size: 1.25rem; color: #fff;">
+                                    +<?= number_format($pointsEarned) ?> + <?= number_format($streakBonus) ?> Streak Bonus
+                                </p>
+                            <?php else: ?>
+                                <p class="mb-0 font-weight-bold" style="font-size: 1.15rem; color: #fff;">
+                                    +<?= number_format($pointsEarned) ?> pts
+                                </p>
+                            <?php endif; ?>
+                        <?php else: ?>
+                            <p class="mb-0 font-weight-bold" style="font-size: 1.15rem; color: #fff;">
+                                +0 pts
+                            </p>
+                            <?php if ($streakLost): ?>
+                                <div class="text-danger font-weight-bold small mt-1 bg-white px-2 py-1 rounded d-inline-block shadow-sm">
+                                    <i class="fas fa-heart-broken mr-1"></i> Answer streak lost!
+                                </div>
+                            <?php endif; ?>
+                        <?php endif; ?>
                     </div>
                 </div>
+
+                <?php if ($isCorrect && $currentStreak >= 2): ?>
+                    <div class="mt-3">
+                        <div class="badge badge-warning text-dark font-weight-bold px-3 py-2 shadow-sm" style="font-size: 0.95rem;">
+                            <i class="fas fa-fire text-danger mr-1 streak-fire-anim"></i> Answer Streak: <?= $currentStreak ?> 🔥
+                        </div>
+                    </div>
+                <?php endif; ?>
             </div>
         </div>
 
@@ -324,6 +381,11 @@ require_once __DIR__ . '/../../includes/header.php';
                                 </span>
                                 <?php if ($isMe): ?>
                                     <span class="badge badge-warning text-dark font-weight-bold ml-1 px-2" style="font-size: 0.75rem;">YOU</span>
+                                <?php endif; ?>
+                                <?php if (intval($p['current_streak'] ?? 0) >= 2): ?>
+                                    <span class="badge badge-danger ml-1 font-weight-bold" style="font-size: 0.75rem;" title="<?= intval($p['current_streak']) ?> câu đúng liên tiếp!">
+                                        <i class="fas fa-fire streak-fire-anim"></i> <?= intval($p['current_streak']) ?>
+                                    </span>
                                 <?php endif; ?>
                             </div>
                         </div>

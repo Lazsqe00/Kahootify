@@ -16,11 +16,12 @@ if ($playerId <= 0 || $answerId <= 0 || $roomId <= 0) {
     exit;
 }
 
-$playerCheck = db_fetch_one("SELECT id_player FROM players WHERE id_player = :p AND id_room = :r", [':p' => $playerId, ':r' => $roomId]);
+$playerCheck = db_fetch_one("SELECT id_player, current_streak FROM players WHERE id_player = :p AND id_room = :r", [':p' => $playerId, ':r' => $roomId]);
 if (!$playerCheck) {
     echo json_encode(['success' => false, 'message' => 'Player not found in this room']);
     exit;
 }
+$currentStreak = intval($playerCheck['current_streak'] ?? 0);
 
 try {
 
@@ -52,6 +53,9 @@ try {
 
     $isCorrect = ($ans['is_correct'] == 1);
     $pointsEarned = 0;
+    $streakBonus = 0;
+    $newStreak = 0;
+    $streakLost = false;
 
     if ($isCorrect) {
         $basePoints = intval($ans['points'] ?: 1000);
@@ -62,22 +66,56 @@ try {
         $ratio = min(1, $elapsed / max(1, $timeLimit));
 
         $pointsEarned = intval(round($basePoints * (1 - ($ratio / 2))));
-    }
 
-    db_insert(
-        "INSERT INTO votes (id_player, id_answer, points_earned) VALUES (:p, :a, :pts)",
-        [
-            ':p'   => $playerId,
-            ':a'   => $answerId,
-            ':pts' => $pointsEarned
-        ]
-    );
+        // Tăng chuỗi đúng liên tiếp
+        $newStreak = $currentStreak + 1;
 
-    if ($isCorrect) {
-        db_execute(
-            "UPDATE players SET score = score + :pts, answers_correct = answers_correct + 1 WHERE id_player = :p",
-            [':pts' => $pointsEarned, ':p' => $playerId]
+        // Tính điểm thưởng chuỗi (Streak Bonus)
+        if ($newStreak == 2) {
+            $streakBonus = 100;
+        } elseif ($newStreak == 3) {
+            $streakBonus = 200;
+        } elseif ($newStreak == 4) {
+            $streakBonus = 300;
+        } elseif ($newStreak >= 5) {
+            $streakBonus = 500;
+        } else {
+            $streakBonus = 0;
+        }
+
+        $totalPts = $pointsEarned + $streakBonus;
+
+        db_insert(
+            "INSERT INTO votes (id_player, id_answer, points_earned, streak_bonus) VALUES (:p, :a, :pts, :bonus)",
+            [
+                ':p'     => $playerId,
+                ':a'     => $answerId,
+                ':pts'   => $pointsEarned,
+                ':bonus' => $streakBonus
+            ]
         );
+
+        db_execute(
+            "UPDATE players SET score = score + :totalPts, answers_correct = answers_correct + 1, current_streak = :newStreak WHERE id_player = :p",
+            [':totalPts' => $totalPts, ':newStreak' => $newStreak, ':p' => $playerId]
+        );
+    } else {
+        // Trả lời SAI: reset chuỗi về 0
+        $streakLost = ($currentStreak >= 2);
+        $newStreak = 0;
+        $streakBonus = 0;
+
+        db_insert(
+            "INSERT INTO votes (id_player, id_answer, points_earned, streak_bonus) VALUES (:p, :a, :pts, :bonus)",
+            [
+                ':p'     => $playerId,
+                ':a'     => $answerId,
+                ':pts'   => 0,
+                ':bonus' => 0
+            ]
+        );
+
+        db_execute("UPDATE players SET current_streak = 0 WHERE id_player = :p", [':p' => $playerId]);
     }
 
     $totalPlayers = db_count('players', 'id_room = :r', [':r' => $roomId]);
@@ -99,7 +137,10 @@ try {
     echo json_encode([
         'success'       => true,
         'is_correct'    => $isCorrect,
-        'points_earned' => $pointsEarned
+        'points_earned' => $pointsEarned,
+        'streak'        => $newStreak,
+        'streak_bonus'  => $streakBonus,
+        'streak_lost'   => $streakLost
     ]);
 
 } catch (Exception $e) {
