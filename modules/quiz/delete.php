@@ -14,4 +14,9 @@ if ($quizId > 0) {
     set_flash_message('success', 'Quiz deleted successfully!');
 }
 
-redirect('modules/quiz/list.php');
+$ref = $_GET['ref'] ?? '';
+if ($ref === 'dashboard') {
+    redirect('modules/auth/dashboard.php');
+} else {
+    redirect('modules/quiz/list.php');
+}
