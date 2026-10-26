@@ -31,6 +31,10 @@ if (isset($_GET['cancel_game'])) {
 }
 
 $players = db_fetch_all("SELECT * FROM players WHERE id_room = :r ORDER BY id_player ASC", [':r' => $roomId]);
+$joinPageUrl = BASE_URL . 'modules/player/join.php';
+$joinUrl = $joinPageUrl . '?pin=' . rawurlencode($room['pin']);
+$joinHost = strtolower(parse_url(BASE_URL, PHP_URL_HOST) ?? '');
+$isLoopbackHost = in_array($joinHost, ['localhost', '127.0.0.1', '[::1]', '::1'], true) || substr($joinHost, -10) === '.localhost';
 
 $pageTitle = "Lobby - Game PIN: " . htmlspecialchars($room['pin']);
 $bodyClass = "backgroundColorChanges";
@@ -67,12 +71,51 @@ require_once __DIR__ . '/../../includes/header.php';
     background: #ffffff;
     border-radius: 20px;
     padding: 25px 40px;
-    max-width: 540px;
+    max-width: 900px;
     width: 90%;
     margin: 20px auto;
     box-shadow: 0 15px 35px rgba(0,0,0,0.3);
     text-align: center;
     box-sizing: border-box;
+}
+.lobby-join-options {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 32px;
+}
+.lobby-pin-details { flex: 1; min-width: 0; }
+.lobby-join-address { overflow-wrap: anywhere; }
+.lobby-qr-panel { border-left: 2px solid #eee; padding-left: 32px; }
+.lobby-qr-button {
+    display: block;
+    padding: 0;
+    margin: 0 auto;
+    border: 0;
+    border-radius: 8px;
+    background: #fff;
+    cursor: zoom-in;
+    width: 208px;
+    max-width: 100%;
+}
+.lobby-qr-button:focus-visible { outline: 3px solid #1368ce; outline-offset: 4px; }
+.lobby-qr-code svg { display: block; width: 100%; height: auto; }
+.lobby-qr-dialog {
+    width: min(90vw, 560px);
+    max-height: 90vh;
+    overflow: auto;
+    border: 0;
+    border-radius: 20px;
+    padding: 24px;
+    text-align: center;
+    color: #212529;
+}
+.lobby-qr-dialog::backdrop { background: rgba(0, 0, 0, 0.75); }
+.lobby-qr-dialog .lobby-qr-code { max-width: 440px; margin: auto; }
+@media (max-width: 900px) {
+    .lobby-pin-card { padding: 24px 16px; }
+    .lobby-join-options { flex-direction: column; gap: 20px; }
+    .lobby-qr-panel { border-left: 0; border-top: 2px solid #eee; padding: 20px 0 0; width: 100%; }
 }
 .lobby-pin-number {
     font-family: 'Montserrat', sans-serif;
@@ -87,16 +130,54 @@ require_once __DIR__ . '/../../includes/header.php';
     word-break: keep-all;
     white-space: nowrap;
 }
+@media (max-width: 600px) {
+    .lobby-pin-number {
+        font-size: clamp(2rem, 11vw, 3rem);
+        letter-spacing: 6px;
+        margin-right: -6px;
+    }
+}
 </style>
 
 <div class="container-fluid text-center text-white py-4">
 
     <div class="lobby-pin-card mx-auto text-dark">
-        <p class="text-muted font-weight-bold text-uppercase mb-2" style="letter-spacing: 3px; font-size: 0.95rem;">GAME PIN</p>
-        <div class="lobby-pin-number">
-            <?= htmlspecialchars($room['pin']) ?>
+        <div class="lobby-join-options" id="lobbyJoin" data-join-url="<?= htmlspecialchars($joinUrl, ENT_QUOTES, 'UTF-8') ?>">
+            <div class="lobby-pin-details">
+                <p class="font-weight-bold mb-2">Join at</p>
+                <a class="lobby-join-address" href="<?= htmlspecialchars($joinPageUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener"><?= htmlspecialchars(preg_replace('#^https?://#', '', $joinPageUrl)) ?></a>
+                <p class="text-muted font-weight-bold text-uppercase mt-3 mb-2" style="letter-spacing: 3px; font-size: 0.95rem;">GAME PIN</p>
+                <div class="lobby-pin-number"><?= htmlspecialchars($room['pin']) ?></div>
+                <div class="mt-3">
+                    <button type="button" id="copyJoinLink" class="btn btn-outline-dark font-weight-bold" hidden>
+                        <i class="fas fa-link mr-1" aria-hidden="true"></i> Copy join link
+                    </button>
+                    <p id="joinLinkStatus" class="small text-muted mt-2 mb-0" role="status" aria-live="polite"></p>
+                    <input type="text" id="joinLinkFallback" class="form-control mt-2" aria-label="Join link: select and copy" value="<?= htmlspecialchars($joinUrl, ENT_QUOTES, 'UTF-8') ?>" readonly hidden>
+                </div>
+            </div>
+            <div class="lobby-qr-panel">
+                <p class="font-weight-bold mb-1">Or scan to join</p>
+                <button type="button" id="enlargeJoinQr" class="lobby-qr-button" aria-label="Enlarge the QR code to join this game" aria-haspopup="dialog" aria-controls="joinQrDialog" disabled>
+                    <span id="joinQrCode" class="lobby-qr-code"><span class="small text-muted">Loading QR code...</span></span>
+                </button>
+                <p id="joinQrHint" class="small text-muted mb-0">Scan with your phone camera</p>
+                <noscript><p class="small text-danger">Enable JavaScript to display the QR code, or join using the PIN.</p></noscript>
+            </div>
         </div>
+        <?php if ($isLoopbackHost): ?>
+            <div class="alert alert-warning small text-left mt-3 mb-0" role="note">
+                <strong>Joining from a phone?</strong> Connect to the same Wi-Fi and open this lobby using your computer's LAN IP instead of localhost (for example, http://192.168.1.10/Kahootify/). The QR code will then use that address.
+            </div>
+        <?php endif; ?>
     </div>
+
+    <dialog id="joinQrDialog" class="lobby-qr-dialog" aria-labelledby="joinQrTitle">
+        <form method="dialog" class="text-right"><button type="submit" class="btn btn-outline-dark btn-sm" aria-label="Close enlarged QR code">Close <span aria-hidden="true">&times;</span></button></form>
+        <h2 id="joinQrTitle" class="h4 font-weight-bold mt-2">Scan to join</h2>
+        <div id="joinQrCodeLarge" class="lobby-qr-code"></div>
+        <p class="font-weight-bold mt-2 mb-0">Game PIN: <?= htmlspecialchars($room['pin']) ?></p>
+    </dialog>
 
     <div class="d-flex justify-content-center align-items-center my-4" style="gap: 20px;">
         <div class="bg-dark px-4 py-2 rounded-pill shadow">
@@ -120,7 +201,7 @@ require_once __DIR__ . '/../../includes/header.php';
                 <div id="waitingMsg" class="py-4">
                     <div class="spinner-border text-light mb-3" role="status"></div>
                     <p class="font-weight-bold" style="font-size: 1.2rem; text-shadow: 1px 1px 2px rgba(0,0,0,0.5);">
-                        Waiting for players to enter PIN...
+                        Waiting for players to enter PIN or scan the QR code...
                     </p>
                 </div>
             <?php else: ?>
@@ -134,6 +215,8 @@ require_once __DIR__ . '/../../includes/header.php';
     </div>
 </div>
 
+<script src="<?= BASE_URL ?>assets/js/qrcodegen.js"></script>
+<script src="<?= BASE_URL ?>assets/js/lobby-join.js"></script>
 <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
 <script>
 
