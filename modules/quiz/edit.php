@@ -6,251 +6,371 @@ require_once __DIR__ . '/../../config/database.php';
 $creatorId = intval($_SESSION['id_creator']);
 $quizId    = intval($_GET['id'] ?? 0);
 
-$quiz = db_fetch_one("SELECT * FROM quiz WHERE id_quiz = :q AND id_creator = :c", [
-    ':q' => $quizId,
-    ':c' => $creatorId
-]);
-
+$quiz = db_fetch_one("SELECT * FROM quiz WHERE id_quiz = :q AND id_creator = :c", [':q' => $quizId, ':c' => $creatorId]);
 if (!$quiz) {
-    set_flash_message('danger', 'Quiz not found or you do not have permission to edit it!');
+    set_flash_message('danger', 'Quiz not found or access denied.');
     redirect('modules/quiz/list.php');
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'add_question') {
-    $qText     = trim($_POST['question_text'] ?? '');
-    $timeLimit = intval($_POST['time_limit'] ?? 20);
-    if (!in_array($timeLimit, [10, 20, 30, 60])) {
-        $timeLimit = 20;
-    }
-    $points    = intval($_POST['points'] ?? 1000);
-    $correctIdx = intval($_POST['correct_answer'] ?? 0);
-    $answers   = $_POST['answers'] ?? [];
+function saveUploadedFile($fileKey) {
+    if (!isset($_FILES[$fileKey]) || $_FILES[$fileKey]['error'] !== UPLOAD_ERR_OK) return null;
+    $f = $_FILES[$fileKey];
+    $allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/webm'];
+    if (!in_array($f['type'], $allowed)) return null;
+    $ext  = strtolower(pathinfo($f['name'], PATHINFO_EXTENSION));
+    $name = 'q_' . uniqid() . '_' . time() . '.' . $ext;
+    $dir  = __DIR__ . '/../../assets/img/questions/';
+    return move_uploaded_file($f['tmp_name'], $dir . $name) ? 'assets/img/questions/' . $name : null;
+}
 
-    if (!empty($qText) && count($answers) === 4) {
-        $qId = db_insert(
-            "INSERT INTO questions (id_quiz, text, points, time_limit) VALUES (:qz, :txt, :pts, :time)",
-            [
-                ':qz'   => $quizId,
-                ':txt'  => $qText,
-                ':pts'  => $points,
-                ':time' => $timeLimit
-            ]
-        );
+function detectMediaType($fileKey) {
+    if (!isset($_FILES[$fileKey]) || $_FILES[$fileKey]['error'] !== UPLOAD_ERR_OK) return null;
+    $mime = $_FILES[$fileKey]['type'];
+    if (strpos($mime, 'image/') === 0) return 'image';
+    if (strpos($mime, 'video/') === 0) return 'video';
+    return null;
+}
 
-        foreach ($answers as $idx => $ansText) {
-            $isCorrect = ($idx === $correctIdx) ? 1 : 0;
-            db_insert(
-                "INSERT INTO answers (id_question, is_correct, text) VALUES (:qid, :corr, :txt)",
-                [
-                    ':qid'  => $qId,
-                    ':corr' => $isCorrect,
-                    ':txt'  => trim($ansText)
-                ]
-            );
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $action = $_POST['action'] ?? '';
+
+    if (in_array($action, ['add_question', 'update_question'])) {
+        $qText = trim($_POST['question_text'] ?? '');
+        $qType = ($_POST['question_type'] ?? '') === 'text' ? 'text' : 'multiple_choice';
+        $tl    = intval($_POST['time_limit'] ?? 20);
+        if (!in_array($tl, [10, 20, 30, 60])) $tl = 20;
+        $pts   = intval($_POST['points'] ?? 1000);
+        if (!in_array($pts, [500, 1000, 2000])) $pts = 1000;
+
+        if (empty($qText)) {
+            set_flash_message('danger', 'Question text is required.');
+            redirect('modules/quiz/edit.php?id=' . $quizId);
         }
 
-        set_flash_message('success', 'Question added successfully!');
+        if ($qType === 'text') {
+            $ta = trim($_POST['text_answer'] ?? '');
+            if (empty($ta)) {
+                set_flash_message('danger', 'Please enter the correct answer for the text question.');
+                redirect('modules/quiz/edit.php?id=' . $quizId);
+            }
+        }
+
+        $oldImg  = null;
+        $oldMt   = null;
+        $editQId = null;
+
+        if ($action === 'update_question') {
+            $editQId = intval($_POST['editing_question_id'] ?? 0);
+            $oldQ    = db_fetch_one("SELECT * FROM questions WHERE id_question = :q AND id_quiz = :qz", [':q' => $editQId, ':qz' => $quizId]);
+            if (!$oldQ) {
+                set_flash_message('danger', 'Question not found.');
+                redirect('modules/quiz/edit.php?id=' . $quizId);
+            }
+            $oldImg = $oldQ['image'];
+            $oldMt  = $oldQ['media_type'] ?? null;
+        }
+
+        $newFile = saveUploadedFile('question_media');
+        $newMt   = detectMediaType('question_media');
+
+        if ($newFile !== null) {
+            $imgCol = $newFile;
+            $mtCol  = $newMt;
+        } elseif (($_POST['question_media_remove'] ?? '0') === '1') {
+            $imgCol = null;
+            $mtCol  = null;
+        } else {
+            $imgCol = $oldImg;
+            $mtCol  = $oldMt;
+        }
+
+        if ($action === 'add_question') {
+            $maxSo = db_fetch_one("SELECT COALESCE(MAX(sort_order), 0) AS mo FROM questions WHERE id_quiz = :qz", [':qz' => $quizId]);
+            $so    = intval($maxSo['mo']) + 1;
+            $qId   = db_insert(
+                "INSERT INTO questions (id_quiz, text, points, time_limit, image, question_type, media_type, sort_order) VALUES (:qz,:t,:p,:tl,:img,:qt,:mt,:so)",
+                [':qz'=>$quizId,':t'=>$qText,':p'=>$pts,':tl'=>$tl,':img'=>$imgCol,':qt'=>$qType,':mt'=>$mtCol,':so'=>$so]
+            );
+        } else {
+            $qId = $editQId;
+            db_execute(
+                "UPDATE questions SET text=:t, points=:p, time_limit=:tl, image=:img, question_type=:qt, media_type=:mt WHERE id_question=:qid AND id_quiz=:qz",
+                [':t'=>$qText,':p'=>$pts,':tl'=>$tl,':img'=>$imgCol,':qt'=>$qType,':mt'=>$mtCol,':qid'=>$qId,':qz'=>$quizId]
+            );
+            db_execute("DELETE FROM answers WHERE id_question = :qid", [':qid' => $qId]);
+        }
+
+        $correctIdxs = array_map('intval', $_POST['correct_answer_idx'] ?? []);
+        $useImgArr   = $_POST['answer_use_image']  ?? [];
+        $keepImgArr  = $_POST['answer_keep_image'] ?? [];
+        $textArr     = $_POST['answer_text']       ?? [];
+
+        if ($qType === 'text') {
+            $ta = trim($_POST['text_answer'] ?? '');
+            db_insert("INSERT INTO answers (id_question, is_correct, text) VALUES (:qid, 1, :t)", [':qid' => $qId, ':t' => $ta]);
+        } else {
+            for ($i = 0; $i < 4; $i++) {
+                $useImg   = ($useImgArr[$i] ?? '0') === '1';
+                $txt      = trim($textArr[$i] ?? '');
+                $newAImg  = saveUploadedFile('answer_image_file_' . $i);
+                $keepImg  = trim($keepImgArr[$i] ?? '');
+                if ($useImg) {
+                    $finalImg = $newAImg ?: ($keepImg ?: null);
+                    if ($finalImg !== null) {
+                        $corr = in_array($i, $correctIdxs) ? 1 : 0;
+                        db_insert("INSERT INTO answers (id_question, is_correct, text, image_path) VALUES (:qid,:c,'',:img)", [':qid'=>$qId,':c'=>$corr,':img'=>$finalImg]);
+                    }
+                } elseif ($txt !== '') {
+                    $corr = in_array($i, $correctIdxs) ? 1 : 0;
+                    db_insert("INSERT INTO answers (id_question, is_correct, text, image_path) VALUES (:qid,:c,:t,NULL)", [':qid'=>$qId,':c'=>$corr,':t'=>$txt]);
+                }
+            }
+        }
+
+        $_SESSION['last_question_type_' . $quizId] = $qType;
+        $_SESSION['last_time_limit_' . $quizId]    = $tl;
+        $_SESSION['last_points_' . $quizId]        = $pts;
+
+        set_flash_message('success', $action === 'add_question' ? 'Question added!' : 'Question updated!');
         redirect('modules/quiz/edit.php?id=' . $quizId);
-    } else {
-        set_flash_message('danger', 'Please enter question text and provide all 4 answer choices!');
     }
 }
 
 if (isset($_GET['delete_question'])) {
-    $delQId = intval($_GET['delete_question']);
-    db_execute("DELETE FROM questions WHERE id_question = :qid AND id_quiz = :quizId", [
-        ':qid'    => $delQId,
-        ':quizId' => $quizId
-    ]);
-    set_flash_message('info', 'Question deleted!');
+    $dqId = intval($_GET['delete_question']);
+    db_execute("DELETE FROM questions WHERE id_question = :q AND id_quiz = :qz", [':q' => $dqId, ':qz' => $quizId]);
+    set_flash_message('info', 'Question deleted.');
     redirect('modules/quiz/edit.php?id=' . $quizId);
 }
 
-$questions = db_fetch_all("SELECT * FROM questions WHERE id_quiz = :q ORDER BY id_question ASC", [':q' => $quizId]);
+$questions = db_fetch_all("SELECT * FROM questions WHERE id_quiz = :q ORDER BY sort_order ASC, id_question ASC", [':q' => $quizId]);
 foreach ($questions as &$q) {
     $q['answers'] = db_fetch_all("SELECT * FROM answers WHERE id_question = :qid ORDER BY id_answer ASC", [':qid' => $q['id_question']]);
 }
 unset($q);
 
-$pageTitle = "Edit Quiz: " . htmlspecialchars($quiz['name']);
+$defaultQType = $_SESSION['last_question_type_' . $quizId]
+    ?? (!empty($questions) ? end($questions)['question_type'] : 'multiple_choice');
+$defaultTimeLimit = $_SESSION['last_time_limit_' . $quizId]
+    ?? (!empty($questions) ? end($questions)['time_limit'] : 20);
+$defaultPoints = $_SESSION['last_points_' . $quizId]
+    ?? (!empty($questions) ? end($questions)['points'] : 1000);
+
+$pageTitle      = 'Edit Quiz: ' . htmlspecialchars($quiz['name']);
+$extraCss       = BASE_URL . 'assets/css/edit-quiz.css';
 require_once __DIR__ . '/../../includes/header.php';
 require_once __DIR__ . '/../../includes/navbar.php';
+
+$flash = get_flash_message();
 ?>
 
-<div class="container my-4">
-
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <div>
-            <a href="<?= BASE_URL ?>modules/quiz/list.php" class="text-muted font-weight-bold">
-                <i class="fas fa-chevron-left mr-1"></i> Back to My Kahoots
-            </a>
-            <h2 class="font-weight-bold mt-1" style="color: var(--kahoot-purple);">
-                <?= htmlspecialchars($quiz['name']) ?>
-            </h2>
-        </div>
-        <div>
-            <a href="<?= BASE_URL ?>modules/host/create_room.php?id_quiz=<?= $quiz['id_quiz'] ?>" class="btn btn-kahoot btn-kahoot-purple">
-                <i class="fas fa-play mr-1"></i> Host Game Now
-            </a>
-        </div>
-    </div>
-
-    <div class="row">
-
-        <div class="col-lg-6 mb-4">
-            <div class="card border-0 shadow-sm" style="border-radius: 12px;">
-                <div class="card-header bg-white py-3">
-                    <h5 class="font-weight-bold mb-0 text-success">
-                        <i class="fas fa-plus-circle mr-2"></i>Add New Question
-                    </h5>
-                </div>
-                <div class="card-body p-4">
-                    <form action="" method="POST">
-                        <input type="hidden" name="action" value="add_question">
-
-                        <div class="form-group">
-                            <label class="font-weight-bold">Question Text <span class="text-danger">*</span></label>
-                            <input type="text" name="question_text" class="form-control" required>
-                        </div>
-
-                        <div class="row">
-                            <div class="col-6 form-group">
-                                <label class="font-weight-bold">Time Limit</label>
-                                <select name="time_limit" class="form-control">
-                                    <option value="10">10 seconds</option>
-                                    <option value="20" selected>20 seconds (Standard)</option>
-                                    <option value="30">30 seconds</option>
-                                    <option value="60">60 seconds</option>
-                                </select>
-                            </div>
-                            <div class="col-6 form-group">
-                                <label class="font-weight-bold">Points</label>
-                                <select name="points" class="form-control">
-                                    <option value="1000" selected>1,000 points (Standard)</option>
-                                    <option value="2000">2,000 points (Double)</option>
-                                    <option value="500">500 points</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <label class="font-weight-bold mt-2">
-                            4 Answer Choices (Select radio button for CORRECT answer) <span class="text-danger">*</span>
-                        </label>
-
-                        <div class="input-group mb-2">
-                            <div class="input-group-prepend">
-                                <span class="input-group-text text-white font-weight-bold" style="background-color: var(--kahoot-red); min-width: 55px;">
-                                    🔺 1
-                                </span>
-                                <div class="input-group-text bg-white">
-                                    <input type="radio" name="correct_answer" value="0" checked title="Select if this is the correct answer">
-                                </div>
-                            </div>
-                            <input type="text" name="answers[]" class="form-control" required>
-                        </div>
-
-                        <div class="input-group mb-2">
-                            <div class="input-group-prepend">
-                                <span class="input-group-text text-white font-weight-bold" style="background-color: var(--kahoot-blue); min-width: 55px;">
-                                    🔷 2
-                                </span>
-                                <div class="input-group-text bg-white">
-                                    <input type="radio" name="correct_answer" value="1" title="Select if this is the correct answer">
-                                </div>
-                            </div>
-                            <input type="text" name="answers[]" class="form-control" required>
-                        </div>
-
-                        <div class="input-group mb-2">
-                            <div class="input-group-prepend">
-                                <span class="input-group-text text-white font-weight-bold" style="background-color: var(--kahoot-yellow); min-width: 55px;">
-                                    🟡 3
-                                </span>
-                                <div class="input-group-text bg-white">
-                                    <input type="radio" name="correct_answer" value="2" title="Select if this is the correct answer">
-                                </div>
-                            </div>
-                            <input type="text" name="answers[]" class="form-control" required>
-                        </div>
-
-                        <div class="input-group mb-3">
-                            <div class="input-group-prepend">
-                                <span class="input-group-text text-white font-weight-bold" style="background-color: var(--kahoot-green); min-width: 55px;">
-                                    🟩 4
-                                </span>
-                                <div class="input-group-text bg-white">
-                                    <input type="radio" name="correct_answer" value="3" title="Select if this is the correct answer">
-                                </div>
-                            </div>
-                            <input type="text" name="answers[]" class="form-control" required>
-                        </div>
-
-                        <button type="submit" class="btn btn-kahoot btn-kahoot-green btn-block">
-                            <i class="fas fa-plus mr-1"></i> Save & Add Question
-                        </button>
-                    </form>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-lg-6">
-            <div class="card border-0 shadow-sm" style="border-radius: 12px;">
-                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-                    <h5 class="font-weight-bold mb-0 text-dark">
-                        <i class="fas fa-list-ol mr-2 text-primary"></i>Questions List (<?= count($questions) ?>)
-                    </h5>
-                    <?php if (count($questions) > 0): ?>
-                        <span class="badge badge-success px-3 py-1">Ready to host</span>
-                    <?php else: ?>
-                        <span class="badge badge-warning px-3 py-1">No questions yet</span>
-                    <?php endif; ?>
-                </div>
-
-                <div class="card-body p-3">
-                    <?php if (empty($questions)): ?>
-                        <div class="text-center py-5 text-muted">
-                            <i class="fas fa-question-circle fa-3x mb-3" style="opacity: 0.4;"></i>
-                            <p>Add your first question using the form on the left!</p>
-                        </div>
-                    <?php else: ?>
-                        <?php
-                        $colors = [KAHOOT_COLOR_RED, KAHOOT_COLOR_BLUE, KAHOOT_COLOR_YELLOW, KAHOOT_COLOR_GREEN];
-                        $icons  = [KAHOOT_ICON_RED, KAHOOT_ICON_BLUE, KAHOOT_ICON_YELLOW, KAHOOT_ICON_GREEN];
-                        ?>
-                        <?php foreach ($questions as $idx => $q): ?>
-                            <div class="border rounded p-3 mb-3 bg-light position-relative shadow-sm">
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <span class="badge badge-primary font-weight-bold px-2 py-1">
-                                        Question <?= $idx + 1 ?> (<?= $q['time_limit'] ?>s - <?= $q['points'] ?> pts)
-                                    </span>
-                                    <a href="<?= BASE_URL ?>modules/quiz/edit.php?id=<?= $quizId ?>&delete_question=<?= $q['id_question'] ?>"
-                                       class="btn btn-sm btn-outline-danger"
-                                       onclick="return confirm('Delete this question?');"
-                                       title="Delete question">
-                                        <i class="fas fa-trash-alt"></i>
-                                    </a>
-                                </div>
-                                <h6 class="font-weight-bold text-dark mb-2"><?= htmlspecialchars($q['text']) ?></h6>
-
-                                <div class="row no-gutters">
-                                    <?php foreach ($q['answers'] as $aIdx => $a): ?>
-                                        <div class="col-6 p-1">
-                                            <div class="p-2 text-white small rounded font-weight-bold d-flex align-items-center justify-content-between" style="background-color: <?= $colors[$aIdx % 4] ?>;">
-                                                <span><?= $icons[$aIdx % 4] ?> <?= htmlspecialchars($a['text']) ?></span>
-                                                <?php if ($a['is_correct']): ?>
-                                                    <span class="badge badge-light text-dark font-weight-bold ml-1">✓ CORRECT</span>
-                                                <?php endif; ?>
-                                            </div>
-                                        </div>
-                                    <?php endforeach; ?>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-                </div>
-            </div>
-        </div>
+<?php if ($flash): ?>
+<div class="editor-flash">
+    <div class="alert alert-<?= htmlspecialchars($flash['type']) ?> alert-auto-dismiss alert-dismissible fade show mb-0" role="alert">
+        <?= htmlspecialchars($flash['message']) ?>
+        <button type="button" class="close" data-dismiss="alert"><span>&times;</span></button>
     </div>
 </div>
+<?php endif; ?>
+
+<div class="editor-page-wrapper">
+
+    <div class="editor-topbar">
+        <a href="<?= BASE_URL ?>modules/quiz/list.php" class="btn btn-sm btn-outline-secondary font-weight-bold">
+            <i class="fas fa-chevron-left mr-1"></i> My Kahoots
+        </a>
+        <div class="quiz-title-wrapper">
+            <span id="quizTitleDisplay"><?= htmlspecialchars($quiz['name']) ?></span>
+            <input type="text" id="quizTitleInput" value="<?= htmlspecialchars($quiz['name']) ?>" maxlength="100">
+            <i class="fas fa-pencil-alt title-edit-icon" id="editTitleIcon" title="Edit title"></i>
+        </div>
+        <a href="<?= BASE_URL ?>modules/host/create_room.php?id_quiz=<?= $quiz['id_quiz'] ?>" class="btn btn-sm font-weight-bold" style="background:#46178f;color:#fff;">
+            <i class="fas fa-play mr-1"></i> Host Game Now
+        </a>
+    </div>
+
+    <div class="editor-layout">
+
+        <div class="q-list-panel">
+            <div class="q-list-scroll">
+                <ul id="questionListSortable" class="list-unstyled m-0 p-0">
+                    <?php if (empty($questions)): ?>
+                    <li class="q-list-empty">
+                        <i class="fas fa-question-circle fa-2x d-block mb-2"></i>
+                        No questions yet
+                    </li>
+                    <?php endif; ?>
+                    <?php foreach ($questions as $idx => $q): ?>
+                    <li class="q-list-item" data-id="<?= $q['id_question'] ?>">
+                        <span class="drag-handle"><i class="fas fa-grip-vertical"></i></span>
+                        <div class="q-thumb-content">
+                            <div class="q-thumb-num">Q<?= $idx + 1 ?></div>
+                            <div class="q-thumb-text" title="<?= htmlspecialchars($q['text'] ?? '') ?>">
+                                <?= htmlspecialchars(mb_strimwidth($q['text'] ?? '', 0, 36, '…')) ?>
+                            </div>
+                            <div class="q-thumb-meta"><?= intval($q['time_limit']) ?>s &bull; <?= number_format(intval($q['points'])) ?> pts</div>
+                        </div>
+                        <div class="q-list-actions">
+                            <button type="button" class="btn-icon" onclick="loadQuestionForEdit(<?= $q['id_question'] ?>)" title="Edit">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button type="button" class="btn-icon" onclick="duplicateQuestion(<?= $q['id_question'] ?>)" title="Duplicate">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                            <a href="?id=<?= $quizId ?>&delete_question=<?= $q['id_question'] ?>"
+                               class="btn-icon btn-delete"
+                               onclick="return confirm('Delete this question?')"
+                               title="Delete">
+                                <i class="fas fa-trash-alt"></i>
+                            </a>
+                        </div>
+                    </li>
+                    <?php endforeach; ?>
+                </ul>
+            </div>
+            <div class="q-list-footer">
+                <button type="button" class="btn-add-question" id="btnAddNewQuestion">
+                    <i class="fas fa-plus"></i> New question
+                </button>
+            </div>
+        </div>
+
+        <div class="q-canvas">
+            <div class="canvas-header">
+                <span id="canvasModeLabel" class="canvas-mode-label">New Question</span>
+                <span style="color:rgba(255,255,255,0.65);font-size:12px;"><?= count($questions) ?> question<?= count($questions) !== 1 ? 's' : '' ?></span>
+            </div>
+            <form id="questionForm" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="action"               id="formAction"              value="add_question">
+                <input type="hidden" name="editing_question_id"  id="editingQuestionId"       value="">
+                <input type="hidden" name="question_type"        id="hiddenQuestionType"      value="<?= htmlspecialchars($defaultQType) ?>">
+                <input type="hidden" name="time_limit"           id="hiddenTimeLimit"         value="<?= htmlspecialchars($defaultTimeLimit) ?>">
+                <input type="hidden" name="points"               id="hiddenPoints"            value="<?= htmlspecialchars($defaultPoints) ?>">
+                <input type="hidden" name="question_media_remove" id="questionMediaRemoveFlag" value="0">
+
+                <div class="canvas-body">
+
+                    <textarea id="questionTextInput" name="question_text" rows="2"
+                              placeholder="Start typing your question…"></textarea>
+
+                    <div class="media-upload-area" id="questionMediaArea">
+                        <input type="file" name="question_media" id="questionMediaFile" accept="image/*,video/*">
+                        <div id="questionMediaPlaceholder">
+                            <i class="fas fa-photo-video fa-2x d-block mb-1" style="color:#bbb;"></i>
+                            <span style="font-size:13px;color:#aaa;">Click or drag to add image / video</span>
+                        </div>
+                        <div id="questionMediaPreview" style="display:none;"></div>
+                        <button type="button" class="media-remove-btn" id="questionMediaRemoveBtn" style="display:none;">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+
+                    <div id="answersMultipleChoice" style="<?= $defaultQType === 'text' ? 'display: none;' : '' ?>">
+                        <div class="answers-grid">
+                            <?php
+                            $aColors   = ['color-red', 'color-blue', 'color-yellow', 'color-green'];
+                            $aIcons    = ['🔺', '🔷', '🟡', '🟩'];
+                            $aLabels   = ['Answer 1', 'Answer 2', 'Answer 3', 'Answer 4'];
+                            $aOptional = [false, false, true, true];
+                            for ($i = 0; $i < 4; $i++):
+                            ?>
+                            <div class="answer-tile" id="answerTile_<?= $i ?>">
+                                <div class="answer-tile-header <?= $aColors[$i] ?>">
+                                    <span><?= $aIcons[$i] ?></span>
+                                    <span style="flex:1;font-size:13px;">
+                                        <?= $aLabels[$i] ?>
+                                        <?php if ($aOptional[$i]): ?>
+                                        <span style="opacity:0.75;font-weight:400;font-size:11px;">(optional)</span>
+                                        <?php endif; ?>
+                                    </span>
+                                    <input type="checkbox" class="answer-correct-cb"
+                                           name="correct_answer_idx[]"
+                                           value="<?= $i ?>"
+                                           id="answerCorrect_<?= $i ?>"
+                                           title="Mark as correct">
+                                </div>
+                                <div class="answer-tile-body">
+                                    <input type="hidden" name="answer_use_image[<?= $i ?>]"  id="answerUseImage_<?= $i ?>"  value="0">
+                                    <input type="hidden" name="answer_keep_image[<?= $i ?>]" id="answerKeepImage_<?= $i ?>" value="">
+                                    <input type="text" class="answer-text-input"
+                                           name="answer_text[<?= $i ?>]"
+                                           id="answerText_<?= $i ?>"
+                                           placeholder="Type answer…">
+                                    <div class="answer-img-area" id="answerImgArea_<?= $i ?>">
+                                        <div id="answerImgPreview_<?= $i ?>" class="answer-img-placeholder">
+                                            <i class="fas fa-image" style="color:#ccc;"></i>
+                                            <span>Click to upload</span>
+                                        </div>
+                                        <input type="file" name="answer_image_file_<?= $i ?>"
+                                               id="answerImgFile_<?= $i ?>" accept="image/*">
+                                    </div>
+                                    <button type="button" class="answer-media-toggle" id="answerToggle_<?= $i ?>" data-index="<?= $i ?>">
+                                        🖼 Use Image
+                                    </button>
+                                </div>
+                            </div>
+                            <?php endfor; ?>
+                        </div>
+                    </div>
+
+                    <div id="answersText" class="text-ans-section" style="<?= $defaultQType === 'text' ? 'display: block;' : 'display: none;' ?>">
+                        <div class="prop-label" style="margin-bottom:8px;">Correct Answer</div>
+                        <input type="text" class="text-ans-input" name="text_answer" id="textAnswerInput"
+                               placeholder="Type the correct answer…" autocomplete="off">
+                        <div class="text-ans-underscores" id="textAnswerUnderscores"></div>
+                    </div>
+
+                </div>
+
+                <div class="canvas-footer">
+                    <button type="button" class="btn-cancel" id="btnCancelEdit" style="display:none;">
+                        <i class="fas fa-times mr-1"></i> Cancel
+                    </button>
+                    <button type="submit" class="btn-save" id="btnSaveQuestion">
+                        <i class="fas fa-plus mr-1"></i> Save &amp; Add Question
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div class="props-panel">
+            <div class="prop-group">
+                <div class="prop-label">Question Type</div>
+                <select class="prop-select" id="propQuestionType">
+                    <option value="multiple_choice" <?= $defaultQType === 'multiple_choice' ? 'selected' : '' ?>>Multiple Choice</option>
+                    <option value="text" <?= $defaultQType === 'text' ? 'selected' : '' ?>>Text Answer</option>
+                </select>
+            </div>
+            <div class="prop-group">
+                <div class="prop-label">Time Limit</div>
+                <select class="prop-select" id="propTimeLimit">
+                    <option value="10" <?= $defaultTimeLimit == 10 ? 'selected' : '' ?>>10 seconds</option>
+                    <option value="20" <?= $defaultTimeLimit == 20 ? 'selected' : '' ?>>20 seconds</option>
+                    <option value="30" <?= $defaultTimeLimit == 30 ? 'selected' : '' ?>>30 seconds</option>
+                    <option value="60" <?= $defaultTimeLimit == 60 ? 'selected' : '' ?>>60 seconds</option>
+                </select>
+            </div>
+            <div class="prop-group">
+                <div class="prop-label">Points</div>
+                <select class="prop-select" id="propPoints">
+                    <option value="500" <?= $defaultPoints == 500 ? 'selected' : '' ?>>500</option>
+                    <option value="1000" <?= $defaultPoints == 1000 ? 'selected' : '' ?>>1,000</option>
+                    <option value="2000" <?= $defaultPoints == 2000 ? 'selected' : '' ?>>2,000</option>
+                </select>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+window.KAHOOT_EDIT = {
+    quizId:    <?= intval($quizId) ?>,
+    baseUrl:   <?= json_encode(BASE_URL) ?>,
+    questions: <?= json_encode(array_values($questions), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<script src="<?= BASE_URL ?>assets/js/edit-quiz.js"></script>
 
 <?php require_once __DIR__ . '/../../includes/footer.php'; ?>
