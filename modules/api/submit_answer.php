@@ -3,6 +3,7 @@
 header('Content-Type: application/json; charset=utf-8');
 require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../includes/room_access.php';
 
 $raw = file_get_contents('php://input');
 $data = json_decode($raw, true);
@@ -36,11 +37,20 @@ $currentStreak = intval($playerCheck['current_streak'] ?? 0);
 
 try {
     // Serialize kick and answer requests until the vote and score are saved.
-    $result = with_room_access_lock($room, function ($handle) use ($room, $playerId, $answerId, $roomId) {
+    $result = with_room_access_lock($room, function ($handle) use ($room, $playerId, $answerId, $roomId, $currentStreak) {
         $state = read_room_access_state($handle);
         if (!empty($state['kicked'][$playerId])) {
             return ['success' => false, 'kicked' => true, 'message' => 'You were removed from the game by the host.'];
         }
+
+        $ans = db_fetch_one(
+            "SELECT a.*, q.points, q.time_limit, r.question_start_time, r.status
+             FROM answers a
+             JOIN questions q ON a.id_question = q.id_question
+             JOIN room r ON r.id_room = :r
+             WHERE a.id_answer = :aid",
+            [':r' => $roomId, ':aid' => $answerId]
+        );
 
         if (!$ans) {
             return ['success' => false, 'message' => 'Invalid answer or room'];
