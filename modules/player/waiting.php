@@ -61,7 +61,16 @@ $bodyClass = "backgroundColorChanges";
 require_once __DIR__ . '/../../includes/header.php';
 ?>
 
-<div class="d-flex align-items-center justify-content-center text-center text-white" style="min-height: 100vh; padding: 20px;">
+<nav class="navbar navbar-dark px-4 py-2 d-flex justify-content-between align-items-center" style="background-color: rgba(0,0,0,0.3); position: absolute; top: 0; left: 0; right: 0; z-index: 10;">
+    <a href="<?= BASE_URL ?>index.php" class="d-flex align-items-center text-decoration-none">
+        <img src="<?= BASE_URL ?>assets/img/logo.png" alt="Logo" style="max-height: 32px; filter: brightness(100);" class="mr-2">
+    </a>
+    <a href="<?= BASE_URL ?>index.php" class="btn btn-sm btn-outline-light font-weight-bold rounded-pill px-3" onclick="return confirm('Are you sure you want to leave this room and return home?');">
+        <i class="fas fa-home mr-1"></i> Home
+    </a>
+</nav>
+
+<div class="d-flex align-items-center justify-content-center text-center text-white" style="min-height: 100vh; padding: 70px 20px 20px;">
     <div class="player-waiting-content">
         <h1 class="display-3 font-weight-bold mb-3" style="text-shadow: 2px 2px 6px rgba(0,0,0,0.5);">
             You're in! 🎉

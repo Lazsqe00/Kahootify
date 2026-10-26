@@ -6,8 +6,11 @@ require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../includes/room_access.php';
 require_once __DIR__ . '/../../includes/player_characters.php';
 
-$action = $_GET['action'] ?? '';
-$roomId = intval($_GET['id_room'] ?? 0);
+$rawInput = file_get_contents('php://input');
+$jsonData = json_decode($rawInput, true);
+
+$action = $_GET['action'] ?? ($_POST['action'] ?? ($jsonData['action'] ?? ''));
+$roomId = intval($_GET['id_room'] ?? ($_POST['id_room'] ?? ($jsonData['id_room'] ?? 0)));
 
 if ($roomId <= 0) {
     echo json_encode(['success' => false, 'message' => 'Invalid room ID']);
@@ -28,14 +31,48 @@ if (isset($_GET['pid'])) {
     }
 }
 
+if ($action === 'update_settings') {
+    $showVal = 0;
+    if (isset($_POST['show_questions_on_players'])) {
+        $showVal = intval($_POST['show_questions_on_players']) ? 1 : 0;
+    } elseif (isset($_GET['show_questions_on_players'])) {
+        $showVal = intval($_GET['show_questions_on_players']) ? 1 : 0;
+    } elseif (isset($jsonData['show_questions_on_players'])) {
+        $showVal = intval($jsonData['show_questions_on_players']) ? 1 : 0;
+    }
+
+    db_execute("UPDATE room SET show_questions_on_players = :val WHERE id_room = :r", [
+        ':val' => $showVal,
+        ':r'   => $roomId
+    ]);
+
+    if (isset($jsonData['question_limit']) || isset($_POST['question_limit'])) {
+        $qLimit = isset($jsonData['question_limit']) ? intval($jsonData['question_limit']) : intval($_POST['question_limit'] ?? 0);
+        $qMode = $jsonData['question_mode'] ?? ($_POST['question_mode'] ?? 'all');
+        $saveLimit = ($qMode === 'random' && $qLimit > 0) ? $qLimit : null;
+        db_execute("UPDATE room SET question_limit = :ql WHERE id_room = :r", [
+            ':ql' => $saveLimit,
+            ':r'  => $roomId
+        ]);
+    }
+
+    echo json_encode([
+        'success' => true,
+        'show_questions_on_players' => $showVal,
+        'message' => 'Settings updated successfully'
+    ]);
+    exit;
+}
+
 if ($action === 'get_room_status') {
-    $room = db_fetch_one("SELECT id_room, pin, status, question_start_time FROM room WHERE id_room = :r", [':r' => $roomId]);
+    $room = db_fetch_one("SELECT id_room, pin, status, question_start_time, show_questions_on_players FROM room WHERE id_room = :r", [':r' => $roomId]);
     if ($room) {
         echo json_encode([
             'success' => true,
             'status'  => $room['status'],
             'is_locked' => room_is_locked($room),
-            'start_time' => $room['question_start_time']
+            'start_time' => $room['question_start_time'],
+            'show_questions_on_players' => intval($room['show_questions_on_players'] ?? 0)
         ]);
     } else {
         echo json_encode(['success' => false, 'message' => 'Room does not exist']);

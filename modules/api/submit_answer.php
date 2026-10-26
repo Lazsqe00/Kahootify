@@ -27,11 +27,12 @@ if (!$room) {
     exit;
 }
 
-$playerCheck = db_fetch_one("SELECT id_player FROM players WHERE id_player = :p AND id_room = :r", [':p' => $playerId, ':r' => $roomId]);
+$playerCheck = db_fetch_one("SELECT id_player, current_streak FROM players WHERE id_player = :p AND id_room = :r", [':p' => $playerId, ':r' => $roomId]);
 if (!$playerCheck) {
     echo json_encode(['success' => false, 'message' => 'Player not found in this room']);
     exit;
 }
+$currentStreak = intval($playerCheck['current_streak'] ?? 0);
 
 try {
     // Serialize kick and answer requests until the vote and score are saved.
@@ -40,15 +41,6 @@ try {
         if (!empty($state['kicked'][$playerId])) {
             return ['success' => false, 'kicked' => true, 'message' => 'You were removed from the game by the host.'];
         }
-
-        $ans = db_fetch_one(
-            "SELECT a.*, q.points, q.time_limit, r.question_start_time, r.status
-             FROM answers a
-             JOIN questions q ON a.id_question = q.id_question
-             JOIN room r ON r.id_room = :r
-             WHERE a.id_answer = :aid",
-            [':r' => $roomId, ':aid' => $answerId]
-        );
 
         if (!$ans) {
             return ['success' => false, 'message' => 'Invalid answer or room'];
@@ -67,6 +59,9 @@ try {
 
         $isCorrect = ($ans['is_correct'] == 1);
         $pointsEarned = 0;
+        $streakBonus = 0;
+        $newStreak = 0;
+        $streakLost = false;
 
         if ($isCorrect) {
             $basePoints = intval($ans['points'] ?: 1000);
@@ -77,22 +72,52 @@ try {
             $ratio = min(1, $elapsed / max(1, $timeLimit));
 
             $pointsEarned = intval(round($basePoints * (1 - ($ratio / 2))));
-        }
+            $newStreak = $currentStreak + 1;
 
-        db_insert(
-            "INSERT INTO votes (id_player, id_answer, points_earned) VALUES (:p, :a, :pts)",
-            [
-                ':p'   => $playerId,
-                ':a'   => $answerId,
-                ':pts' => $pointsEarned
-            ]
-        );
+            if ($newStreak == 2) {
+                $streakBonus = 100;
+            } elseif ($newStreak == 3) {
+                $streakBonus = 200;
+            } elseif ($newStreak == 4) {
+                $streakBonus = 300;
+            } elseif ($newStreak >= 5) {
+                $streakBonus = 500;
+            } else {
+                $streakBonus = 0;
+            }
 
-        if ($isCorrect) {
-            db_execute(
-                "UPDATE players SET score = score + :pts, answers_correct = answers_correct + 1 WHERE id_player = :p",
-                [':pts' => $pointsEarned, ':p' => $playerId]
+            $totalPts = $pointsEarned + $streakBonus;
+
+            db_insert(
+                "INSERT INTO votes (id_player, id_answer, points_earned, streak_bonus) VALUES (:p, :a, :pts, :bonus)",
+                [
+                    ':p'     => $playerId,
+                    ':a'     => $answerId,
+                    ':pts'   => $pointsEarned,
+                    ':bonus' => $streakBonus
+                ]
             );
+
+            db_execute(
+                "UPDATE players SET score = score + :totalPts, answers_correct = answers_correct + 1, current_streak = :newStreak WHERE id_player = :p",
+                [':totalPts' => $totalPts, ':newStreak' => $newStreak, ':p' => $playerId]
+            );
+        } else {
+            $streakLost = ($currentStreak >= 2);
+            $newStreak = 0;
+            $streakBonus = 0;
+
+            db_insert(
+                "INSERT INTO votes (id_player, id_answer, points_earned, streak_bonus) VALUES (:p, :a, :pts, :bonus)",
+                [
+                    ':p'     => $playerId,
+                    ':a'     => $answerId,
+                    ':pts'   => 0,
+                    ':bonus' => 0
+                ]
+            );
+
+            db_execute("UPDATE players SET current_streak = 0 WHERE id_player = :p", [':p' => $playerId]);
         }
 
         $counts = room_question_counts($room, $qId, $state);
@@ -110,7 +135,10 @@ try {
         return [
             'success'       => true,
             'is_correct'    => $isCorrect,
-            'points_earned' => $pointsEarned
+            'points_earned' => $pointsEarned,
+            'streak'        => $newStreak,
+            'streak_bonus'  => $streakBonus,
+            'streak_lost'   => $streakLost
         ];
     });
     echo json_encode($result);

@@ -36,16 +36,57 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['set_room_lock'])) {
     }
 }
 $isLocked = room_is_locked($room);
+$questions = db_fetch_all("SELECT id_question FROM questions WHERE id_quiz = :q ORDER BY id_question ASC", [':q' => $room['id_quiz']]);
+$totalQuizQuestions = count($questions);
 
 if (isset($_GET['start_game'])) {
-    $firstQ = db_fetch_one("SELECT id_question FROM questions WHERE id_quiz = :q ORDER BY id_question ASC LIMIT 1", [':q' => $room['id_quiz']]);
-    if ($firstQ) {
-        db_execute("UPDATE room SET status = :s, question_start_time = UNIX_TIMESTAMP() WHERE id_room = :r", [
-            ':s' => (string)$firstQ['id_question'],
-            ':r' => $roomId
-        ]);
+    if ($totalQuizQuestions > 0) {
+        $allQIds = array_column($questions, 'id_question');
+
+        if (isset($_GET['show_questions'])) {
+            $showQ = intval($_GET['show_questions']) ? 1 : 0;
+            db_execute("UPDATE room SET show_questions_on_players = :sq WHERE id_room = :r", [
+                ':sq' => $showQ,
+                ':r'  => $roomId
+            ]);
+        }
+
+        $mode = $_GET['question_mode'] ?? 'all';
+        $n = isset($_GET['question_limit']) ? intval($_GET['question_limit']) : $totalQuizQuestions;
+        $selectedQIds = $allQIds;
+        $savedLimit = null;
+
+        // Nếu Host chọn bốc N câu hợp lệ (1 <= N < Tổng số câu)
+        if ($mode === 'random' && $n > 0 && $n < $totalQuizQuestions) {
+            shuffle($allQIds);
+            $selectedQIds = array_slice($allQIds, 0, $n);
+            $savedLimit = $n;
+        } elseif ($mode === 'random' && $n >= $totalQuizQuestions) {
+            // N >= tổng số câu: bốc tất cả các câu xáo trộn
+            shuffle($allQIds);
+            $selectedQIds = $allQIds;
+            $savedLimit = $totalQuizQuestions;
+        } else {
+            // Chế độ 'all' hoặc N <= 0: Chơi toàn bộ câu hỏi (mặc định)
+            $selectedQIds = $allQIds;
+            $savedLimit = null;
+        }
+
+        $firstQId = $selectedQIds[0];
+        db_execute(
+            "UPDATE room SET status = :s, question_start_time = UNIX_TIMESTAMP(), question_limit = :ql, question_order = :qo WHERE id_room = :r",
+            [
+                ':s'  => (string)$firstQId,
+                ':ql' => $savedLimit,
+                ':qo' => json_encode(array_values($selectedQIds)),
+                ':r'  => $roomId
+            ]
+        );
         $_SESSION['question_index'] = 0;
         redirect('modules/host/play.php');
+    } else {
+        set_flash_message('danger', 'Bài trắc nghiệm này chưa có câu hỏi nào!');
+        redirect('modules/auth/dashboard.php');
     }
 }
 
@@ -61,6 +102,8 @@ $joinPageUrl = BASE_URL . 'modules/player/join.php';
 $joinUrl = $joinPageUrl . '?pin=' . rawurlencode($room['pin']);
 $joinHost = strtolower(parse_url(BASE_URL, PHP_URL_HOST) ?? '');
 $isLoopbackHost = in_array($joinHost, ['localhost', '127.0.0.1', '[::1]', '::1'], true) || substr($joinHost, -10) === '.localhost';
+
+$showOnPlayers = !empty($room['show_questions_on_players']);
 
 $pageTitle = "Lobby - Game PIN: " . htmlspecialchars($room['pin']);
 $bodyClass = "backgroundColorChanges";
@@ -79,6 +122,10 @@ require_once __DIR__ . '/../../includes/header.php';
         <span class="text-white font-weight-bold" style="font-size: 1.1rem;"><?= htmlspecialchars($room['quiz_name']) ?></span>
     </div>
     <div class="d-flex align-items-center" style="gap: 12px;">
+
+        <button type="button" class="btn btn-sm btn-outline-light font-weight-bold shadow-sm rounded-pill px-3" data-toggle="modal" data-target="#gameSettingsModal" title="Cài đặt phòng chơi">
+            <i class="fas fa-cog mr-1"></i> Cài đặt
+        </button>
 
         <button type="button" id="audioToggleBtn" class="btn btn-sm btn-light font-weight-bold shadow-sm rounded-pill px-3" onclick="toggleAudio()" title="Toggle lobby music">
             <i class="fas fa-volume-up text-success mr-1" id="audioIcon"></i>
@@ -210,12 +257,69 @@ require_once __DIR__ . '/../../includes/header.php';
         <?php endif; ?>
     </div>
 
+<<<<<<< HEAD
     <dialog id="joinQrDialog" class="lobby-qr-dialog" aria-labelledby="joinQrTitle">
         <form method="dialog" class="text-right"><button type="submit" class="btn btn-outline-dark btn-sm" aria-label="Close enlarged QR code">Close <span aria-hidden="true">&times;</span></button></form>
         <h2 id="joinQrTitle" class="h4 font-weight-bold mt-2">Scan to join</h2>
         <div id="joinQrCodeLarge" class="lobby-qr-code"></div>
         <p class="font-weight-bold mt-2 mb-0">Game PIN: <?= htmlspecialchars($room['pin']) ?></p>
     </dialog>
+=======
+    <!-- Cài đặt: Hiển thị câu hỏi & đáp án trên máy học sinh (Căn phải, in đậm, rõ ràng, không icon) -->
+    <div class="lobby-settings-bar mx-auto mb-3" style="max-width: 540px; width: 90%;">
+        <div class="d-flex justify-content-end align-items-center">
+            <div class="lobby-device-toggle-pill shadow d-inline-flex align-items-center" style="background: #ffffff; border-radius: 50px; padding: 10px 22px; border: 2px solid #ffffff;">
+                <label for="toggleShowQuestions" class="mb-0 mr-3 text-dark font-weight-bold" style="font-family: 'Montserrat', sans-serif; font-size: 0.98rem; font-weight: 800; color: #111111; cursor: pointer; user-select: none;">
+                    Hiển thị câu hỏi &amp; đáp án trên máy học sinh:
+                </label>
+                <span id="settingStatusLabel" class="badge <?= $showOnPlayers ? 'badge-success' : 'badge-secondary' ?> font-weight-bold mr-3 px-2 py-1" style="font-size: 0.85rem; letter-spacing: 0.5px;">
+                    <?= $showOnPlayers ? 'BẬT' : 'TẮT' ?>
+                </span>
+                <div class="custom-control custom-switch" style="transform: scale(1.3); transform-origin: center center;">
+                    <input type="checkbox" class="custom-control-input" id="toggleShowQuestions" <?= $showOnPlayers ? 'checked' : '' ?> onchange="updateShowQuestions(this.checked)">
+                    <label class="custom-control-label" for="toggleShowQuestions" style="cursor: pointer;"></label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cài đặt số lượng câu hỏi ván chơi (Ngân hàng đề) -->
+    <div class="lobby-settings-bar mx-auto mb-4" style="max-width: 540px; width: 90%;">
+        <div class="lobby-device-toggle-pill shadow d-flex flex-column text-dark" style="background: #ffffff; border-radius: 18px; padding: 14px 22px; border: 2px solid #ffffff;">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="font-weight-bold" style="font-family: 'Montserrat', sans-serif; font-size: 0.98rem; font-weight: 800; color: #111111;">
+                    <i class="fas fa-random text-primary mr-1"></i> Số lượng câu hỏi ván chơi:
+                </span>
+                <span id="lobbyModeStatusBadge" class="badge badge-primary font-weight-bold px-2 py-1" style="font-size: 0.85rem;">
+                    Tất cả (<?= $totalQuizQuestions ?> câu)
+                </span>
+            </div>
+
+            <div class="d-flex flex-column text-left" style="gap: 8px;">
+                <div class="custom-control custom-radio">
+                    <input type="radio" id="lobbyModeAll" name="lobby_question_mode" class="custom-control-input" value="all" checked onchange="syncQuestionSettings('lobby')">
+                    <label class="custom-control-label font-weight-bold text-dark" for="lobbyModeAll" style="cursor: pointer; font-size: 0.92rem;">
+                        Chơi tất cả câu hỏi (<span class="text-primary font-weight-bold"><?= $totalQuizQuestions ?> câu</span>)
+                    </label>
+                </div>
+                <div class="custom-control custom-radio d-flex align-items-center flex-wrap">
+                    <input type="radio" id="lobbyModeRandom" name="lobby_question_mode" class="custom-control-input" value="random" onchange="syncQuestionSettings('lobby')">
+                    <label class="custom-control-label font-weight-bold text-dark mr-2 mb-0" for="lobbyModeRandom" style="cursor: pointer; font-size: 0.92rem;">
+                        Bốc ngẫu nhiên
+                    </label>
+                    <div class="d-inline-flex align-items-center" style="gap: 6px;">
+                        <input type="number" id="lobbyQuestionLimit" class="form-control form-control-sm text-center font-weight-bold text-dark" 
+                               style="width: 75px; height: 32px; border-radius: 8px; border: 2px solid #ced4da;" 
+                               min="1" max="<?= $totalQuizQuestions ?>" 
+                               value="<?= min(5, $totalQuizQuestions) ?>" 
+                               onchange="onLobbyLimitInput()" oninput="onLobbyLimitInput()" onclick="$('#lobbyModeRandom').prop('checked', true); syncQuestionSettings('lobby');">
+                        <span class="font-weight-bold text-muted small">/ <?= $totalQuizQuestions ?> câu trong ngân hàng</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+>>>>>>> origin/pr/8
 
     <div class="d-flex justify-content-center align-items-center my-4" style="gap: 20px;">
         <div class="bg-dark px-4 py-2 rounded-pill shadow">
@@ -225,7 +329,7 @@ require_once __DIR__ . '/../../includes/header.php';
             </span>
         </div>
 
-        <a href="lobby.php?start_game=true" id="btnStartGame" class="btn btn-kahoot btn-kahoot-green btn-lg px-5 py-3 shadow" style="<?= count($players) === 0 ? 'pointer-events: none; opacity: 0.6;' : '' ?>">
+        <a href="lobby.php?start_game=true&show_questions=<?= $showOnPlayers ? '1' : '0' ?>" id="btnStartGame" class="btn btn-kahoot btn-kahoot-green btn-lg px-5 py-3 shadow" style="<?= count($players) === 0 ? 'pointer-events: none; opacity: 0.6;' : '' ?>">
             <i class="fas fa-play mr-2"></i> START GAME
         </a>
     </div>
@@ -238,10 +342,94 @@ require_once __DIR__ . '/../../includes/header.php';
     </div>
 </div>
 
+<<<<<<< HEAD
 <script src="<?= BASE_URL ?>assets/js/qrcodegen.js"></script>
 <script src="<?= BASE_URL ?>assets/js/lobby-join.js"></script>
 <script src="<?= BASE_URL ?>assets/js/host-players.js"></script>
+=======
+<!-- Modal Cài đặt phòng -->
+<div class="modal fade text-dark" id="gameSettingsModal" tabindex="-1" role="dialog" aria-labelledby="settingsModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
+            <div class="modal-header text-white" style="background-color: var(--kahoot-purple-dark);">
+                <h5 class="modal-title font-weight-bold" id="settingsModalTitle">
+                    <i class="fas fa-sliders-h mr-2"></i>Cài đặt phòng trò chơi
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body p-4 text-left">
+                <!-- 1. Bốc ngẫu nhiên câu hỏi từ ngân hàng đề -->
+                <div class="p-3 mb-3 rounded" style="background-color: #f8f9fa; border: 1px solid #e9ecef;">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="font-weight-bold mb-0" style="font-family: 'Montserrat', sans-serif; font-weight: 800; color: #111111;">
+                            <i class="fas fa-random text-primary mr-2"></i>Số lượng câu hỏi (Ngân hàng đề)
+                        </h6>
+                        <span id="modalModeStatusBadge" class="badge badge-primary font-weight-bold px-2 py-1" style="font-size: 0.85rem;">
+                            Tất cả (<?= $totalQuizQuestions ?> câu)
+                        </span>
+                    </div>
+                    <p class="text-muted small mb-3">
+                        Ngân hàng Quiz hiện có tổng cộng <b><?= $totalQuizQuestions ?> câu</b>. Bạn có thể cho lớp chơi toàn bộ câu hỏi hoặc chỉ bốc ngẫu nhiên N câu hỏi cho trận đấu này.
+                    </p>
+
+                    <div class="custom-control custom-radio mb-2">
+                        <input type="radio" id="modalModeAll" name="modal_question_mode" class="custom-control-input" value="all" checked onchange="syncQuestionSettings('modal')">
+                        <label class="custom-control-label font-weight-bold text-dark" for="modalModeAll" style="cursor: pointer;">
+                            Chơi tất cả câu hỏi (<span class="text-primary font-weight-bold"><?= $totalQuizQuestions ?> câu</span>)
+                        </label>
+                    </div>
+
+                    <div class="custom-control custom-radio d-flex align-items-center flex-wrap">
+                        <input type="radio" id="modalModeRandom" name="modal_question_mode" class="custom-control-input" value="random" onchange="syncQuestionSettings('modal')">
+                        <label class="custom-control-label font-weight-bold text-dark mr-2 mb-0" for="modalModeRandom" style="cursor: pointer;">
+                            Bốc ngẫu nhiên
+                        </label>
+                        <div class="d-inline-flex align-items-center" style="gap: 6px;">
+                            <input type="number" id="modalQuestionLimit" class="form-control form-control-sm text-center font-weight-bold text-dark" 
+                                   style="width: 80px; height: 32px; border-radius: 8px; border: 2px solid #ced4da;" 
+                                   min="1" max="<?= $totalQuizQuestions ?>" 
+                                   value="<?= min(5, $totalQuizQuestions) ?>" 
+                                   onchange="onModalLimitChange()" oninput="onModalLimitChange()" onclick="$('#modalModeRandom').prop('checked', true); syncQuestionSettings('modal');">
+                            <span class="font-weight-bold text-muted small">/ <?= $totalQuizQuestions ?> câu</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Hiển thị câu hỏi & đáp án trên máy học sinh -->
+                <div class="p-3 mb-3 rounded" style="background-color: #f8f9fa; border: 1px solid #e9ecef;">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="pr-3">
+                            <h6 class="font-weight-bold mb-1" style="font-family: 'Montserrat', sans-serif; font-weight: 800; color: #111111;">
+                                Hiển thị câu hỏi &amp; đáp án trên máy học sinh
+                            </h6>
+                            <p class="text-muted small mb-0">
+                                Dành cho học Online / Ngồi xa máy chiếu. Khi bật, thiết bị học sinh sẽ thấy đề bài, hình ảnh và chữ trên các nút đáp án.
+                            </p>
+                        </div>
+                        <div class="custom-control custom-switch pl-4" style="transform: scale(1.3); transform-origin: right center;">
+                            <input type="checkbox" class="custom-control-input" id="modalToggleShowQuestions" <?= $showOnPlayers ? 'checked' : '' ?> onchange="updateShowQuestions(this.checked)">
+                            <label class="custom-control-label" for="modalToggleShowQuestions" style="cursor: pointer;"></label>
+                        </div>
+                    </div>
+                </div>
+                <div class="alert alert-info py-2 px-3 small mb-0">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    <strong>Chế độ mặc định (TẮT):</strong> Màn hình học sinh chỉ có 4 ô màu trơn lớn để nhìn lên máy chiếu.
+                </div>
+            </div>
+            <div class="modal-footer bg-light py-2">
+                <button type="button" class="btn btn-primary font-weight-bold rounded-pill px-4" data-dismiss="modal">Xong</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+>>>>>>> origin/pr/8
 <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
 <script>
 
 const audio = document.getElementById('lobbyAudio');
@@ -292,9 +480,85 @@ function updateAudioUI(isPlaying) {
     }
 }
 
+let currentShowQuestions = <?= $showOnPlayers ? 1 : 0 ?>;
+const totalQuizQuestions = <?= $totalQuizQuestions ?>;
+
+function getSelectedQuestionConfig() {
+    const isRandom = $('#lobbyModeRandom').is(':checked') || $('#modalModeRandom').is(':checked');
+    let limit = parseInt($('#lobbyQuestionLimit').val()) || totalQuizQuestions;
+    if (limit <= 0) limit = 1;
+    if (limit > totalQuizQuestions) limit = totalQuizQuestions;
+    return {
+        mode: isRandom ? 'random' : 'all',
+        limit: limit
+    };
+}
+
+function syncQuestionSettings(source) {
+    let mode, limit;
+    if (source === 'modal') {
+        mode = $('input[name="modal_question_mode"]:checked').val() || 'all';
+        limit = parseInt($('#modalQuestionLimit').val()) || totalQuizQuestions;
+        if (limit <= 0) limit = 1;
+        if (limit > totalQuizQuestions) limit = totalQuizQuestions;
+
+        $('#lobbyModeAll').prop('checked', mode === 'all');
+        $('#lobbyModeRandom').prop('checked', mode === 'random');
+        $('#lobbyQuestionLimit').val(limit);
+    } else {
+        mode = $('input[name="lobby_question_mode"]:checked').val() || 'all';
+        limit = parseInt($('#lobbyQuestionLimit').val()) || totalQuizQuestions;
+        if (limit <= 0) limit = 1;
+        if (limit > totalQuizQuestions) limit = totalQuizQuestions;
+
+        $('#modalModeAll').prop('checked', mode === 'all');
+        $('#modalModeRandom').prop('checked', mode === 'random');
+        $('#modalQuestionLimit').val(limit);
+    }
+
+    if (mode === 'random') {
+        $('#lobbyModeStatusBadge').text('Bốc ' + limit + ' / ' + totalQuizQuestions + ' câu')
+                                  .removeClass('badge-primary').addClass('badge-warning text-dark');
+        $('#modalModeStatusBadge').text('Bốc ' + limit + ' / ' + totalQuizQuestions + ' câu')
+                                  .removeClass('badge-primary').addClass('badge-warning text-dark');
+    } else {
+        $('#lobbyModeStatusBadge').text('Tất cả (' + totalQuizQuestions + ' câu)')
+                                  .removeClass('badge-warning text-dark').addClass('badge-primary');
+        $('#modalModeStatusBadge').text('Tất cả (' + totalQuizQuestions + ' câu)')
+                                  .removeClass('badge-warning text-dark').addClass('badge-primary');
+    }
+
+    updateStartGameHref();
+}
+
+function onLobbyLimitInput() {
+    $('#lobbyModeRandom').prop('checked', true);
+    syncQuestionSettings('lobby');
+}
+
+function onModalLimitChange() {
+    $('#modalModeRandom').prop('checked', true);
+    syncQuestionSettings('modal');
+}
+
+function updateStartGameHref() {
+    const config = getSelectedQuestionConfig();
+    let url = 'lobby.php?start_game=true&show_questions=' + currentShowQuestions + '&question_mode=' + config.mode;
+    if (config.mode === 'random') {
+        url += '&question_limit=' + config.limit;
+    }
+    $('#btnStartGame').attr('href', url);
+}
+
 $(document).ready(function() {
     tryPlayAudio();
+    updateStartGameHref();
+    $('#btnStartGame').on('click', function() {
+        updateStartGameHref();
+    });
 });
+
+
 
 document.addEventListener('roomplayerschange', function (event) {
     const data = event.detail;
@@ -314,7 +578,6 @@ function updateRoomLockUI(isLocked) {
         ? 'Room locked. New players cannot join.'
         : 'Room open. Players can join using the Game PIN or a join link.')
         .toggleClass('text-danger', isLocked).toggleClass('text-muted', !isLocked);
-}
 }
 
 </script>
