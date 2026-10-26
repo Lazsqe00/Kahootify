@@ -163,7 +163,8 @@ function join_room_player($roomId, $pin, $nickname, $characterId = null, $access
 
         $existing = db_fetch_one(
             'SELECT id_player FROM players WHERE id_room = :r AND nickname = :nick LIMIT 1',
-            );
+            [':r' => $roomId, ':nick' => $nickname]
+        );
         if ($existing) {
             $nickname .= '_' . mt_rand(10, 99);
         }
