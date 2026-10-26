@@ -10,7 +10,7 @@ if (!$room) {
     redirect('modules/auth/dashboard.php');
 }
 
-$isFinal = (isset($_GET['final']) && $_GET['final'] === 'true') || ($room['status'] === 'finished');
+$isFinal = $room['status'] === 'finished';
 
 $currentQId = intval($_GET['qid'] ?? 0);
 if ($currentQId <= 0 && !$isFinal) {
@@ -39,13 +39,19 @@ if (!$isFinal && $currentQId > 0) {
             LEFT JOIN votes v ON v.id_player = p.id_player AND v.id_answer IN (SELECT id_answer FROM answers WHERE id_question = :qid)
             LEFT JOIN answers a ON v.id_answer = a.id_answer
             WHERE p.id_room = :id_room
-            ORDER BY p.score DESC, p.playeradd ASC";
+            ORDER BY p.score DESC, p.playeradd ASC, p.id_player ASC";
     $leaderboard = filter_room_players($roomId, db_fetch_all($sql, [':id_room' => $roomId, ':qid' => $currentQId]));
 } else {
     $leaderboard = get_room_leaderboard($roomId);
 }
 
-$pageTitle = $isFinal ? "🏆 Final Podium - Game Over" : "📊 Score Leaderboard";
+if ($isFinal) {
+    $resultsPlayerId = 0;
+    require __DIR__ . '/../../includes/final_results.php';
+    exit;
+}
+
+$pageTitle = 'Score Leaderboard';
 $bodyClass = "backgroundColorChanges";
 require_once __DIR__ . '/../../includes/header.php';
 ?>
@@ -54,92 +60,16 @@ require_once __DIR__ . '/../../includes/header.php';
     <div class="d-flex align-items-center">
         <img src="<?= BASE_URL ?>assets/img/logo.png" alt="Logo" style="max-height: 32px; filter: brightness(100);" class="mr-3">
         <span class="badge badge-light font-weight-bold mr-2">PIN: <?= htmlspecialchars($room['pin']) ?></span>
-        <span class="text-white font-weight-bold"><?= $isFinal ? 'FINAL RESULTS' : 'LEADERBOARD' ?></span>
+        <span class="text-white font-weight-bold">LEADERBOARD</span>
     </div>
     <div>
-        <?php if ($isFinal): ?>
-            <a href="<?= BASE_URL ?>modules/auth/dashboard.php" class="btn btn-kahoot btn-kahoot-green font-weight-bold">
-                <i class="fas fa-home mr-1"></i> Return to Dashboard
-            </a>
-        <?php else: ?>
-            <a href="<?= BASE_URL ?>modules/host/play.php?action=next_question" class="btn btn-kahoot btn-kahoot-green font-weight-bold">
-                <?= $hasNextQuestion ? 'Next Question &raquo;' : 'Final Results 🏆' ?>
-            </a>
-        <?php endif; ?>
+        <a href="<?= BASE_URL ?>modules/host/play.php?action=next_question" class="btn btn-kahoot btn-kahoot-green font-weight-bold">
+            <?= $hasNextQuestion ? 'Next Question &raquo;' : 'Final Results &raquo;' ?>
+        </a>
     </div>
 </nav>
 
 <div class="container my-4" style="max-width: 850px;">
-    <?php if ($isFinal): ?>
-
-        <div class="text-center text-white mb-4">
-            <h1 class="display-4 font-weight-bold" style="text-shadow: 2px 2px 5px rgba(0,0,0,0.4);">
-                🎉 CONGRATULATIONS! 🎉
-            </h1>
-            <p class="lead font-weight-bold" style="text-shadow: 1px 1px 3px rgba(0,0,0,0.4);">Celebrating our top champions</p>
-        </div>
-
-        <?php if (count($leaderboard) > 0):
-            $top1 = $leaderboard[0] ?? null;
-            $top2 = $leaderboard[1] ?? null;
-            $top3 = $leaderboard[2] ?? null;
-        ?>
-            <div class="podium-container mb-5">
-
-                <?php if ($top2): ?>
-                    <div class="podium-step rank-2">
-                        <div class="mb-2"><i class="fas fa-medal fa-2x text-light"></i></div>
-                        <h5 class="font-weight-bold mb-1"><?= htmlspecialchars($top2['nickname']) ?></h5>
-                        <div class="badge badge-light text-dark font-weight-bold mb-3"><?= number_format($top2['score']) ?> pts</div>
-                        <h2 class="font-weight-bold">2</h2>
-                    </div>
-                <?php endif; ?>
-
-                <?php if ($top1): ?>
-                    <div class="podium-step rank-1">
-                        <div class="mb-2"><i class="fas fa-crown fa-3x text-warning"></i></div>
-                        <h4 class="font-weight-bold mb-1"><?= htmlspecialchars($top1['nickname']) ?></h4>
-                        <div class="badge badge-light text-dark font-weight-bold mb-3" style="font-size: 1.1rem;"><?= number_format($top1['score']) ?> pts</div>
-                        <h1 class="display-3 font-weight-bold">1</h1>
-                    </div>
-                <?php endif; ?>
-
-                <?php if ($top3): ?>
-                    <div class="podium-step rank-3">
-                        <div class="mb-2"><i class="fas fa-award fa-2x text-light"></i></div>
-                        <h5 class="font-weight-bold mb-1"><?= htmlspecialchars($top3['nickname']) ?></h5>
-                        <div class="badge badge-light text-dark font-weight-bold mb-3"><?= number_format($top3['score']) ?> pts</div>
-                        <h2 class="font-weight-bold">3</h2>
-                    </div>
-                <?php endif; ?>
-            </div>
-        <?php endif; ?>
-
-        <div class="card border-0 shadow-lg p-3" style="border-radius: 14px; background: rgba(255,255,255,0.95);">
-            <h5 class="font-weight-bold text-dark mb-3 px-2">Final Standings:</h5>
-            <?php foreach ($leaderboard as $idx => $p):
-                $rank = $idx + 1;
-                $badgeClass = ($rank == 1) ? 'badge-warning text-dark' : (($rank == 2) ? 'badge-secondary' : (($rank == 3) ? 'badge-danger' : 'badge-light text-dark'));
-            ?>
-                <div class="leaderboard-item d-flex justify-content-between align-items-center py-2 px-3 mb-2" style="background: #f8f9fa; border-radius: 8px;">
-                    <div class="d-flex align-items-center">
-                        <span class="badge <?= $badgeClass ?> font-weight-bold mr-3" style="font-size: 1.1rem; width: 34px; height: 34px; line-height: 24px; border-radius: 50%;">
-                            <?= $rank ?>
-                        </span>
-                        <span class="font-weight-bold text-dark" style="font-size: 1.15rem;">
-                            <?= htmlspecialchars($p['nickname']) ?>
-                        </span>
-                    </div>
-                    <div class="text-right">
-                        <span class="font-weight-bold text-success" style="font-size: 1.2rem;"><?= number_format($p['score']) ?> pts</span>
-                        <small class="text-muted d-block font-weight-bold"><?= $p['correct_count'] ?> correct</small>
-                    </div>
-                </div>
-            <?php endforeach; ?>
-        </div>
-
-    <?php else: ?>
-
         <div class="text-center text-white mb-3">
             <h2 class="font-weight-bold" style="text-shadow: 2px 2px 4px rgba(0,0,0,0.4);">
                 <i class="fas fa-chart-line mr-2"></i>Interim Leaderboard
@@ -206,24 +136,10 @@ require_once __DIR__ . '/../../includes/header.php';
                 <?php endforeach; ?>
             <?php endif; ?>
         </div>
-    <?php endif; ?>
 </div>
 
 <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
-<?php if ($isFinal): ?>
-<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
-<script>
-$(document).ready(function() {
-    if (typeof confetti === 'function') {
-        confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
-        setTimeout(function() {
-            confetti({ particleCount: 50, angle: 60, spread: 55, origin: { x: 0 } });
-            confetti({ particleCount: 50, angle: 120, spread: 55, origin: { x: 1 } });
-        }, 400);
-    }
-});
-</script>
-<?php else: ?>
+
 <script>
 $(document).ready(function() {
 
@@ -276,6 +192,6 @@ $(document).ready(function() {
     }, 1000);
 });
 </script>
-<?php endif; ?>
+
 </body>
 </html>

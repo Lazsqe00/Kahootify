@@ -4,6 +4,7 @@ header('Content-Type: application/json; charset=utf-8');
 require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../includes/room_access.php';
+require_once __DIR__ . '/../../includes/player_characters.php';
 
 $action = $_GET['action'] ?? '';
 $roomId = intval($_GET['id_room'] ?? 0);
@@ -49,6 +50,11 @@ if ($action === 'get_players') {
         exit;
     }
     $players = filter_room_players($roomId, db_fetch_all("SELECT id_player, nickname, score FROM players WHERE id_room = :r ORDER BY id_player ASC", [':r' => $roomId]));
+    foreach ($players as &$lobbyPlayer) {
+        $appearance = get_player_appearance($room, (int) $lobbyPlayer['id_player']);
+        $lobbyPlayer['character_svg'] = player_appearance_image($appearance, 'lobby-character');
+    }
+    unset($lobbyPlayer);
     echo json_encode([
         'success' => true,
         'players' => $players,

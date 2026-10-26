@@ -19,5 +19,9 @@ $bodyClass = $bodyClass ?? '';
 
     <link rel="stylesheet" href="<?= BASE_URL ?>assets/css/kahoot-theme.css">
     <?php if (!empty($extraCss)): ?><link rel="stylesheet" href="<?= htmlspecialchars($extraCss) ?>"><?php endif; ?>
+    <link rel="stylesheet" href="<?= BASE_URL ?>assets/css/character-avatar.css">
+    <?php foreach (($pageStyles ?? []) as $stylesheet): ?>
+        <link rel="stylesheet" href="<?= htmlspecialchars(BASE_URL . $stylesheet, ENT_QUOTES, 'UTF-8') ?>">
+    <?php endforeach; ?>
 </head>
 <body class="<?= htmlspecialchars($bodyClass) ?>">

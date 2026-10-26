@@ -142,7 +142,7 @@ function room_join_error($room, $isLocked = null) {
     return '';
 }
 
-function join_room_player($roomId, $pin, $nickname) {
+function join_room_player($roomId, $pin, $nickname, $characterId = null, $accessoryId = null) {
     $room = db_fetch_one('SELECT * FROM room WHERE id_room = :r AND pin = :pin', [':r' => $roomId, ':pin' => $pin]);
     if (!$room) {
         return ['success' => false, 'message' => room_join_error($room)];
@@ -163,15 +163,14 @@ function join_room_player($roomId, $pin, $nickname) {
 
         $existing = db_fetch_one(
             'SELECT id_player FROM players WHERE id_room = :r AND nickname = :nick LIMIT 1',
-            [':r' => $roomId, ':nick' => $nickname]
-        );
+            );
         if ($existing) {
             $nickname .= '_' . mt_rand(10, 99);
         }
         $playerId = db_insert(
-            'INSERT INTO players (id_room, nickname, score, answers_correct, is_kicked) VALUES (:r, :nick, 0, 0, 0)',
-            [':r' => $roomId, ':nick' => $nickname]
-        );
+            'INSERT INTO players (id_room, nickname, score, answers_correct, is_kicked, character_id, accessory_id) VALUES (:r, :nick, 0, 0, 0, :char, :acc)',
+            [':r' => $roomId, ':nick' => $nickname, ':char' => ($characterId ?: '1500'), ':acc' => ($accessoryId ?: '')]
+            );
         $pdo->commit();
         return ['success' => true, 'id_player' => $playerId, 'nickname' => $nickname];
     } catch (Throwable $error) {

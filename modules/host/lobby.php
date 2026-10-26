@@ -3,6 +3,7 @@
 require_once __DIR__ . '/../../includes/auth_check.php';
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../includes/room_access.php';
+require_once __DIR__ . '/../../includes/player_characters.php';
 
 $roomId = intval($_SESSION['id_room'] ?? 0);
 $creatorId = intval($_SESSION['id_creator']);
@@ -313,6 +314,7 @@ function updateRoomLockUI(isLocked) {
         ? 'Room locked. New players cannot join.'
         : 'Room open. Players can join using the Game PIN or a join link.')
         .toggleClass('text-danger', isLocked).toggleClass('text-muted', !isLocked);
+}
 }
 
 </script>
