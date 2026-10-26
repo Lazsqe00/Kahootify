@@ -257,23 +257,21 @@ require_once __DIR__ . '/../../includes/header.php';
         <?php endif; ?>
     </div>
 
-<<<<<<< HEAD
     <dialog id="joinQrDialog" class="lobby-qr-dialog" aria-labelledby="joinQrTitle">
         <form method="dialog" class="text-right"><button type="submit" class="btn btn-outline-dark btn-sm" aria-label="Close enlarged QR code">Close <span aria-hidden="true">&times;</span></button></form>
         <h2 id="joinQrTitle" class="h4 font-weight-bold mt-2">Scan to join</h2>
         <div id="joinQrCodeLarge" class="lobby-qr-code"></div>
         <p class="font-weight-bold mt-2 mb-0">Game PIN: <?= htmlspecialchars($room['pin']) ?></p>
     </dialog>
-=======
-    <!-- Cài đặt: Hiển thị câu hỏi & đáp án trên máy học sinh (Căn phải, in đậm, rõ ràng, không icon) -->
+
     <div class="lobby-settings-bar mx-auto mb-3" style="max-width: 540px; width: 90%;">
         <div class="d-flex justify-content-end align-items-center">
             <div class="lobby-device-toggle-pill shadow d-inline-flex align-items-center" style="background: #ffffff; border-radius: 50px; padding: 10px 22px; border: 2px solid #ffffff;">
                 <label for="toggleShowQuestions" class="mb-0 mr-3 text-dark font-weight-bold" style="font-family: 'Montserrat', sans-serif; font-size: 0.98rem; font-weight: 800; color: #111111; cursor: pointer; user-select: none;">
-                    Hiển thị câu hỏi &amp; đáp án trên máy học sinh:
+                    Show questions &amp; answers on player devices:
                 </label>
                 <span id="settingStatusLabel" class="badge <?= $showOnPlayers ? 'badge-success' : 'badge-secondary' ?> font-weight-bold mr-3 px-2 py-1" style="font-size: 0.85rem; letter-spacing: 0.5px;">
-                    <?= $showOnPlayers ? 'BẬT' : 'TẮT' ?>
+                    <?= $showOnPlayers ? 'ON' : 'OFF' ?>
                 </span>
                 <div class="custom-control custom-switch" style="transform: scale(1.3); transform-origin: center center;">
                     <input type="checkbox" class="custom-control-input" id="toggleShowQuestions" <?= $showOnPlayers ? 'checked' : '' ?> onchange="updateShowQuestions(this.checked)">
@@ -283,15 +281,14 @@ require_once __DIR__ . '/../../includes/header.php';
         </div>
     </div>
 
-    <!-- Cài đặt số lượng câu hỏi ván chơi (Ngân hàng đề) -->
     <div class="lobby-settings-bar mx-auto mb-4" style="max-width: 540px; width: 90%;">
         <div class="lobby-device-toggle-pill shadow d-flex flex-column text-dark" style="background: #ffffff; border-radius: 18px; padding: 14px 22px; border: 2px solid #ffffff;">
             <div class="d-flex justify-content-between align-items-center mb-2">
                 <span class="font-weight-bold" style="font-family: 'Montserrat', sans-serif; font-size: 0.98rem; font-weight: 800; color: #111111;">
-                    <i class="fas fa-random text-primary mr-1"></i> Số lượng câu hỏi ván chơi:
+                    <i class="fas fa-random text-primary mr-1"></i> Questions per game:
                 </span>
                 <span id="lobbyModeStatusBadge" class="badge badge-primary font-weight-bold px-2 py-1" style="font-size: 0.85rem;">
-                    Tất cả (<?= $totalQuizQuestions ?> câu)
+                    All (<?= $totalQuizQuestions ?> questions)
                 </span>
             </div>
 
@@ -299,13 +296,13 @@ require_once __DIR__ . '/../../includes/header.php';
                 <div class="custom-control custom-radio">
                     <input type="radio" id="lobbyModeAll" name="lobby_question_mode" class="custom-control-input" value="all" checked onchange="syncQuestionSettings('lobby')">
                     <label class="custom-control-label font-weight-bold text-dark" for="lobbyModeAll" style="cursor: pointer; font-size: 0.92rem;">
-                        Chơi tất cả câu hỏi (<span class="text-primary font-weight-bold"><?= $totalQuizQuestions ?> câu</span>)
+                        Play all questions (<span class="text-primary font-weight-bold"><?= $totalQuizQuestions ?> questions</span>)
                     </label>
                 </div>
                 <div class="custom-control custom-radio d-flex align-items-center flex-wrap">
                     <input type="radio" id="lobbyModeRandom" name="lobby_question_mode" class="custom-control-input" value="random" onchange="syncQuestionSettings('lobby')">
                     <label class="custom-control-label font-weight-bold text-dark mr-2 mb-0" for="lobbyModeRandom" style="cursor: pointer; font-size: 0.92rem;">
-                        Bốc ngẫu nhiên
+                        Random selection
                     </label>
                     <div class="d-inline-flex align-items-center" style="gap: 6px;">
                         <input type="number" id="lobbyQuestionLimit" class="form-control form-control-sm text-center font-weight-bold text-dark" 
@@ -313,13 +310,12 @@ require_once __DIR__ . '/../../includes/header.php';
                                min="1" max="<?= $totalQuizQuestions ?>" 
                                value="<?= min(5, $totalQuizQuestions) ?>" 
                                onchange="onLobbyLimitInput()" oninput="onLobbyLimitInput()" onclick="$('#lobbyModeRandom').prop('checked', true); syncQuestionSettings('lobby');">
-                        <span class="font-weight-bold text-muted small">/ <?= $totalQuizQuestions ?> câu trong ngân hàng</span>
+                        <span class="font-weight-bold text-muted small">/ <?= $totalQuizQuestions ?> questions in pool</span>
                     </div>
                 </div>
             </div>
         </div>
     </div>
->>>>>>> origin/pr/8
 
     <div class="d-flex justify-content-center align-items-center my-4" style="gap: 20px;">
         <div class="bg-dark px-4 py-2 rounded-pill shadow">
@@ -342,49 +338,42 @@ require_once __DIR__ . '/../../includes/header.php';
     </div>
 </div>
 
-<<<<<<< HEAD
-<script src="<?= BASE_URL ?>assets/js/qrcodegen.js"></script>
-<script src="<?= BASE_URL ?>assets/js/lobby-join.js"></script>
-<script src="<?= BASE_URL ?>assets/js/host-players.js"></script>
-=======
-<!-- Modal Cài đặt phòng -->
 <div class="modal fade text-dark" id="gameSettingsModal" tabindex="-1" role="dialog" aria-labelledby="settingsModalTitle" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered" role="document">
         <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
             <div class="modal-header text-white" style="background-color: var(--kahoot-purple-dark);">
                 <h5 class="modal-title font-weight-bold" id="settingsModalTitle">
-                    <i class="fas fa-sliders-h mr-2"></i>Cài đặt phòng trò chơi
+                    <i class="fas fa-sliders-h mr-2"></i>Game Room Settings
                 </h5>
                 <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
                     <span aria-hidden="true">&times;</span>
                 </button>
             </div>
             <div class="modal-body p-4 text-left">
-                <!-- 1. Bốc ngẫu nhiên câu hỏi từ ngân hàng đề -->
                 <div class="p-3 mb-3 rounded" style="background-color: #f8f9fa; border: 1px solid #e9ecef;">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <h6 class="font-weight-bold mb-0" style="font-family: 'Montserrat', sans-serif; font-weight: 800; color: #111111;">
-                            <i class="fas fa-random text-primary mr-2"></i>Số lượng câu hỏi (Ngân hàng đề)
+                            <i class="fas fa-random text-primary mr-2"></i>Questions Per Game
                         </h6>
                         <span id="modalModeStatusBadge" class="badge badge-primary font-weight-bold px-2 py-1" style="font-size: 0.85rem;">
-                            Tất cả (<?= $totalQuizQuestions ?> câu)
+                            All (<?= $totalQuizQuestions ?> questions)
                         </span>
                     </div>
                     <p class="text-muted small mb-3">
-                        Ngân hàng Quiz hiện có tổng cộng <b><?= $totalQuizQuestions ?> câu</b>. Bạn có thể cho lớp chơi toàn bộ câu hỏi hoặc chỉ bốc ngẫu nhiên N câu hỏi cho trận đấu này.
+                        Total questions available: <b><?= $totalQuizQuestions ?> questions</b>. You can play all questions or randomly select N questions for this round.
                     </p>
 
                     <div class="custom-control custom-radio mb-2">
                         <input type="radio" id="modalModeAll" name="modal_question_mode" class="custom-control-input" value="all" checked onchange="syncQuestionSettings('modal')">
                         <label class="custom-control-label font-weight-bold text-dark" for="modalModeAll" style="cursor: pointer;">
-                            Chơi tất cả câu hỏi (<span class="text-primary font-weight-bold"><?= $totalQuizQuestions ?> câu</span>)
+                            Play all questions (<span class="text-primary font-weight-bold"><?= $totalQuizQuestions ?> questions</span>)
                         </label>
                     </div>
 
                     <div class="custom-control custom-radio d-flex align-items-center flex-wrap">
                         <input type="radio" id="modalModeRandom" name="modal_question_mode" class="custom-control-input" value="random" onchange="syncQuestionSettings('modal')">
                         <label class="custom-control-label font-weight-bold text-dark mr-2 mb-0" for="modalModeRandom" style="cursor: pointer;">
-                            Bốc ngẫu nhiên
+                            Random selection
                         </label>
                         <div class="d-inline-flex align-items-center" style="gap: 6px;">
                             <input type="number" id="modalQuestionLimit" class="form-control form-control-sm text-center font-weight-bold text-dark" 
@@ -392,20 +381,19 @@ require_once __DIR__ . '/../../includes/header.php';
                                    min="1" max="<?= $totalQuizQuestions ?>" 
                                    value="<?= min(5, $totalQuizQuestions) ?>" 
                                    onchange="onModalLimitChange()" oninput="onModalLimitChange()" onclick="$('#modalModeRandom').prop('checked', true); syncQuestionSettings('modal');">
-                            <span class="font-weight-bold text-muted small">/ <?= $totalQuizQuestions ?> câu</span>
+                            <span class="font-weight-bold text-muted small">/ <?= $totalQuizQuestions ?> questions</span>
                         </div>
                     </div>
                 </div>
 
-                <!-- 2. Hiển thị câu hỏi & đáp án trên máy học sinh -->
                 <div class="p-3 mb-3 rounded" style="background-color: #f8f9fa; border: 1px solid #e9ecef;">
                     <div class="d-flex justify-content-between align-items-center">
                         <div class="pr-3">
                             <h6 class="font-weight-bold mb-1" style="font-family: 'Montserrat', sans-serif; font-weight: 800; color: #111111;">
-                                Hiển thị câu hỏi &amp; đáp án trên máy học sinh
+                                Show questions &amp; answers on player devices
                             </h6>
                             <p class="text-muted small mb-0">
-                                Dành cho học Online / Ngồi xa máy chiếu. Khi bật, thiết bị học sinh sẽ thấy đề bài, hình ảnh và chữ trên các nút đáp án.
+                                Useful for remote learning or large screens. When enabled, player devices show full question text, media, and button labels.
                             </p>
                         </div>
                         <div class="custom-control custom-switch pl-4" style="transform: scale(1.3); transform-origin: right center;">
@@ -414,19 +402,17 @@ require_once __DIR__ . '/../../includes/header.php';
                         </div>
                     </div>
                 </div>
-                <div class="alert alert-info py-2 px-3 small mb-0">
-                    <i class="fas fa-info-circle mr-1"></i>
-                    <strong>Chế độ mặc định (TẮT):</strong> Màn hình học sinh chỉ có 4 ô màu trơn lớn để nhìn lên máy chiếu.
-                </div>
             </div>
             <div class="modal-footer bg-light py-2">
-                <button type="button" class="btn btn-primary font-weight-bold rounded-pill px-4" data-dismiss="modal">Xong</button>
+                <button type="button" class="btn btn-primary font-weight-bold rounded-pill px-4" data-dismiss="modal">Done</button>
             </div>
         </div>
     </div>
 </div>
 
->>>>>>> origin/pr/8
+<script src="<?= BASE_URL ?>assets/js/qrcodegen.js"></script>
+<script src="<?= BASE_URL ?>assets/js/lobby-join.js"></script>
+<script src="<?= BASE_URL ?>assets/js/host-players.js"></script>
 <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
 <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
