@@ -7,6 +7,7 @@ $playerId = intval($_GET['pid'] ?? ($_SESSION['id_player'] ?? 0));
 $token    = trim($_GET['token'] ?? '');
 $roomId   = intval($_SESSION['player_room_id'] ?? 0);
 $nickname = $_SESSION['player_nickname'] ?? 'Player';
+$player = null;
 
 if ($playerId > 0) {
     $player = db_fetch_one("SELECT * FROM players WHERE id_player = :p", [':p' => $playerId]);
@@ -16,9 +17,12 @@ if ($playerId > 0) {
     }
 }
 
-if ($roomId <= 0 || $playerId <= 0) {
+if ($roomId <= 0 || $playerId <= 0 || !$player || !player_request_is_valid($playerId, $roomId, $token)) {
     redirect('modules/player/join.php');
 }
+$room = db_fetch_one('SELECT id_room, pin FROM room WHERE id_room = :r', [':r' => $roomId]);
+if (!$room) redirect('modules/player/join.php');
+if (player_is_kicked($room, $playerId)) redirect_removed_player($playerId);
 
 $pageTitle = "You're in! - " . htmlspecialchars($nickname);
 $bodyClass = "backgroundColorChanges";
@@ -57,7 +61,11 @@ sessionStorage.setItem('kahoot_pid', playerId);
 sessionStorage.setItem('kahoot_token', playerToken);
 
 setInterval(function() {
-    $.getJSON('<?= BASE_URL ?>modules/api/game_state.php?action=get_room_status&id_room=' + roomId, function(res) {
+    $.getJSON('<?= BASE_URL ?>modules/api/game_state.php?action=get_room_status&id_room=' + roomId + '&pid=' + playerId + '&token=' + encodeURIComponent(playerToken), function(res) {
+        if (res && res.kicked) {
+            window.location.replace('waiting.php?pid=' + playerId + '&token=' + encodeURIComponent(playerToken));
+            return;
+        }
         if (res && res.success) {
 
             if (res.status !== 'waiting' && res.status !== 'finished') {

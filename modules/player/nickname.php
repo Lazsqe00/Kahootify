@@ -2,9 +2,11 @@
 
 require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../includes/room_access.php';
 
 $roomId = intval($_GET['room_id'] ?? ($_POST['room_id'] ?? ($_SESSION['player_room_id'] ?? 0)));
-$pin = trim($_GET['pin'] ?? ($_POST['pin'] ?? ($_SESSION['player_pin'] ?? '')));
+$submittedPin = $_GET['pin'] ?? ($_POST['pin'] ?? ($_SESSION['player_pin'] ?? ''));
+$pin = is_string($submittedPin) ? trim($submittedPin) : '';
 
 if ($roomId <= 0 && !empty($pin)) {
     $room = db_fetch_one("SELECT * FROM room WHERE pin = :pin AND status != 'finished' LIMIT 1", [':pin' => $pin]);
@@ -17,37 +19,32 @@ if ($roomId <= 0) {
     redirect('modules/player/join.php');
 }
 
-$error = '';
+$room = db_fetch_one('SELECT * FROM room WHERE id_room = :r AND pin = :pin', [':r' => $roomId, ':pin' => $pin]);
+$error = room_join_error($room);
+$canJoin = $error === '';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $nickname = trim($_POST['nickname'] ?? '');
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $canJoin) {
+    $submittedNickname = $_POST['nickname'] ?? '';
+    $nickname = is_string($submittedNickname) ? trim($submittedNickname) : '';
 
     if (!empty($nickname)) {
 
-        $existing = db_fetch_one("SELECT id_player FROM players WHERE id_room = :r AND nickname = :nick LIMIT 1", [
-            ':r'    => $roomId,
-            ':nick' => $nickname
-        ]);
+        $result = join_room_player($roomId, $pin, $nickname);
+        if ($result['success']) {
+            $playerId = $result['id_player'];
+            $nickname = $result['nickname'];
 
-        if ($existing) {
-            $nickname .= '_' . mt_rand(10, 99);
+            $playerToken = substr(md5($playerId . '_' . $roomId . '_kahoot_secret_2026'), 0, 16);
+
+            $_SESSION['id_player'] = $playerId;
+            $_SESSION['player_nickname'] = $nickname;
+            $_SESSION['player_room_id'] = $roomId;
+
+            redirect('modules/player/waiting.php?pid=' . $playerId . '&token=' . $playerToken);
+        } else {
+            $error = $result['message'];
+            $canJoin = false;
         }
-
-        $playerId = db_insert(
-            "INSERT INTO players (id_room, nickname, score, answers_correct) VALUES (:r, :nick, 0, 0)",
-            [
-                ':r'    => $roomId,
-                ':nick' => $nickname
-            ]
-        );
-
-        $playerToken = substr(md5($playerId . '_' . $roomId . '_kahoot_secret_2026'), 0, 16);
-
-        $_SESSION['id_player'] = $playerId;
-        $_SESSION['player_nickname'] = $nickname;
-        $_SESSION['player_room_id'] = $roomId;
-
-        redirect('modules/player/waiting.php?pid=' . $playerId . '&token=' . $playerToken);
     } else {
         $error = 'Please enter your nickname!';
     }
@@ -69,6 +66,7 @@ require_once __DIR__ . '/../../includes/header.php';
             </div>
         <?php endif; ?>
 
+        <?php if ($canJoin): ?>
         <form action="" method="POST">
             <input type="hidden" name="room_id" value="<?= $roomId ?>">
             <input type="hidden" name="pin" value="<?= htmlspecialchars($pin) ?>">
@@ -79,6 +77,10 @@ require_once __DIR__ . '/../../includes/header.php';
                 OK, Go!
             </button>
         </form>
+        <?php else: ?>
+            <a href="<?= BASE_URL ?>modules/player/nickname.php?room_id=<?= $roomId ?>&amp;pin=<?= rawurlencode($pin) ?>" class="btn btn-kahoot btn-block btn-dark text-white py-3">Try again</a>
+            <a href="<?= BASE_URL ?>modules/player/join.php" class="d-block mt-3 text-dark font-weight-bold">Enter another Game PIN</a>
+        <?php endif; ?>
     </div>
 </div>
 

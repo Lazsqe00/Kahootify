@@ -2,14 +2,39 @@
 
 require_once __DIR__ . '/../../includes/auth_check.php';
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../includes/room_access.php';
 
 $roomId = intval($_SESSION['id_room'] ?? 0);
-$room = db_fetch_one("SELECT r.*, q.name as quiz_name FROM room r JOIN quiz q ON r.id_quiz = q.id_quiz WHERE r.id_room = :r", [':r' => $roomId]);
+$creatorId = intval($_SESSION['id_creator']);
+$room = db_fetch_one("SELECT r.*, q.name as quiz_name FROM room r JOIN quiz q ON r.id_quiz = q.id_quiz WHERE r.id_room = :r AND r.id_creator = :c", [':r' => $roomId, ':c' => $creatorId]);
 
 if (!$room || $room['status'] === 'finished') {
     set_flash_message('danger', 'Game room does not exist or has already finished!');
     redirect('modules/auth/dashboard.php');
 }
+
+if ($room['status'] !== 'waiting') {
+    redirect('modules/host/play.php');
+}
+
+if (empty($_SESSION['room_lock_token'])) {
+    $_SESSION['room_lock_token'] = bin2hex(random_bytes(32));
+}
+$roomLockError = '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['set_room_lock'])) {
+    $token = $_POST['room_lock_token'] ?? '';
+    if (!is_string($token) || !hash_equals($_SESSION['room_lock_token'], $token)) {
+        http_response_code(403);
+        $roomLockError = 'Your request could not be verified. Refresh the page and try again.';
+    } elseif (($_POST['lock_room_id'] ?? '') !== (string)$roomId || !in_array($_POST['set_room_lock'], ['0', '1'], true)) {
+        http_response_code(400);
+        $roomLockError = 'Invalid room lock setting.';
+    } else {
+        set_room_locked($room, $_POST['set_room_lock'] === '1');
+        redirect('modules/host/lobby.php');
+    }
+}
+$isLocked = room_is_locked($room);
 
 if (isset($_GET['start_game'])) {
     $firstQ = db_fetch_one("SELECT id_question FROM questions WHERE id_quiz = :q ORDER BY id_question ASC LIMIT 1", [':q' => $room['id_quiz']]);
@@ -30,7 +55,7 @@ if (isset($_GET['cancel_game'])) {
     redirect('modules/auth/dashboard.php');
 }
 
-$players = db_fetch_all("SELECT * FROM players WHERE id_room = :r ORDER BY id_player ASC", [':r' => $roomId]);
+$players = filter_room_players($roomId, db_fetch_all("SELECT * FROM players WHERE id_room = :r ORDER BY id_player ASC", [':r' => $roomId]));
 $joinPageUrl = BASE_URL . 'modules/player/join.php';
 $joinUrl = $joinPageUrl . '?pin=' . rawurlencode($room['pin']);
 $joinHost = strtolower(parse_url(BASE_URL, PHP_URL_HOST) ?? '');
@@ -170,6 +195,18 @@ require_once __DIR__ . '/../../includes/header.php';
                 <strong>Joining from a phone?</strong> Connect to the same Wi-Fi and open this lobby using your computer's LAN IP instead of localhost (for example, http://192.168.1.10/Kahootify/). The QR code will then use that address.
             </div>
         <?php endif; ?>
+        <form action="<?= BASE_URL ?>modules/host/lobby.php" method="POST" class="mt-3">
+            <input type="hidden" name="room_lock_token" value="<?= htmlspecialchars($_SESSION['room_lock_token'], ENT_QUOTES, 'UTF-8') ?>">
+            <input type="hidden" name="lock_room_id" value="<?= $roomId ?>">
+            <button type="submit" name="set_room_lock" value="<?= $isLocked ? '0' : '1' ?>" id="roomLockButton" class="btn <?= $isLocked ? 'btn-warning' : 'btn-outline-dark' ?> font-weight-bold" aria-describedby="roomLockState">
+                <i id="roomLockIcon" class="fas <?= $isLocked ? 'fa-lock' : 'fa-lock-open' ?> mr-1" aria-hidden="true"></i>
+                <span id="roomLockLabel"><?= $isLocked ? 'Unlock room' : 'Lock room' ?></span>
+            </button>
+        </form>
+        <p id="roomLockState" class="small font-weight-bold mt-2 mb-0 <?= $isLocked ? 'text-danger' : 'text-muted' ?>" role="status" aria-live="polite"><?= $isLocked ? 'Room locked. New players cannot join.' : 'Room open. Players can join using the Game PIN or a join link.' ?></p>
+        <?php if ($roomLockError !== ''): ?>
+            <div class="alert alert-danger small mt-3 mb-0" role="alert"><?= htmlspecialchars($roomLockError) ?></div>
+        <?php endif; ?>
     </div>
 
     <dialog id="joinQrDialog" class="lobby-qr-dialog" aria-labelledby="joinQrTitle">
@@ -196,27 +233,13 @@ require_once __DIR__ . '/../../includes/header.php';
         <h5 class="font-weight-bold mb-3" style="text-shadow: 1px 1px 3px rgba(0,0,0,0.5);">
             Waiting for players to join:
         </h5>
-        <div id="playersContainer" class="d-flex flex-wrap justify-content-center" style="gap: 12px;">
-            <?php if (empty($players)): ?>
-                <div id="waitingMsg" class="py-4">
-                    <div class="spinner-border text-light mb-3" role="status"></div>
-                    <p class="font-weight-bold" style="font-size: 1.2rem; text-shadow: 1px 1px 2px rgba(0,0,0,0.5);">
-                        Waiting for players to enter PIN or scan the QR code...
-                    </p>
-                </div>
-            <?php else: ?>
-                <?php foreach ($players as $p): ?>
-                    <div class="badge badge-light px-3 py-2 text-dark font-weight-bold shadow-sm" style="font-size: 1.1rem; border-radius: 8px;">
-                        <i class="fas fa-user-circle text-primary mr-1"></i> <?= htmlspecialchars($p['nickname']) ?>
-                    </div>
-                <?php endforeach; ?>
-            <?php endif; ?>
-        </div>
+        <?php require __DIR__ . '/../../includes/host_players.php'; ?>
     </div>
 </div>
 
 <script src="<?= BASE_URL ?>assets/js/qrcodegen.js"></script>
 <script src="<?= BASE_URL ?>assets/js/lobby-join.js"></script>
+<script src="<?= BASE_URL ?>assets/js/host-players.js"></script>
 <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
 <script>
 
@@ -272,43 +295,26 @@ $(document).ready(function() {
     tryPlayAudio();
 });
 
-const roomId = <?= $roomId ?>;
-let previousCount = <?= count($players) ?>;
+document.addEventListener('roomplayerschange', function (event) {
+    const data = event.detail;
+    updateRoomLockUI(data.is_locked);
+    $('#playerCount').text(data.players.length);
+    $('#btnStartGame').css(data.players.length > 0
+        ? {'pointer-events': 'auto', 'opacity': '1'}
+        : {'pointer-events': 'none', 'opacity': '0.6'});
+});
 
-function checkLobbyPlayers() {
-    $.getJSON('<?= BASE_URL ?>modules/api/game_state.php?action=get_players&id_room=' + roomId, function(res) {
-        if (res && res.success) {
-            const players = res.players;
-            $('#playerCount').text(players.length);
-
-            if (players.length > 0) {
-                $('#btnStartGame').css({'pointer-events': 'auto', 'opacity': '1'});
-                $('#waitingMsg').remove();
-            } else {
-                $('#btnStartGame').css({'pointer-events': 'none', 'opacity': '0.6'});
-            }
-
-            if (players.length !== previousCount) {
-                previousCount = players.length;
-                let html = '';
-                players.forEach(function(p) {
-                    html += `<div class="badge badge-light px-3 py-2 text-dark font-weight-bold shadow-sm" style="font-size: 1.1rem; border-radius: 8px;">
-                                <i class="fas fa-user-circle text-primary mr-1"></i> ${escapeHtml(p.nickname)}
-                             </div>`;
-                });
-                $('#playersContainer').html(html);
-            }
-        }
-    });
+function updateRoomLockUI(isLocked) {
+    $('#roomLockButton').val(isLocked ? '0' : '1')
+        .toggleClass('btn-warning', isLocked).toggleClass('btn-outline-dark', !isLocked);
+    $('#roomLockIcon').toggleClass('fa-lock', isLocked).toggleClass('fa-lock-open', !isLocked);
+    $('#roomLockLabel').text(isLocked ? 'Unlock room' : 'Lock room');
+    $('#roomLockState').text(isLocked
+        ? 'Room locked. New players cannot join.'
+        : 'Room open. Players can join using the Game PIN or a join link.')
+        .toggleClass('text-danger', isLocked).toggleClass('text-muted', !isLocked);
 }
 
-function escapeHtml(text) {
-    var div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-setInterval(checkLobbyPlayers, 1500);
 </script>
 </body>
 </html>
