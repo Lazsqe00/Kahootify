@@ -61,6 +61,24 @@ $qId = $isResultPhase ? intval(str_replace('res_', '', $status)) : intval($statu
 $currentQuestion = db_fetch_one("SELECT * FROM questions WHERE id_question = :qid", [':qid' => $qId]);
 $answers = db_fetch_all("SELECT * FROM answers WHERE id_question = :qid ORDER BY id_answer ASC", [':qid' => $qId]);
 
+$questionMediaUrl = '';
+$questionMediaType = 'image';
+if (!empty($currentQuestion['image'])) {
+    if (preg_match('#^https?://#i', $currentQuestion['image'])) {
+        $questionMediaUrl = $currentQuestion['image'];
+        $ext = strtolower(pathinfo(parse_url($questionMediaUrl, PHP_URL_PATH) ?? '', PATHINFO_EXTENSION));
+        $questionMediaType = (in_array($ext, ['mp4', 'webm']) || ($currentQuestion['media_type'] ?? '') === 'video') ? 'video' : 'image';
+    } else {
+        $imgFilename = basename($currentQuestion['image']);
+        $mediaDiskPath = dirname(__DIR__, 2) . '/assets/img/questions/' . $imgFilename;
+        if (file_exists($mediaDiskPath)) {
+            $questionMediaUrl = BASE_URL . 'assets/img/questions/' . rawurlencode($imgFilename);
+            $ext = strtolower(pathinfo($imgFilename, PATHINFO_EXTENSION));
+            $questionMediaType = (in_array($ext, ['mp4', 'webm']) || ($currentQuestion['media_type'] ?? '') === 'video') ? 'video' : 'image';
+        }
+    }
+}
+
 $counts = room_question_counts($room, $qId);
 $totalPlayers = $counts['total_players'];
 $votedCount = $counts['voted_count'];
@@ -157,6 +175,15 @@ require_once __DIR__ . '/../../includes/header.php';
         <h2 class="font-weight-bold text-dark mb-0">
             <?= htmlspecialchars($currentQuestion['text']) ?>
         </h2>
+        <?php if (!empty($questionMediaUrl)): ?>
+            <div class="text-center mt-3">
+                <?php if ($questionMediaType === 'video'): ?>
+                    <video src="<?= htmlspecialchars($questionMediaUrl) ?>" controls autoplay muted loop class="img-fluid rounded shadow-sm" style="max-height: 280px; max-width: 100%; border-radius: 12px;"></video>
+                <?php else: ?>
+                    <img src="<?= htmlspecialchars($questionMediaUrl) ?>" alt="Question Media" class="img-fluid rounded shadow-sm" style="max-height: 280px; max-width: 100%; object-fit: contain; border-radius: 12px;">
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
     </div>
 
     <?php if ($isResultPhase): ?>
@@ -230,13 +257,30 @@ require_once __DIR__ . '/../../includes/header.php';
             $isCorrect = ($a['is_correct'] == 1);
             $opacity = ($isResultPhase && !$isCorrect) ? 'opacity: 0.35;' : 'opacity: 1;';
             $ansCount = $voteStats[$a['id_answer']] ?? 0;
+            $ansImgUrl = '';
+            if (!empty($a['image_path'])) {
+                if (preg_match('#^https?://#i', $a['image_path'])) {
+                    $ansImgUrl = $a['image_path'];
+                } else {
+                    $aImgFile = basename($a['image_path']);
+                    $aImgDiskPath = dirname(__DIR__, 2) . '/assets/img/questions/' . $aImgFile;
+                    if (file_exists($aImgDiskPath)) {
+                        $ansImgUrl = BASE_URL . 'assets/img/questions/' . rawurlencode($aImgFile);
+                    }
+                }
+            }
         ?>
             <div class="col-md-6 mb-3">
                 <div class="answer-box shadow-sm d-flex justify-content-between align-items-center"
                      style="background-color: <?= $colors[$cIdx] ?>; <?= $opacity ?> cursor: default;">
-                    <div class="d-flex align-items-center">
+                    <div class="d-flex align-items-center flex-grow-1 mr-2">
                         <span class="symbol mr-3" style="font-size: 2rem;"><?= $icons[$cIdx] ?></span>
-                        <span style="font-size: 1.3rem;"><?= htmlspecialchars($a['text']) ?></span>
+                        <?php if ($ansImgUrl): ?>
+                            <img src="<?= htmlspecialchars($ansImgUrl) ?>" alt="Answer" class="img-fluid rounded mr-3 bg-white p-1" style="max-height: 55px; max-width: 85px; object-fit: contain; box-shadow: 0 2px 4px rgba(0,0,0,0.15);">
+                        <?php endif; ?>
+                        <?php if (!empty($a['text'])): ?>
+                            <span style="font-size: 1.3rem;"><?= htmlspecialchars($a['text']) ?></span>
+                        <?php endif; ?>
                     </div>
 
                     <?php if ($isResultPhase): ?>

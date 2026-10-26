@@ -60,12 +60,22 @@ $showOnDevice = !empty($room['show_questions_on_players']);
 
 $hasQuestionImage = false;
 $questionImageUrl = '';
+$questionMediaType = 'image';
 if (!empty($currentQuestion['image'])) {
-    $imgFilename = basename($currentQuestion['image']);
-    $imgPath = dirname(__DIR__, 2) . '/assets/img/questions/' . $imgFilename;
-    if (file_exists($imgPath)) {
+    if (preg_match('#^https?://#i', $currentQuestion['image'])) {
         $hasQuestionImage = true;
-        $questionImageUrl = BASE_URL . 'assets/img/questions/' . rawurlencode($imgFilename);
+        $questionImageUrl = $currentQuestion['image'];
+        $ext = strtolower(pathinfo(parse_url($questionImageUrl, PHP_URL_PATH) ?? '', PATHINFO_EXTENSION));
+        $questionMediaType = (in_array($ext, ['mp4', 'webm']) || ($currentQuestion['media_type'] ?? '') === 'video') ? 'video' : 'image';
+    } else {
+        $imgFilename = basename($currentQuestion['image']);
+        $imgPath = dirname(__DIR__, 2) . '/assets/img/questions/' . $imgFilename;
+        if (file_exists($imgPath)) {
+            $hasQuestionImage = true;
+            $questionImageUrl = BASE_URL . 'assets/img/questions/' . rawurlencode($imgFilename);
+            $ext = strtolower(pathinfo($imgFilename, PATHINFO_EXTENSION));
+            $questionMediaType = (in_array($ext, ['mp4', 'webm']) || ($currentQuestion['media_type'] ?? '') === 'video') ? 'video' : 'image';
+        }
     }
 }
 
@@ -408,7 +418,11 @@ require_once __DIR__ . '/../../includes/header.php';
                 </h2>
                 <?php if ($hasQuestionImage): ?>
                     <div class="text-center mt-3">
-                        <img src="<?= htmlspecialchars($questionImageUrl) ?>" alt="Question Illustration" class="img-fluid rounded player-thumb-img shadow-sm" style="max-height: 280px; object-fit: contain;">
+                        <?php if ($questionMediaType === 'video'): ?>
+                            <video src="<?= htmlspecialchars($questionImageUrl) ?>" controls autoplay muted loop class="img-fluid rounded player-thumb-img shadow-sm" style="max-height: 280px; max-width: 100%; border-radius: 12px;"></video>
+                        <?php else: ?>
+                            <img src="<?= htmlspecialchars($questionImageUrl) ?>" alt="Question Illustration" class="img-fluid rounded player-thumb-img shadow-sm" style="max-height: 280px; object-fit: contain; border-radius: 12px;">
+                        <?php endif; ?>
                     </div>
                 <?php endif; ?>
             </div>
@@ -436,13 +450,30 @@ require_once __DIR__ . '/../../includes/header.php';
                 foreach ($answers as $idx => $a):
                     $cIdx = $idx % 4;
                     $ansId = intval($a['id_answer'] ?? 0);
+                    $ansImgUrl = '';
+                    if (!empty($a['image_path'])) {
+                        if (preg_match('#^https?://#i', $a['image_path'])) {
+                            $ansImgUrl = $a['image_path'];
+                        } else {
+                            $aImgFile = basename($a['image_path']);
+                            $aImgDiskPath = dirname(__DIR__, 2) . '/assets/img/questions/' . $aImgFile;
+                            if (file_exists($aImgDiskPath)) {
+                                $ansImgUrl = BASE_URL . 'assets/img/questions/' . rawurlencode($aImgFile);
+                            }
+                        }
+                    }
                 ?>
                     <div class="col-md-6 mb-3">
                         <div class="answer-box shadow-sm d-flex justify-content-between align-items-center <?= $colorClasses[$cIdx] ?>"
                              onclick="submitAnswer(<?= $ansId ?>)">
-                            <div class="d-flex align-items-center">
+                            <div class="d-flex align-items-center flex-grow-1 mr-2">
                                 <span class="symbol mr-3" style="font-size: 2rem;"><?= $icons[$cIdx] ?></span>
-                                <span style="font-size: 1.3rem;"><?= htmlspecialchars($a['text'] ?? '') ?></span>
+                                <?php if ($ansImgUrl): ?>
+                                    <img src="<?= htmlspecialchars($ansImgUrl) ?>" alt="Answer" class="img-fluid rounded mr-3 bg-white p-1" style="max-height: 50px; max-width: 75px; object-fit: contain; box-shadow: 0 2px 4px rgba(0,0,0,0.15);">
+                                <?php endif; ?>
+                                <?php if (!empty($a['text'])): ?>
+                                    <span style="font-size: 1.3rem;"><?= htmlspecialchars($a['text'] ?? '') ?></span>
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>
