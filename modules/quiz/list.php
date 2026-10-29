@@ -15,9 +15,18 @@ $quizzes = db_fetch_all(
 $pageTitle = "My Kahoots | Quiz Management";
 require_once __DIR__ . '/../../includes/header.php';
 require_once __DIR__ . '/../../includes/navbar.php';
+
+$flash = get_flash_message();
 ?>
 
 <div class="container my-5">
+    <?php if ($flash): ?>
+        <div class="alert alert-<?= htmlspecialchars($flash['type']) ?> alert-dismissible fade show mb-4" role="alert">
+            <?= htmlspecialchars($flash['message']) ?>
+            <button type="button" class="close" data-dismiss="alert"><span>&times;</span></button>
+        </div>
+    <?php endif; ?>
+
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <h2 class="font-weight-bold" style="color: var(--kahoot-purple);">
@@ -47,8 +56,8 @@ require_once __DIR__ . '/../../includes/navbar.php';
         <?php else: ?>
             <?php foreach ($quizzes as $q): ?>
                 <div class="col-md-6 col-lg-4 mb-4">
-                    <div class="card h-100 border-0 shadow-sm" style="border-radius: 12px; overflow: hidden;">
-                        <div style="height: 160px; background: linear-gradient(135deg, var(--kahoot-purple), var(--kahoot-purple-light)); display: flex; align-items: center; justify-content: center; position: relative;">
+                    <div class="card h-100 border-0 shadow-sm" style="border-radius: 12px;">
+                        <div style="height: 160px; background: linear-gradient(135deg, var(--kahoot-purple), var(--kahoot-purple-light)); display: flex; align-items: center; justify-content: center; position: relative; border-top-left-radius: 12px; border-top-right-radius: 12px; overflow: hidden;">
                             <img src="<?= BASE_URL ?>assets/img/cover.png" alt="Cover" style="max-height: 100%; object-fit: cover; opacity: 0.35; width: 100%;">
                             <div class="position-absolute text-center px-3">
                                 <h5 class="text-white font-weight-bold mb-1"><?= htmlspecialchars($q['name']) ?></h5>
@@ -64,16 +73,27 @@ require_once __DIR__ . '/../../includes/navbar.php';
                             </p>
                             <div class="d-flex justify-content-between align-items-center pt-2 border-top">
                                 <small class="text-muted"><?= date('M d, Y', strtotime($q['quizadd'] ?? $q['created_at'] ?? 'now')) ?></small>
-                                <div>
-                                    <a href="<?= BASE_URL ?>modules/host/create_room.php?id_quiz=<?= $q['id_quiz'] ?>" class="btn btn-sm btn-primary font-weight-bold" title="Play">
-                                        <i class="fas fa-play"></i> Play
+                                <div class="d-flex align-items-center">
+                                    <a href="<?= BASE_URL ?>modules/host/create_room.php?id_quiz=<?= $q['id_quiz'] ?>" class="btn btn-sm btn-primary font-weight-bold mr-2" title="Play">
+                                        <i class="fas fa-play mr-1"></i> Play
                                     </a>
-                                    <a href="<?= BASE_URL ?>modules/quiz/edit.php?id=<?= $q['id_quiz'] ?>" class="btn btn-sm btn-success font-weight-bold" title="Edit quiz">
-                                        <i class="fas fa-edit"></i> Edit
-                                    </a>
-                                    <a href="<?= BASE_URL ?>modules/quiz/delete.php?id=<?= $q['id_quiz'] ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to delete this quiz?');" title="Delete">
-                                        <i class="fas fa-trash-alt"></i>
-                                    </a>
+                                    <div class="dropdown">
+                                        <button class="btn btn-sm btn-outline-secondary font-weight-bold dropdown-toggle" type="button" id="quizActions_<?= $q['id_quiz'] ?>" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" title="Actions">
+                                            <i class="fas fa-ellipsis-v mr-1"></i> Actions
+                                        </button>
+                                        <div class="dropdown-menu dropdown-menu-right shadow-sm" aria-labelledby="quizActions_<?= $q['id_quiz'] ?>">
+                                            <a class="dropdown-item" href="<?= BASE_URL ?>modules/quiz/edit.php?id=<?= $q['id_quiz'] ?>">
+                                                <i class="fas fa-edit text-success mr-2"></i> Edit
+                                            </a>
+                                            <a class="dropdown-item" href="<?= BASE_URL ?>modules/quiz/duplicate.php?id=<?= $q['id_quiz'] ?>">
+                                                <i class="fas fa-copy text-info mr-2"></i> Duplicate
+                                            </a>
+                                            <div class="dropdown-divider"></div>
+                                            <a class="dropdown-item text-danger" href="<?= BASE_URL ?>modules/quiz/delete.php?id=<?= $q['id_quiz'] ?>" onclick="return confirm('Are you sure you want to delete this quiz?');">
+                                                <i class="fas fa-trash-alt mr-2"></i> Delete
+                                            </a>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>

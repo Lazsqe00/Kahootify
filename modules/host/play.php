@@ -4,7 +4,7 @@ require_once __DIR__ . '/../../includes/auth_check.php';
 require_once __DIR__ . '/../../config/database.php';
 
 $roomId = intval($_SESSION['id_room'] ?? 0);
-$room = db_fetch_one("SELECT r.*, q.name as quiz_name FROM room r JOIN quiz q ON r.id_quiz = q.id_quiz WHERE r.id_room = :r", [':r' => $roomId]);
+$room = db_fetch_one("SELECT r.*, q.name as quiz_name FROM room r JOIN quiz q ON r.id_quiz = q.id_quiz WHERE r.id_room = :r AND r.id_creator = :c", [':r' => $roomId, ':c' => (int)$_SESSION['id_creator']]);
 
 if (!$room) {
     redirect('modules/auth/dashboard.php');
@@ -20,8 +20,12 @@ if ($status === 'finished') {
     redirect('modules/host/leaderboard.php?final=true');
 }
 
-$allQuestions = db_fetch_all("SELECT * FROM questions WHERE id_quiz = :q ORDER BY id_question ASC", [':q' => $room['id_quiz']]);
-$totalQuestions = count($allQuestions);
+$selectedQIds = !empty($room['question_order']) ? json_decode($room['question_order'], true) : null;
+if (!is_array($selectedQIds) || empty($selectedQIds)) {
+    $fallbackQuestions = db_fetch_all("SELECT id_question FROM questions WHERE id_quiz = :q ORDER BY id_question ASC", [':q' => $room['id_quiz']]);
+    $selectedQIds = array_column($fallbackQuestions, 'id_question');
+}
+$totalQuestions = count($selectedQIds);
 
 if (isset($_GET['action']) && $_GET['action'] === 'show_result') {
     if (is_numeric($status)) {
@@ -35,28 +39,17 @@ if (isset($_GET['action']) && $_GET['action'] === 'show_result') {
 
 if (isset($_GET['action']) && $_GET['action'] === 'next_question') {
     $currentQId = intval(str_replace('res_', '', $status));
-    $nextQ = null;
-    $foundCurrent = false;
+    $currentIdx = array_search($currentQId, $selectedQIds);
 
-    foreach ($allQuestions as $idx => $q) {
-        if ($foundCurrent) {
-            $nextQ = $q;
-            $_SESSION['question_index'] = $idx;
-            break;
-        }
-        if ($q['id_question'] == $currentQId) {
-            $foundCurrent = true;
-        }
-    }
-
-    if ($nextQ) {
+    if ($currentIdx !== false && isset($selectedQIds[$currentIdx + 1])) {
+        $nextQId = intval($selectedQIds[$currentIdx + 1]);
+        $_SESSION['question_index'] = $currentIdx + 1;
         db_execute("UPDATE room SET status = :s, question_start_time = UNIX_TIMESTAMP() WHERE id_room = :r", [
-            ':s' => (string)$nextQ['id_question'],
+            ':s' => (string)$nextQId,
             ':r' => $roomId
         ]);
         redirect('modules/host/play.php');
     } else {
-
         db_execute("UPDATE room SET status = 'finished' WHERE id_room = :r", [':r' => $roomId]);
         redirect('modules/host/leaderboard.php?final=true');
     }
@@ -68,13 +61,27 @@ $qId = $isResultPhase ? intval(str_replace('res_', '', $status)) : intval($statu
 $currentQuestion = db_fetch_one("SELECT * FROM questions WHERE id_question = :qid", [':qid' => $qId]);
 $answers = db_fetch_all("SELECT * FROM answers WHERE id_question = :qid ORDER BY id_answer ASC", [':qid' => $qId]);
 
-$totalPlayers = db_count('players', 'id_room = :r', [':r' => $roomId]);
-$votedCount = db_fetch_one(
-    "SELECT COUNT(DISTINCT v.id_player) as total
-     FROM votes v JOIN answers a ON v.id_answer = a.id_answer
-     WHERE a.id_question = :qid AND v.id_player IN (SELECT id_player FROM players WHERE id_room = :r)",
-    [':qid' => $qId, ':r' => $roomId]
-)['total'] ?? 0;
+$questionMediaUrl = '';
+$questionMediaType = 'image';
+if (!empty($currentQuestion['image'])) {
+    if (preg_match('#^https?://#i', $currentQuestion['image'])) {
+        $questionMediaUrl = $currentQuestion['image'];
+        $ext = strtolower(pathinfo(parse_url($questionMediaUrl, PHP_URL_PATH) ?? '', PATHINFO_EXTENSION));
+        $questionMediaType = (in_array($ext, ['mp4', 'webm']) || ($currentQuestion['media_type'] ?? '') === 'video') ? 'video' : 'image';
+    } else {
+        $imgFilename = basename($currentQuestion['image']);
+        $mediaDiskPath = dirname(__DIR__, 2) . '/assets/img/questions/' . $imgFilename;
+        if (file_exists($mediaDiskPath)) {
+            $questionMediaUrl = BASE_URL . 'assets/img/questions/' . rawurlencode($imgFilename);
+            $ext = strtolower(pathinfo($imgFilename, PATHINFO_EXTENSION));
+            $questionMediaType = (in_array($ext, ['mp4', 'webm']) || ($currentQuestion['media_type'] ?? '') === 'video') ? 'video' : 'image';
+        }
+    }
+}
+
+$counts = room_question_counts($room, $qId);
+$totalPlayers = $counts['total_players'];
+$votedCount = $counts['voted_count'];
 
 $timeLimit = intval($currentQuestion['time_limit'] ?? 20);
 
@@ -89,13 +96,8 @@ $startTime = !empty($room['question_start_time']) ? intval($room['question_start
 $elapsed = time() - $startTime;
 $remainingSeconds = max(0, $timeLimit - $elapsed);
 
-$questionNumber = 1;
-foreach ($allQuestions as $idx => $q) {
-    if ($q['id_question'] == $qId) {
-        $questionNumber = $idx + 1;
-        break;
-    }
-}
+$currentIdx = array_search($qId, $selectedQIds);
+$questionNumber = ($currentIdx !== false) ? ($currentIdx + 1) : 1;
 
 $questionAudioFile = null;
 if (!$isResultPhase) {
@@ -164,10 +166,24 @@ require_once __DIR__ . '/../../includes/header.php';
 
 <div class="container my-3" style="max-width: 1050px;">
 
+    <details class="text-white mb-3">
+        <summary class="font-weight-bold">Manage players</summary>
+        <div class="text-center mt-3"><?php $reloadAfterKick = true; require __DIR__ . '/../../includes/host_players.php'; ?></div>
+    </details>
+
     <div class="question-card-banner">
         <h2 class="font-weight-bold text-dark mb-0">
             <?= htmlspecialchars($currentQuestion['text']) ?>
         </h2>
+        <?php if (!empty($questionMediaUrl)): ?>
+            <div class="text-center mt-3">
+                <?php if ($questionMediaType === 'video'): ?>
+                    <video src="<?= htmlspecialchars($questionMediaUrl) ?>" controls autoplay muted loop class="img-fluid rounded shadow-sm" style="max-height: 280px; max-width: 100%; border-radius: 12px;"></video>
+                <?php else: ?>
+                    <img src="<?= htmlspecialchars($questionMediaUrl) ?>" alt="Question Media" class="img-fluid rounded shadow-sm" style="max-height: 280px; max-width: 100%; object-fit: contain; border-radius: 12px;">
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
     </div>
 
     <?php if ($isResultPhase): ?>
@@ -206,7 +222,7 @@ require_once __DIR__ . '/../../includes/header.php';
             <?php if (!$isResultPhase): ?>
                 <div class="bg-white rounded-pill px-4 py-2 shadow-sm font-weight-bold text-dark" style="font-size: 1.2rem;">
                     <i class="fas fa-paper-plane text-primary mr-1"></i>
-                    <span id="voteCount"><?= $votedCount ?></span> / <?= $totalPlayers ?> Answers
+                    <span id="voteCount"><?= $votedCount ?></span> / <span id="totalPlayerCount"><?= $totalPlayers ?></span> Answers
                 </div>
             <?php else: ?>
                 <span class="badge badge-light px-4 py-2 font-weight-bold" style="font-size: 1.1rem;">
@@ -224,15 +240,14 @@ require_once __DIR__ . '/../../includes/header.php';
             $ansIds = array_column($answers, 'id_answer');
             $inClause = implode(',', array_map('intval', $ansIds));
             $statsRows = db_fetch_all(
-                "SELECT v.id_answer, COUNT(v.id_vote) as cnt
+                "SELECT v.id_answer, v.id_player
                  FROM votes v
                  JOIN players p ON v.id_player = p.id_player
-                 WHERE p.id_room = :r AND v.id_answer IN ($inClause)
-                 GROUP BY v.id_answer",
+                 WHERE p.id_room = :r AND v.id_answer IN ($inClause)",
                 [':r' => $roomId]
             );
-            foreach ($statsRows as $sr) {
-                $voteStats[$sr['id_answer']] = intval($sr['cnt']);
+            foreach (filter_room_players($roomId, $statsRows) as $sr) {
+                $voteStats[$sr['id_answer']] = ($voteStats[$sr['id_answer']] ?? 0) + 1;
             }
         }
         ?>
@@ -242,13 +257,30 @@ require_once __DIR__ . '/../../includes/header.php';
             $isCorrect = ($a['is_correct'] == 1);
             $opacity = ($isResultPhase && !$isCorrect) ? 'opacity: 0.35;' : 'opacity: 1;';
             $ansCount = $voteStats[$a['id_answer']] ?? 0;
+            $ansImgUrl = '';
+            if (!empty($a['image_path'])) {
+                if (preg_match('#^https?://#i', $a['image_path'])) {
+                    $ansImgUrl = $a['image_path'];
+                } else {
+                    $aImgFile = basename($a['image_path']);
+                    $aImgDiskPath = dirname(__DIR__, 2) . '/assets/img/questions/' . $aImgFile;
+                    if (file_exists($aImgDiskPath)) {
+                        $ansImgUrl = BASE_URL . 'assets/img/questions/' . rawurlencode($aImgFile);
+                    }
+                }
+            }
         ?>
             <div class="col-md-6 mb-3">
                 <div class="answer-box shadow-sm d-flex justify-content-between align-items-center"
                      style="background-color: <?= $colors[$cIdx] ?>; <?= $opacity ?> cursor: default;">
-                    <div class="d-flex align-items-center">
+                    <div class="d-flex align-items-center flex-grow-1 mr-2">
                         <span class="symbol mr-3" style="font-size: 2rem;"><?= $icons[$cIdx] ?></span>
-                        <span style="font-size: 1.3rem;"><?= htmlspecialchars($a['text']) ?></span>
+                        <?php if ($ansImgUrl): ?>
+                            <img src="<?= htmlspecialchars($ansImgUrl) ?>" alt="Answer" class="img-fluid rounded mr-3 bg-white p-1" style="max-height: 55px; max-width: 85px; object-fit: contain; box-shadow: 0 2px 4px rgba(0,0,0,0.15);">
+                        <?php endif; ?>
+                        <?php if (!empty($a['text'])): ?>
+                            <span style="font-size: 1.3rem;"><?= htmlspecialchars($a['text']) ?></span>
+                        <?php endif; ?>
                     </div>
 
                     <?php if ($isResultPhase): ?>
@@ -392,6 +424,7 @@ const pollInterval = setInterval(function() {
     $.getJSON('<?= BASE_URL ?>modules/api/game_state.php?action=get_question_status&id_room=' + roomId + '&id_question=' + qId, function(data) {
         if (data && data.success) {
             $('#voteCount').text(data.voted_count);
+            $('#totalPlayerCount').text(data.total_players);
 
             if (data.total_players > 0 && data.voted_count >= data.total_players) {
                 clearInterval(pollInterval);

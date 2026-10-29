@@ -17,7 +17,7 @@ if ($playerId > 0) {
     }
 }
 
-if ($roomId <= 0 || $playerId <= 0 || !$player) {
+if ($roomId <= 0 || $playerId <= 0 || !$player || !player_request_is_valid($playerId, $roomId, $token)) {
     redirect('modules/player/join.php');
 }
 
@@ -28,6 +28,7 @@ if (!$room) {
 }
 
 $status = $room['status'];
+if (player_is_kicked($room, $playerId)) redirect_removed_player($playerId);
 
 if ($status === 'waiting') {
     redirect('modules/player/waiting.php?pid=' . $playerId . '&token=' . urlencode($token));
@@ -35,111 +36,8 @@ if ($status === 'waiting') {
 
 if ($status === 'finished') {
     $leaderboard = get_room_leaderboard($roomId);
-    $myRank = 1;
-    foreach ($leaderboard as $idx => $p) {
-        if ($p['id_player'] == $playerId) {
-            $myRank = $idx + 1;
-            break;
-        }
-    }
-    $pageTitle = "🏆 Final Results - " . htmlspecialchars($nickname);
-    $bodyClass = "backgroundColorChanges";
-    require_once __DIR__ . '/../../includes/header.php';
-    ?>
-    <div class="container py-4 text-white" style="max-width: 650px;">
-
-        <div class="card border-0 shadow-lg text-dark mb-4 text-center" style="border-radius: 18px; overflow: hidden;">
-            <div class="py-4 text-white" style="background: linear-gradient(135deg, #46178F, #300d66);">
-                <div style="font-size: 4rem;">
-                    <?= $myRank === 1 ? '🥇' : ($myRank === 2 ? '🥈' : ($myRank === 3 ? '🥉' : '🏆')) ?>
-                </div>
-                <h2 class="font-weight-bold mb-1">Game Over!</h2>
-                <p class="mb-0 text-light opacity-80" style="font-size: 1.1rem;"><?= htmlspecialchars($nickname) ?></p>
-            </div>
-            <div class="card-body p-4">
-                <div class="row mb-3">
-                    <div class="col-6 border-right">
-                        <span class="text-muted d-block small font-weight-bold text-uppercase">Final Standing</span>
-                        <h2 class="font-weight-bold text-warning mb-0" style="font-size: 2.2rem;">Rank #<?= $myRank ?></h2>
-                        <small class="text-muted">out of <?= count($leaderboard) ?> players</small>
-                    </div>
-                    <div class="col-6">
-                        <span class="text-muted d-block small font-weight-bold text-uppercase">Total Score</span>
-                        <h2 class="font-weight-bold text-success mb-0" style="font-size: 2.2rem;"><?= number_format($player['score']) ?></h2>
-                        <small class="text-muted font-weight-bold"><?= $player['answers_correct'] ?> correct</small>
-                    </div>
-                </div>
-
-                <a href="<?= BASE_URL ?>modules/player/join.php" class="btn btn-kahoot btn-kahoot-green btn-block py-3 font-weight-bold">
-                    <i class="fas fa-redo mr-2"></i> Join Another Game
-                </a>
-            </div>
-        </div>
-
-        <div class="card border-0 shadow-lg text-dark mb-4" style="border-radius: 18px;">
-            <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between">
-                <h5 class="font-weight-bold mb-0 text-dark">
-                    <i class="fas fa-trophy mr-2 text-warning"></i>Room Leaderboard
-                </h5>
-                <span class="badge badge-light px-3 py-1 font-weight-bold border">
-                    <?= count($leaderboard) ?> players
-                </span>
-            </div>
-            <div class="card-body p-3">
-                <?php foreach ($leaderboard as $idx => $p):
-                    $rank = $idx + 1;
-                    $isMe = ($p['id_player'] == $playerId);
-                    $itemClass = $isMe ? 'border-warning bg-warning-light shadow-sm' : 'border-light bg-light';
-                ?>
-                    <div class="d-flex align-items-center justify-content-between p-3 mb-2 rounded <?= $itemClass ?>"
-                         style="border: <?= $isMe ? '2px solid #ffca28' : '1px solid #e9ecef' ?>; background-color: <?= $isMe ? '#fffde7' : '#ffffff' ?>;">
-                        <div class="d-flex align-items-center" style="gap: 12px; overflow: hidden;">
-                            <div class="font-weight-bold text-center" style="width: 35px; font-size: 1.2rem;">
-                                <?php if ($rank === 1): ?>
-                                    <span title="Rank 1">🥇</span>
-                                <?php elseif ($rank === 2): ?>
-                                    <span title="Rank 2">🥈</span>
-                                <?php elseif ($rank === 3): ?>
-                                    <span title="Rank 3">🥉</span>
-                                <?php else: ?>
-                                    <span class="text-muted">#<?= $rank ?></span>
-                                <?php endif; ?>
-                            </div>
-                            <div class="text-truncate" style="font-size: 1.05rem;">
-                                <span class="font-weight-bold <?= $isMe ? 'text-dark' : 'text-dark' ?>">
-                                    <?= htmlspecialchars($p['nickname']) ?>
-                                </span>
-                                <?php if ($isMe): ?>
-                                    <span class="badge badge-warning text-dark font-weight-bold ml-1 px-2">YOU</span>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-                        <div class="text-right pl-2" style="min-width: 90px;">
-                            <span class="font-weight-bold text-primary" style="font-size: 1.15rem;">
-                                <?= number_format($p['score']) ?>
-                            </span>
-                            <span class="small text-muted font-weight-bold d-block">pts</span>
-                        </div>
-                    </div>
-                <?php endforeach; ?>
-            </div>
-        </div>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
-    <script>
-    window.addEventListener('DOMContentLoaded', function() {
-        if (typeof confetti === 'function') {
-            confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
-            setTimeout(function() {
-                confetti({ particleCount: 50, angle: 60, spread: 55, origin: { x: 0 } });
-                confetti({ particleCount: 50, angle: 120, spread: 55, origin: { x: 1 } });
-            }, 400);
-        }
-    });
-    </script>
-    </body></html>
-    <?php
+    $resultsPlayerId = $playerId;
+    require __DIR__ . '/../../includes/final_results.php';
     exit;
 }
 
@@ -147,6 +45,39 @@ $isResultPhase = (strpos($status, 'res_') === 0);
 $qId = $isResultPhase ? intval(str_replace('res_', '', $status)) : intval($status);
 
 $answers = db_fetch_all("SELECT * FROM answers WHERE id_question = :qid ORDER BY id_answer ASC", [':qid' => $qId]);
+
+$currentQuestion = db_fetch_one("SELECT * FROM questions WHERE id_question = :qid", [':qid' => $qId]);
+$timeLimit = intval($currentQuestion['time_limit'] ?? 20);
+if ($timeLimit <= 0) {
+    $timeLimit = 20;
+}
+
+$startTime = !empty($room['question_start_time']) ? intval($room['question_start_time']) : time();
+$elapsed = max(0, time() - $startTime);
+$remainingSeconds = max(0, $timeLimit - $elapsed);
+
+$showOnDevice = !empty($room['show_questions_on_players']);
+
+$hasQuestionImage = false;
+$questionImageUrl = '';
+$questionMediaType = 'image';
+if (!empty($currentQuestion['image'])) {
+    if (preg_match('#^https?://#i', $currentQuestion['image'])) {
+        $hasQuestionImage = true;
+        $questionImageUrl = $currentQuestion['image'];
+        $ext = strtolower(pathinfo(parse_url($questionImageUrl, PHP_URL_PATH) ?? '', PATHINFO_EXTENSION));
+        $questionMediaType = (in_array($ext, ['mp4', 'webm']) || ($currentQuestion['media_type'] ?? '') === 'video') ? 'video' : 'image';
+    } else {
+        $imgFilename = basename($currentQuestion['image']);
+        $imgPath = dirname(__DIR__, 2) . '/assets/img/questions/' . $imgFilename;
+        if (file_exists($imgPath)) {
+            $hasQuestionImage = true;
+            $questionImageUrl = BASE_URL . 'assets/img/questions/' . rawurlencode($imgFilename);
+            $ext = strtolower(pathinfo($imgFilename, PATHINFO_EXTENSION));
+            $questionMediaType = (in_array($ext, ['mp4', 'webm']) || ($currentQuestion['media_type'] ?? '') === 'video') ? 'video' : 'image';
+        }
+    }
+}
 
 $myVote = db_fetch_one(
     "SELECT v.*, a.is_correct
@@ -160,19 +91,20 @@ $myRank = 1;
 if ($isResultPhase) {
     $leaderboardSql = "
         SELECT p.*,
-               COALESCE(v.points_earned, 0) as points_gained,
+               COALESCE(v.points_earned + v.streak_bonus, 0) as points_gained,
                COALESCE(a.is_correct, 0) as is_round_correct
         FROM players p
         LEFT JOIN votes v ON v.id_player = p.id_player
              AND v.id_answer IN (SELECT id_answer FROM answers WHERE id_question = :qid)
         LEFT JOIN answers a ON v.id_answer = a.id_answer
         WHERE p.id_room = :r
-        ORDER BY p.score DESC, p.playeradd ASC
+        ORDER BY p.score DESC, p.playeradd ASC, p.id_player ASC
     ";
     $leaderboard = db_fetch_all($leaderboardSql, [':r' => $roomId, ':qid' => $qId]);
     if (empty($leaderboard)) {
-        $leaderboard = db_fetch_all("SELECT * FROM players WHERE id_room = :r ORDER BY score DESC, playeradd ASC", [':r' => $roomId]);
+        $leaderboard = db_fetch_all("SELECT * FROM players WHERE id_room = :r ORDER BY score DESC, playeradd ASC, id_player ASC", [':r' => $roomId]);
     }
+    $leaderboard = filter_room_players($roomId, $leaderboard);
     foreach ($leaderboard as $idx => $p) {
         if ($p['id_player'] == $playerId) {
             $myRank = $idx + 1;
@@ -181,17 +113,36 @@ if ($isResultPhase) {
     }
 }
 
-$pageTitle = "Kahoot! | " . htmlspecialchars($nickname);
+$selectedQIds = !empty($room['question_order']) ? json_decode($room['question_order'], true) : null;
+if (!is_array($selectedQIds) || empty($selectedQIds)) {
+    $fallbackQuestions = db_fetch_all("SELECT id_question FROM questions WHERE id_quiz = :q ORDER BY id_question ASC", [':q' => $room['id_quiz']]);
+    $selectedQIds = array_column($fallbackQuestions, 'id_question');
+}
+$totalQuestions = count($selectedQIds);
+$currentQNum = array_search($qId, $selectedQIds);
+$questionNumber = ($currentQNum !== false) ? ($currentQNum + 1) : 1;
+
+$pageTitle = "Question " . $questionNumber . "/" . $totalQuestions . " - Kahoot! | " . htmlspecialchars($nickname);
 $bodyClass = "backgroundColorChanges";
 require_once __DIR__ . '/../../includes/header.php';
 ?>
 
+<audio id="submitSfx" preload="auto" src="<?= BASE_URL ?>assets/audio/<?= rawurlencode('submit_answer_tension_002.mp3') ?>"></audio>
+
 <div class="d-flex justify-content-between align-items-center px-3 py-2 text-white shadow-sm" style="background-color: var(--kahoot-purple-dark);">
-    <div class="font-weight-bold">
+    <div class="font-weight-bold d-flex align-items-center">
         <i class="fas fa-user mr-1 text-warning"></i> <?= htmlspecialchars($nickname) ?>
+        <span class="badge badge-light text-dark font-weight-bold ml-2 px-2 py-1 shadow-sm" style="font-size: 0.85rem;">
+            Question <?= $questionNumber ?> / <?= $totalQuestions ?>
+        </span>
     </div>
-    <div class="font-weight-bold badge badge-light text-dark px-3 py-2" style="font-size: 0.95rem;">
-        Score: <?= number_format($player['score']) ?>
+    <div class="d-flex align-items-center" style="gap: 10px;">
+        <div class="font-weight-bold badge badge-light text-dark px-3 py-2" style="font-size: 0.95rem;">
+            Score: <?= number_format($player['score']) ?>
+        </div>
+        <a href="<?= BASE_URL ?>index.php" class="btn btn-sm btn-outline-light font-weight-bold rounded-pill px-3" onclick="return confirm('Bạn có chắc muốn rời phòng và quay về trang chủ không?');" title="Rời phòng về trang chủ">
+            <i class="fas fa-home mr-1"></i> Trang chủ
+        </a>
     </div>
 </div>
 
@@ -200,7 +151,44 @@ require_once __DIR__ . '/../../includes/header.php';
     <?php
     $isCorrect = ($myVote && $myVote['is_correct'] == 1);
     $pointsEarned = $myVote ? intval($myVote['points_earned']) : 0;
+    $streakBonus = $myVote ? intval($myVote['streak_bonus'] ?? 0) : 0;
+    $totalRoundPoints = $pointsEarned + $streakBonus;
+    $currentStreak = intval($player['current_streak'] ?? 0);
+
+    // Audio công bố kết quả câu hỏi (SFX)
+    $correctAudios = ['correct_01.mp3', 'correct_02.mp3', 'correct_03.mp3', 'correct_04.mp3', 'correct_high.mp3'];
+    $incorrectAudios = ['incorrect_01.mp3', 'incorrect_02.mp3', 'incorrect_03.mp3', 'incorrect_04.mp3', 'incorrect_low.mp3'];
+    $resultAudioFile = $isCorrect
+        ? $correctAudios[array_rand($correctAudios)]
+        : $incorrectAudios[array_rand($incorrectAudios)];
+
+    // Kiểm tra mất chuỗi (Streak Lost): Nếu câu này sai và trước đó có chuỗi >= 2
+    $streakLost = false;
+    if (!$isCorrect && $myVote) {
+        $prevVotes = db_fetch_all(
+            "SELECT a.is_correct
+             FROM votes v
+             JOIN answers a ON v.id_answer = a.id_answer
+             WHERE v.id_player = :pid AND a.id_question != :qid
+             ORDER BY v.id_vote DESC",
+            [':pid' => $playerId, ':qid' => $qId]
+        );
+        $prevStreak = 0;
+        foreach ($prevVotes as $pv) {
+            if ($pv['is_correct'] == 1) {
+                $prevStreak++;
+            } else {
+                break;
+            }
+        }
+        if ($prevStreak >= 2) {
+            $streakLost = true;
+        }
+    }
     ?>
+    <audio id="resultSfx" preload="auto" src="<?= BASE_URL ?>assets/audio/<?= rawurlencode($resultAudioFile) ?>"></audio>
+    <audio id="pointsSfx" preload="auto" src="<?= BASE_URL ?>assets/audio/<?= rawurlencode('points.mp3') ?>"></audio>
+
     <div class="container py-3" style="max-width: 650px;">
 
         <div class="card border-0 shadow text-white text-center mb-3"
@@ -214,11 +202,36 @@ require_once __DIR__ . '/../../includes/header.php';
                         <h3 class="font-weight-bold mb-0">
                             <?= $isCorrect ? 'Correct!' : 'Incorrect!' ?>
                         </h3>
-                        <p class="mb-0 font-weight-bold" style="font-size: 1.15rem; color: #fff;">
-                            <?= $isCorrect ? ('+' . number_format($pointsEarned) . ' pts') : '+0 pts' ?>
-                        </p>
+                        <?php if ($isCorrect): ?>
+                            <?php if ($streakBonus > 0): ?>
+                                <p class="mb-0 font-weight-bold" style="font-size: 1.25rem; color: #fff;">
+                                    +<?= number_format($pointsEarned) ?> + <?= number_format($streakBonus) ?> Streak Bonus
+                                </p>
+                            <?php else: ?>
+                                <p class="mb-0 font-weight-bold" style="font-size: 1.15rem; color: #fff;">
+                                    +<?= number_format($pointsEarned) ?> pts
+                                </p>
+                            <?php endif; ?>
+                        <?php else: ?>
+                            <p class="mb-0 font-weight-bold" style="font-size: 1.15rem; color: #fff;">
+                                +0 pts
+                            </p>
+                            <?php if ($streakLost): ?>
+                                <div class="text-danger font-weight-bold small mt-1 bg-white px-2 py-1 rounded d-inline-block shadow-sm">
+                                    <i class="fas fa-heart-broken mr-1"></i> Answer streak lost!
+                                </div>
+                            <?php endif; ?>
+                        <?php endif; ?>
                     </div>
                 </div>
+
+                <?php if ($isCorrect && $currentStreak >= 2): ?>
+                    <div class="mt-3">
+                        <div class="badge badge-warning text-dark font-weight-bold px-3 py-2 shadow-sm" style="font-size: 0.95rem;">
+                            <i class="fas fa-fire text-danger mr-1 streak-fire-anim"></i> Answer Streak: <?= $currentStreak ?> 🔥
+                        </div>
+                    </div>
+                <?php endif; ?>
             </div>
         </div>
 
@@ -279,6 +292,11 @@ require_once __DIR__ . '/../../includes/header.php';
                                 <?php if ($isMe): ?>
                                     <span class="badge badge-warning text-dark font-weight-bold ml-1 px-2" style="font-size: 0.75rem;">YOU</span>
                                 <?php endif; ?>
+                                <?php if (intval($p['current_streak'] ?? 0) >= 2): ?>
+                                    <span class="badge badge-danger ml-1 font-weight-bold" style="font-size: 0.75rem;" title="<?= intval($p['current_streak']) ?> câu đúng liên tiếp!">
+                                        <i class="fas fa-fire streak-fire-anim"></i> <?= intval($p['current_streak']) ?>
+                                    </span>
+                                <?php endif; ?>
                             </div>
                         </div>
                         <div class="text-right pl-2" style="min-width: 85px;">
@@ -310,13 +328,33 @@ require_once __DIR__ . '/../../includes/header.php';
 
     <script>
     window.addEventListener('DOMContentLoaded', function() {
+        const resAudio = document.getElementById('resultSfx');
+        if (resAudio) {
+            resAudio.volume = 0.8;
+            resAudio.play().catch(function() {
+                $(document).one('click touchstart', function() {
+                    if (resAudio) resAudio.play().catch(function() {});
+                });
+            });
+        }
+
         setTimeout(function() {
+            let pointsAudioPlayed = false;
             document.querySelectorAll('.score-jump').forEach(function(el) {
                 const startVal = parseInt(el.getAttribute('data-start')) || 0;
                 const targetVal = parseInt(el.getAttribute('data-target')) || 0;
                 const gainedVal = parseInt(el.getAttribute('data-gained')) || 0;
 
                 if (gainedVal > 0 && targetVal > startVal) {
+                    if (!pointsAudioPlayed) {
+                        pointsAudioPlayed = true;
+                        const pointsAudio = document.getElementById('pointsSfx');
+                        if (pointsAudio) {
+                            pointsAudio.volume = 0.7;
+                            pointsAudio.currentTime = 0;
+                            pointsAudio.play().catch(function() {});
+                        }
+                    }
                     el.classList.add('text-success');
                     let startTime = null;
                     const duration = 1200;
@@ -354,24 +392,96 @@ require_once __DIR__ . '/../../includes/header.php';
 
 <?php else: ?>
 
-    <div class="player-buttons-grid">
+    <?php if (!$showOnDevice): ?>
+        <div class="player-buttons-grid">
+            <div class="player-btn red" onclick="submitAnswer(<?= $answers[0]['id_answer'] ?? 0 ?>)">
+                <span class="text-white">🔺</span>
+            </div>
 
-        <div class="player-btn red" onclick="submitAnswer(<?= $answers[0]['id_answer'] ?? 0 ?>)">
-            <span class="text-white">🔺</span>
-        </div>
+            <div class="player-btn blue" onclick="submitAnswer(<?= $answers[1]['id_answer'] ?? 0 ?>)">
+                <span class="text-white">🔷</span>
+            </div>
 
-        <div class="player-btn blue" onclick="submitAnswer(<?= $answers[1]['id_answer'] ?? 0 ?>)">
-            <span class="text-white">🔷</span>
-        </div>
+            <div class="player-btn yellow" onclick="submitAnswer(<?= $answers[2]['id_answer'] ?? 0 ?>)">
+                <span class="text-white">🟡</span>
+            </div>
 
-        <div class="player-btn yellow" onclick="submitAnswer(<?= $answers[2]['id_answer'] ?? 0 ?>)">
-            <span class="text-white">🟡</span>
+            <div class="player-btn green" onclick="submitAnswer(<?= $answers[3]['id_answer'] ?? 0 ?>)">
+                <span class="text-white">🟩</span>
+            </div>
         </div>
+    <?php else: ?>
+        <div class="container my-3" style="max-width: 1050px;">
+            <div class="question-card-banner">
+                <h2 class="font-weight-bold text-dark mb-0">
+                    <?= htmlspecialchars($currentQuestion['text'] ?? '') ?>
+                </h2>
+                <?php if ($hasQuestionImage): ?>
+                    <div class="text-center mt-3">
+                        <?php if ($questionMediaType === 'video'): ?>
+                            <video src="<?= htmlspecialchars($questionImageUrl) ?>" controls autoplay muted loop class="img-fluid rounded player-thumb-img shadow-sm" style="max-height: 280px; max-width: 100%; border-radius: 12px;"></video>
+                        <?php else: ?>
+                            <img src="<?= htmlspecialchars($questionImageUrl) ?>" alt="Question Illustration" class="img-fluid rounded player-thumb-img shadow-sm" style="max-height: 280px; object-fit: contain; border-radius: 12px;">
+                        <?php endif; ?>
+                    </div>
+                <?php endif; ?>
+            </div>
 
-        <div class="player-btn green" onclick="submitAnswer(<?= $answers[3]['id_answer'] ?? 0 ?>)">
-            <span class="text-white">🟩</span>
+            <div class="d-flex justify-content-between align-items-center my-3 px-2">
+                <div>
+                    <div id="playerTimerBox" class="timer-circle <?= $remainingSeconds <= 5 ? 'warning' : '' ?>">
+                        <span id="playerTimer"><?= $remainingSeconds ?></span>
+                    </div>
+                </div>
+
+                <div class="text-right">
+                    <span class="badge badge-light px-4 py-2 font-weight-bold text-dark shadow-sm" style="font-size: 1.1rem; border-radius: 50px;">
+                        <i class="fas fa-hand-pointer text-primary mr-1"></i> Chọn 1 đáp án
+                    </span>
+                </div>
+            </div>
+
+            <div class="row">
+                <?php
+                $colors = [KAHOOT_COLOR_RED, KAHOOT_COLOR_BLUE, KAHOOT_COLOR_YELLOW, KAHOOT_COLOR_GREEN];
+                $icons  = [KAHOOT_ICON_RED, KAHOOT_ICON_BLUE, KAHOOT_ICON_YELLOW, KAHOOT_ICON_GREEN];
+                $colorClasses = ['red', 'blue', 'yellow', 'green'];
+
+                foreach ($answers as $idx => $a):
+                    $cIdx = $idx % 4;
+                    $ansId = intval($a['id_answer'] ?? 0);
+                    $ansImgUrl = '';
+                    if (!empty($a['image_path'])) {
+                        if (preg_match('#^https?://#i', $a['image_path'])) {
+                            $ansImgUrl = $a['image_path'];
+                        } else {
+                            $aImgFile = basename($a['image_path']);
+                            $aImgDiskPath = dirname(__DIR__, 2) . '/assets/img/questions/' . $aImgFile;
+                            if (file_exists($aImgDiskPath)) {
+                                $ansImgUrl = BASE_URL . 'assets/img/questions/' . rawurlencode($aImgFile);
+                            }
+                        }
+                    }
+                ?>
+                    <div class="col-md-6 mb-3">
+                        <div class="answer-box shadow-sm d-flex justify-content-between align-items-center <?= $colorClasses[$cIdx] ?>"
+                             onclick="submitAnswer(<?= $ansId ?>)">
+                            <div class="d-flex align-items-center flex-grow-1 mr-2">
+                                <span class="symbol mr-3" style="font-size: 2rem;"><?= $icons[$cIdx] ?></span>
+                                <?php if ($ansImgUrl): ?>
+                                    <img src="<?= htmlspecialchars($ansImgUrl) ?>" alt="Answer" class="img-fluid rounded mr-3 bg-white p-1" style="max-height: 50px; max-width: 75px; object-fit: contain; box-shadow: 0 2px 4px rgba(0,0,0,0.15);">
+                                <?php endif; ?>
+                                <?php if (!empty($a['text'])): ?>
+                                    <span style="font-size: 1.3rem;"><?= htmlspecialchars($a['text'] ?? '') ?></span>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
         </div>
-    </div>
+    <?php endif; ?>
+
 <?php endif; ?>
 
 <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
@@ -391,7 +501,17 @@ function refreshPlayerPage() {
 function submitAnswer(answerId) {
     if (!answerId) return;
 
-    $('.player-btn').css('pointer-events', 'none').css('opacity', '0.7');
+    // Phát âm thanh submit tension ngay khi chạm/click vào đáp án
+    const submitAudio = document.getElementById('submitSfx');
+    if (submitAudio) {
+        try {
+            submitAudio.volume = 0.8;
+            submitAudio.currentTime = 0;
+            submitAudio.play().catch(function() {});
+        } catch(e) {}
+    }
+
+    $('.answer-box, .player-btn').css('pointer-events', 'none').css('opacity', '0.7');
 
     $.ajax({
         url: '<?= BASE_URL ?>modules/api/submit_answer.php',
@@ -413,8 +533,37 @@ function submitAnswer(answerId) {
     });
 }
 
+<?php if ($showOnDevice && !$isResultPhase && !$myVote): ?>
+let playerSeconds = <?= intval($remainingSeconds) ?>;
+const timerEl = document.getElementById('playerTimer');
+const timerBox = document.getElementById('playerTimerBox');
+
+if (playerSeconds <= 0) {
+    $('.answer-box, .player-btn').css('pointer-events', 'none').css('opacity', '0.6');
+} else if (timerEl) {
+    const playerCountdown = setInterval(function() {
+        playerSeconds--;
+        if (playerSeconds <= 0) {
+            playerSeconds = 0;
+            clearInterval(playerCountdown);
+            timerEl.textContent = '0';
+            $('.answer-box, .player-btn').css('pointer-events', 'none').css('opacity', '0.6');
+        } else {
+            timerEl.textContent = playerSeconds;
+            if (playerSeconds <= 5 && timerBox) {
+                timerBox.classList.add('warning');
+            }
+        }
+    }, 1000);
+}
+<?php endif; ?>
+
 setInterval(function() {
-    $.getJSON('<?= BASE_URL ?>modules/api/game_state.php?action=get_room_status&id_room=' + roomId, function(res) {
+    $.getJSON('<?= BASE_URL ?>modules/api/game_state.php?action=get_room_status&id_room=' + roomId + '&pid=' + playerId + '&token=' + encodeURIComponent(playerToken), function(res) {
+        if (res && res.kicked) {
+            refreshPlayerPage();
+            return;
+        }
         if (res && res.success) {
             if (res.status !== currentStatus) {
                 refreshPlayerPage();

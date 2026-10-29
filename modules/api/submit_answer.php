@@ -3,6 +3,7 @@
 header('Content-Type: application/json; charset=utf-8');
 require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../includes/room_access.php';
 
 $raw = file_get_contents('php://input');
 $data = json_decode($raw, true);
@@ -16,92 +17,143 @@ if ($playerId <= 0 || $answerId <= 0 || $roomId <= 0) {
     exit;
 }
 
-$playerCheck = db_fetch_one("SELECT id_player FROM players WHERE id_player = :p AND id_room = :r", [':p' => $playerId, ':r' => $roomId]);
+if (!player_request_is_valid($playerId, $roomId, $data['token'] ?? '')) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Invalid player session']);
+    exit;
+}
+$room = db_fetch_one('SELECT id_room, pin FROM room WHERE id_room = :r', [':r' => $roomId]);
+if (!$room) {
+    echo json_encode(['success' => false, 'message' => 'Room does not exist']);
+    exit;
+}
+
+$playerCheck = db_fetch_one("SELECT id_player, current_streak FROM players WHERE id_player = :p AND id_room = :r", [':p' => $playerId, ':r' => $roomId]);
 if (!$playerCheck) {
     echo json_encode(['success' => false, 'message' => 'Player not found in this room']);
     exit;
 }
+$currentStreak = intval($playerCheck['current_streak'] ?? 0);
 
 try {
+    // Serialize kick and answer requests until the vote and score are saved.
+    $result = with_room_access_lock($room, function ($handle) use ($room, $playerId, $answerId, $roomId, $currentStreak) {
+        $state = read_room_access_state($handle);
+        if (!empty($state['kicked'][$playerId])) {
+            return ['success' => false, 'kicked' => true, 'message' => 'You were removed from the game by the host.'];
+        }
 
-    $ans = db_fetch_one(
-        "SELECT a.*, q.points, q.time_limit, r.question_start_time, r.status
-         FROM answers a
-         JOIN questions q ON a.id_question = q.id_question
-         JOIN room r ON r.id_room = :r
-         WHERE a.id_answer = :aid",
-        [':r' => $roomId, ':aid' => $answerId]
-    );
-
-    if (!$ans) {
-        echo json_encode(['success' => false, 'message' => 'Invalid answer or room']);
-        exit;
-    }
-
-    $qId = intval($ans['id_question']);
-
-    $alreadyVoted = db_fetch_one(
-        "SELECT v.id_vote FROM votes v JOIN answers a ON v.id_answer = a.id_answer WHERE v.id_player = :p AND a.id_question = :q LIMIT 1",
-        [':p' => $playerId, ':q' => $qId]
-    );
-
-    if ($alreadyVoted) {
-        echo json_encode(['success' => false, 'message' => 'You have already answered this question']);
-        exit;
-    }
-
-    $isCorrect = ($ans['is_correct'] == 1);
-    $pointsEarned = 0;
-
-    if ($isCorrect) {
-        $basePoints = intval($ans['points'] ?: 1000);
-        $timeLimit  = intval($ans['time_limit'] ?: 20);
-        $startTime  = intval($ans['question_start_time'] ?: time());
-        $elapsed    = max(0, time() - $startTime);
-
-        $ratio = min(1, $elapsed / max(1, $timeLimit));
-
-        $pointsEarned = intval(round($basePoints * (1 - ($ratio / 2))));
-    }
-
-    db_insert(
-        "INSERT INTO votes (id_player, id_answer, points_earned) VALUES (:p, :a, :pts)",
-        [
-            ':p'   => $playerId,
-            ':a'   => $answerId,
-            ':pts' => $pointsEarned
-        ]
-    );
-
-    if ($isCorrect) {
-        db_execute(
-            "UPDATE players SET score = score + :pts, answers_correct = answers_correct + 1 WHERE id_player = :p",
-            [':pts' => $pointsEarned, ':p' => $playerId]
+        $ans = db_fetch_one(
+            "SELECT a.*, q.points, q.time_limit, r.question_start_time, r.status
+             FROM answers a
+             JOIN questions q ON a.id_question = q.id_question
+             JOIN room r ON r.id_room = :r
+             WHERE a.id_answer = :aid",
+            [':r' => $roomId, ':aid' => $answerId]
         );
-    }
 
-    $totalPlayers = db_count('players', 'id_room = :r', [':r' => $roomId]);
-    $votedCount = db_fetch_one(
-        "SELECT COUNT(DISTINCT v.id_player) as total
-         FROM votes v JOIN answers a ON v.id_answer = a.id_answer
-         WHERE a.id_question = :qid AND v.id_player IN (SELECT id_player FROM players WHERE id_room = :r)",
-        [':qid' => $qId, ':r' => $roomId]
-    )['total'] ?? 0;
+        if (!$ans) {
+            return ['success' => false, 'message' => 'Invalid answer or room'];
+        }
 
-    if ($totalPlayers > 0 && $votedCount >= $totalPlayers) {
-        db_execute("UPDATE room SET status = :s WHERE id_room = :r AND status = :curQ", [
-            ':s'    => 'res_' . $qId,
-            ':r'    => $roomId,
-            ':curQ' => (string)$qId
-        ]);
-    }
+        $qId = intval($ans['id_question']);
 
-    echo json_encode([
-        'success'       => true,
-        'is_correct'    => $isCorrect,
-        'points_earned' => $pointsEarned
-    ]);
+        $alreadyVoted = db_fetch_one(
+            "SELECT v.id_vote FROM votes v JOIN answers a ON v.id_answer = a.id_answer WHERE v.id_player = :p AND a.id_question = :q LIMIT 1",
+            [':p' => $playerId, ':q' => $qId]
+        );
 
-} catch (Exception $e) {
-    echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        if ($alreadyVoted) {
+            return ['success' => false, 'message' => 'You have already answered this question'];
+        }
+
+        $isCorrect = ($ans['is_correct'] == 1);
+        $pointsEarned = 0;
+        $streakBonus = 0;
+        $newStreak = 0;
+        $streakLost = false;
+
+        if ($isCorrect) {
+            $basePoints = intval($ans['points'] ?: 1000);
+            $timeLimit  = intval($ans['time_limit'] ?: 20);
+            $startTime  = intval($ans['question_start_time'] ?: time());
+            $elapsed    = max(0, time() - $startTime);
+
+            $ratio = min(1, $elapsed / max(1, $timeLimit));
+
+            $pointsEarned = intval(round($basePoints * (1 - ($ratio / 2))));
+            $newStreak = $currentStreak + 1;
+
+            if ($newStreak == 2) {
+                $streakBonus = 100;
+            } elseif ($newStreak == 3) {
+                $streakBonus = 200;
+            } elseif ($newStreak == 4) {
+                $streakBonus = 300;
+            } elseif ($newStreak >= 5) {
+                $streakBonus = 500;
+            } else {
+                $streakBonus = 0;
+            }
+
+            $totalPts = $pointsEarned + $streakBonus;
+
+            db_insert(
+                "INSERT INTO votes (id_player, id_answer, points_earned, streak_bonus) VALUES (:p, :a, :pts, :bonus)",
+                [
+                    ':p'     => $playerId,
+                    ':a'     => $answerId,
+                    ':pts'   => $pointsEarned,
+                    ':bonus' => $streakBonus
+                ]
+            );
+
+            db_execute(
+                "UPDATE players SET score = score + :totalPts, answers_correct = answers_correct + 1, current_streak = :newStreak WHERE id_player = :p",
+                [':totalPts' => $totalPts, ':newStreak' => $newStreak, ':p' => $playerId]
+            );
+        } else {
+            $streakLost = ($currentStreak >= 2);
+            $newStreak = 0;
+            $streakBonus = 0;
+
+            db_insert(
+                "INSERT INTO votes (id_player, id_answer, points_earned, streak_bonus) VALUES (:p, :a, :pts, :bonus)",
+                [
+                    ':p'     => $playerId,
+                    ':a'     => $answerId,
+                    ':pts'   => 0,
+                    ':bonus' => 0
+                ]
+            );
+
+            db_execute("UPDATE players SET current_streak = 0 WHERE id_player = :p", [':p' => $playerId]);
+        }
+
+        $counts = room_question_counts($room, $qId, $state);
+        $totalPlayers = $counts['total_players'];
+        $votedCount = $counts['voted_count'];
+
+        if ($totalPlayers > 0 && $votedCount >= $totalPlayers) {
+            db_execute("UPDATE room SET status = :s WHERE id_room = :r AND status = :curQ", [
+                ':s'    => 'res_' . $qId,
+                ':r'    => $roomId,
+                ':curQ' => (string)$qId
+            ]);
+        }
+
+        return [
+            'success'       => true,
+            'is_correct'    => $isCorrect,
+            'points_earned' => $pointsEarned,
+            'streak'        => $newStreak,
+            'streak_bonus'  => $streakBonus,
+            'streak_lost'   => $streakLost
+        ];
+    });
+    echo json_encode($result);
+
+} catch (Throwable $e) {
+    http_response_code(500);
+    echo json_encode(['success' => false, 'message' => 'Unable to submit your answer. Please try again.']);
 }

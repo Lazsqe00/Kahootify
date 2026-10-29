@@ -7,6 +7,8 @@ $pageTitle = "Dashboard | Kahoot!";
 require_once __DIR__ . '/../../includes/header.php';
 require_once __DIR__ . '/../../includes/navbar.php';
 
+$flash = get_flash_message();
+
 $creatorId = intval($_SESSION['id_creator']);
 
 $totalQuizzes = db_count('quiz', 'id_creator = :c', [':c' => $creatorId]);
@@ -27,6 +29,13 @@ $quizzes = db_fetch_all(
 
 <div class="container my-4">
 
+    <?php if ($flash): ?>
+        <div class="alert alert-<?= htmlspecialchars($flash['type']) ?> alert-dismissible fade show mb-4" role="alert">
+            <?= htmlspecialchars($flash['message']) ?>
+            <button type="button" class="close" data-dismiss="alert"><span>&times;</span></button>
+        </div>
+    <?php endif; ?>
+
     <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
         <div>
             <h2 class="font-weight-bold mb-1" style="color: var(--kahoot-purple);">
@@ -35,6 +44,9 @@ $quizzes = db_fetch_all(
             <p class="text-muted mb-0">Welcome, <b><?= htmlspecialchars($_SESSION['nameCreator']) ?></b>! Manage your quizzes and hosted games.</p>
         </div>
         <div>
+            <a href="<?= BASE_URL ?>modules/reports/list.php" class="btn btn-outline-primary font-weight-bold mr-2">
+                <i class="fas fa-chart-pie mr-1"></i> Báo cáo & Thống kê
+            </a>
             <a href="<?= BASE_URL ?>modules/quiz/create.php" class="btn btn-kahoot btn-kahoot-green">
                 <i class="fas fa-plus-circle mr-2"></i> Create New Kahoot
             </a>
@@ -57,17 +69,20 @@ $quizzes = db_fetch_all(
         </div>
 
         <div class="col-md-4 mb-3">
-            <div class="card border-0 shadow-sm text-white" style="background: linear-gradient(135deg, #1368ce, #2980b9); border-radius: 10px;">
-                <div class="card-body d-flex justify-content-between align-items-center p-4">
-                    <div>
-                        <h6 class="text-uppercase mb-2 font-weight-bold" style="opacity: 0.85;">Hosted Sessions</h6>
-                        <h2 class="display-4 font-weight-bold mb-0"><?= $totalRooms ?></h2>
-                    </div>
-                    <div style="font-size: 3rem; opacity: 0.3;">
-                        <i class="fas fa-broadcast-tower"></i>
+            <a href="<?= BASE_URL ?>modules/reports/list.php" class="text-decoration-none">
+                <div class="card border-0 shadow-sm text-white" style="background: linear-gradient(135deg, #1368ce, #2980b9); border-radius: 10px; transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform='translateY(0)'">
+                    <div class="card-body d-flex justify-content-between align-items-center p-4">
+                        <div>
+                            <h6 class="text-uppercase mb-2 font-weight-bold text-white" style="opacity: 0.85;">Hosted Sessions</h6>
+                            <h2 class="display-4 font-weight-bold mb-0 text-white"><?= $totalRooms ?></h2>
+                            <small class="text-white-50"><i class="fas fa-chart-line mr-1"></i> Xem báo cáo ván đấu &raquo;</small>
+                        </div>
+                        <div style="font-size: 3rem; opacity: 0.3;">
+                            <i class="fas fa-broadcast-tower"></i>
+                        </div>
                     </div>
                 </div>
-            </div>
+            </a>
         </div>
 
         <div class="col-md-4 mb-3">
@@ -100,7 +115,7 @@ $quizzes = db_fetch_all(
                     <p class="text-muted">Click the "Create New Kahoot" button above to get started.</p>
                 </div>
             <?php else: ?>
-                <div class="table-responsive">
+                <div class="table-responsive" style="min-height: 180px;">
                     <table class="table table-hover align-middle mb-0">
                         <thead class="thead-light">
                             <tr>
@@ -108,7 +123,7 @@ $quizzes = db_fetch_all(
                                 <th>Quiz Name</th>
                                 <th class="text-center" style="width: 140px;">Questions</th>
                                 <th style="width: 180px;">Created Date</th>
-                                <th class="text-center" style="width: 280px;">Actions</th>
+                                <th class="text-center" style="width: 220px;">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -133,18 +148,26 @@ $quizzes = db_fetch_all(
                                     </td>
                                     <td class="text-center">
                                         <div class="btn-group" role="group">
-
                                             <a href="<?= BASE_URL ?>modules/host/create_room.php?id_quiz=<?= $q['id_quiz'] ?>" class="btn btn-sm btn-primary font-weight-bold px-3" title="Host game room">
                                                 <i class="fas fa-play mr-1"></i> Play
                                             </a>
-
-                                            <a href="<?= BASE_URL ?>modules/quiz/edit.php?id=<?= $q['id_quiz'] ?>" class="btn btn-sm btn-success font-weight-bold px-3" title="Edit quiz">
-                                                <i class="fas fa-edit mr-1"></i> Edit
-                                            </a>
-
-                                            <a href="<?= BASE_URL ?>modules/quiz/delete.php?id=<?= $q['id_quiz'] ?>" class="btn btn-sm btn-danger font-weight-bold px-3" onclick="return confirm('Are you sure you want to delete this quiz and all its questions?');" title="Delete quiz">
-                                                <i class="fas fa-trash-alt"></i>
-                                            </a>
+                                            <div class="btn-group" role="group">
+                                                <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle font-weight-bold px-2" id="quizActionsDash_<?= $q['id_quiz'] ?>" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" title="Actions">
+                                                    <i class="fas fa-ellipsis-v mr-1"></i> Actions
+                                                </button>
+                                                <div class="dropdown-menu dropdown-menu-right shadow-sm" aria-labelledby="quizActionsDash_<?= $q['id_quiz'] ?>">
+                                                    <a class="dropdown-item" href="<?= BASE_URL ?>modules/quiz/edit.php?id=<?= $q['id_quiz'] ?>">
+                                                        <i class="fas fa-edit mr-2 text-success"></i> Edit
+                                                    </a>
+                                                    <a class="dropdown-item" href="<?= BASE_URL ?>modules/quiz/duplicate.php?id=<?= $q['id_quiz'] ?>&ref=dashboard">
+                                                        <i class="fas fa-copy mr-2 text-info"></i> Duplicate
+                                                    </a>
+                                                    <div class="dropdown-divider"></div>
+                                                    <a class="dropdown-item text-danger" href="<?= BASE_URL ?>modules/quiz/delete.php?id=<?= $q['id_quiz'] ?>&ref=dashboard" onclick="return confirm('Are you sure you want to delete this quiz and all its questions?');">
+                                                        <i class="fas fa-trash-alt mr-2"></i> Delete
+                                                    </a>
+                                                </div>
+                                            </div>
                                         </div>
                                     </td>
                                 </tr>

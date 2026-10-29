@@ -1,0 +1,44 @@
+.character-picker { border: 0; padding: 0; margin: 12px 0; min-width: 0; }
+.character-picker legend { font-size: 15px; font-weight: 700; color: #46178f; text-align: left; }
+.character-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(64px, 1fr)); gap: 8px; max-height: 244px; overflow-y: auto; padding: 5px; background: #f4effa; border-radius: 8px; }
+.character-option { position: relative; margin: 0; cursor: pointer; }
+.character-option > input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.character-option > span { display: flex; align-items: center; justify-content: center; min-height: 72px; border: 3px solid transparent; border-radius: 8px; background: white; }
+.character-option .player-avatar { width: 60px; height: 60px; pointer-events: none; }
+.character-option img { width: 60px; height: 60px; object-fit: contain; }
+.character-option > input:checked + span { border-color: #46178f; background: #e8dcfa; }
+.character-option > input:focus-visible + span { outline: 3px solid #1368ce; outline-offset: 2px; }
+.character-selected { display: none; position: absolute; bottom: 2px; right: 3px; width: 19px; height: 19px; border-radius: 50%; background: #46178f; color: white; font-size: 12px; line-height: 19px; text-align: center; }
+.character-option > input:checked + span .character-selected { display: block; }
+.waiting-character { display: block; width: 110px; height: 110px; object-fit: contain; margin: 0 auto 12px; }
+.character-editor { color: #302047; text-align: center; }
+.character-editor [hidden], .join-card [hidden] { display: none !important; }
+.character-preview { display: grid; place-items: center; min-height: 164px; background: radial-gradient(ellipse, #eee1ff, #f8f4ff 70%); border-radius: 14px; padding: 12px; }
+.character-preview .character-preview-avatar { width: 140px; height: 140px; filter: drop-shadow(0 5px 3px #46178f20); }
+.character-summary { margin: 8px 0 12px; font-size: 13px; font-weight: 700; min-height: 20px; }
+.character-tabs { display: flex; border-bottom: 2px solid #ddd1ec; gap: 8px; }
+.character-tabs button { flex: 1; min-height: 44px; border: 0; border-bottom: 3px solid transparent; background: transparent; color: #675778; font-weight: 700; cursor: pointer; }
+.character-tabs button[aria-selected="true"] { color: #46178f; border-bottom-color: #46178f; }
+.character-tabs button:focus-visible, .character-random:focus-visible { outline: 3px solid #1368ce; outline-offset: 2px; }
+.character-random { background: #f0e8fb; color: #46178f; border: 1px solid #d5c3ed; border-radius: 6px; padding: 10px 16px; min-height: 44px; cursor: pointer; font-weight: 700; font-size: 12px; }
+.accessory-none { color: #746386; font-size: 28px; line-height: 1; }
+.accessory-none small { display: block; font-size: 10px; margin-top: 3px; }
+.join-step-label { font-size: 12px; font-weight: 700; color: #7d629c; margin-bottom: 12px; }
+.join-actions { display: flex; gap: 10px; margin-top: 18px; }
+.join-actions button { min-height: 48px; }
+.join-actions .join-primary { flex: 1; margin: 0; background: #26890c; color: white; }
+.join-back { border: 1px solid #d5c3ed; border-radius: 6px; background: white; color: #46178f; padding: 10px 15px; font-weight: 700; cursor: pointer; }
+.waiting-editor { width: min(480px, 100%); margin: 0 auto 20px; padding: 18px; border-radius: 12px; background: white; color: #302047; }
+.waiting-editor > summary { cursor: pointer; font-weight: 700; color: #46178f; padding: 8px; }
+.waiting-editor form { margin-top: 15px; }
+.waiting-editor .character-save { margin-top: 15px; background: #26890c; color: white; width: 100%; }
+.player-waiting-content { width: 100%; max-width: 560px; min-width: 0; }
+.player-waiting-content > h1 { font-size: clamp(2rem, 8vw, 4rem); }
+.waiting-profile { max-width: 100%; }
+.waiting-profile h2 { overflow-wrap: anywhere; }
+@media (max-width: 480px) {
+    .join-card.pin-card-box { padding: 22px 18px; }
+    .character-preview { min-height: 132px; }
+    .character-preview .character-preview-avatar { width: 112px; height: 112px; }
+    .character-options { max-height: 210px; }
+}
