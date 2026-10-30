@@ -4,6 +4,7 @@ USE `kahoot_btn`;
 
 SET FOREIGN_KEY_CHECKS = 0;
 
+DROP TABLE IF EXISTS `saved_review_questions`;
 DROP TABLE IF EXISTS `roles`;
 CREATE TABLE `roles` (
   `id_role` bigint(6) NOT NULL AUTO_INCREMENT,
@@ -156,6 +157,18 @@ CREATE TABLE `votes` (
   KEY `FK_IDPLAYER_PLAYERS2` (`id_answer`),
   CONSTRAINT `FK_IDPLAYER_PLAYERS` FOREIGN KEY (`id_player`) REFERENCES `players` (`id_player`) ON DELETE CASCADE,
   CONSTRAINT `FK_IDPLAYER_PLAYERS2` FOREIGN KEY (`id_answer`) REFERENCES `answers` (`id_answer`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `saved_review_questions` (
+  `id_saved` bigint(11) NOT NULL AUTO_INCREMENT,
+  `id_player` bigint(6) NOT NULL,
+  `id_question` bigint(6) NOT NULL,
+  `saved_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id_saved`),
+  UNIQUE KEY `uq_saved_review_player_question` (`id_player`, `id_question`),
+  KEY `idx_saved_review_question` (`id_question`),
+  CONSTRAINT `fk_saved_review_player` FOREIGN KEY (`id_player`) REFERENCES `players` (`id_player`) ON DELETE CASCADE,
+  CONSTRAINT `fk_saved_review_question` FOREIGN KEY (`id_question`) REFERENCES `questions` (`id_question`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 SET FOREIGN_KEY_CHECKS = 1;
