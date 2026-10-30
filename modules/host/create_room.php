@@ -6,6 +6,12 @@ require_once __DIR__ . '/../../config/database.php';
 $creatorId = intval($_SESSION['id_creator']);
 $quizId    = intval($_GET['id_quiz'] ?? 0);
 
+$quiz = db_fetch_one("SELECT id_quiz FROM quiz WHERE id_quiz = :q AND id_creator = :c", [':q' => $quizId, ':c' => $creatorId]);
+if (!$quiz) {
+    set_flash_message('danger', 'Quiz not found or access denied.');
+    redirect('modules/quiz/list.php');
+}
+
 $questions = db_fetch_all("SELECT id_question FROM questions WHERE id_quiz = :q ORDER BY id_question ASC", [':q' => $quizId]);
 
 if (empty($questions)) {

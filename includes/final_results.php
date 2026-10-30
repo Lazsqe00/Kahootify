@@ -19,6 +19,83 @@ foreach ($leaderboard as $index => $entry) {
         break;
     }
 }
+$playerQuestionReview = [];
+if (!$isHostResults && $myResult !== null) {
+    $reviewQuestionIds = !empty($room['question_order']) ? json_decode($room['question_order'], true) : null;
+    if (!is_array($reviewQuestionIds) || empty($reviewQuestionIds)) {
+        $fallbackReviewQuestions = db_fetch_all(
+            'SELECT id_question FROM questions WHERE id_quiz = :q ORDER BY id_question ASC',
+            [':q' => $room['id_quiz']]
+        );
+        $reviewQuestionIds = array_column($fallbackReviewQuestions, 'id_question');
+    }
+
+    $reviewQuestionIds = array_values(array_unique(array_filter(array_map('intval', $reviewQuestionIds))));
+    if (!empty($reviewQuestionIds)) {
+        $reviewIdsSql = implode(',', $reviewQuestionIds);
+        $isUserLoggedIn = !empty($_SESSION['id_creator']);
+        $creatorId = (int)($_SESSION['id_creator'] ?? 0);
+        if ($isUserLoggedIn) {
+            $savedReviewRows = db_fetch_all(
+                'SELECT id_question FROM saved_review_questions WHERE id_creator = :cid',
+                [':cid' => $creatorId]
+            );
+        } else {
+            $savedReviewRows = [];
+        }
+        $savedReviewIds = array_flip(array_map('intval', array_column($savedReviewRows, 'id_question')));
+        $reviewQuestions = db_fetch_all(
+            "SELECT * FROM questions WHERE id_quiz = :quiz AND id_question IN ($reviewIdsSql)",
+            [':quiz' => $room['id_quiz']]
+        );
+        $reviewQuestionsById = [];
+        foreach ($reviewQuestions as $reviewQuestion) {
+            $reviewQuestionsById[(int) $reviewQuestion['id_question']] = $reviewQuestion;
+        }
+
+        $reviewVotes = db_fetch_all(
+            "SELECT a.id_question, v.id_answer, a.is_correct FROM votes v JOIN answers a ON a.id_answer = v.id_answer WHERE v.id_player = :pid AND a.id_question IN ($reviewIdsSql)",
+            [':pid' => $resultsPlayerId]
+        );
+        $reviewVotesByQuestion = [];
+        foreach ($reviewVotes as $reviewVote) {
+            $reviewVotesByQuestion[(int) $reviewVote['id_question']] = $reviewVote;
+        }
+
+        $reviewAnswers = db_fetch_all(
+            "SELECT * FROM answers WHERE id_question IN ($reviewIdsSql) ORDER BY id_question ASC, id_answer ASC"
+        );
+        $reviewAnswersByQuestion = [];
+        foreach ($reviewAnswers as $reviewAnswer) {
+            $reviewAnswersByQuestion[(int) $reviewAnswer['id_question']][] = $reviewAnswer;
+        }
+
+        foreach ($reviewQuestionIds as $reviewIndex => $reviewQuestionId) {
+            if (!isset($reviewQuestionsById[$reviewQuestionId], $reviewVotesByQuestion[$reviewQuestionId])) continue;
+
+            $reviewQuestion = $reviewQuestionsById[$reviewQuestionId];
+            $reviewVote = $reviewVotesByQuestion[$reviewQuestionId];
+            $questionAnswers = $reviewAnswersByQuestion[$reviewQuestionId] ?? [];
+            foreach ($questionAnswers as &$reviewAnswer) {
+                $reviewAnswer['is_player_choice'] = (int) $reviewAnswer['id_answer'] === (int) $reviewVote['id_answer'];
+            }
+            unset($reviewAnswer);
+
+            $reviewQuestion['number'] = $reviewIndex + 1;
+            $reviewQuestion['player_was_correct'] = (int) $reviewVote['is_correct'] === 1;
+            $reviewQuestion['is_saved'] = isset($savedReviewIds[$reviewQuestionId]);
+            $reviewQuestion['answers'] = $questionAnswers;
+            $playerQuestionReview[] = $reviewQuestion;
+        }
+    }
+}
+$reviewMediaUrl = static function (?string $path): string {
+    if (!$path) return '';
+    if (preg_match('#^https?://#i', $path)) return $path;
+    $filename = basename($path);
+    $diskPath = dirname(__DIR__) . '/assets/img/questions/' . $filename;
+    return is_file($diskPath) ? BASE_URL . 'assets/img/questions/' . rawurlencode($filename) : '';
+};
 $pageTitle = 'Final Results - ' . ($quiz['name'] ?? 'Kahootify');
 $bodyClass = 'final-results-page';
 $pageStyles = ['assets/css/final-results.css'];
@@ -101,6 +178,107 @@ require __DIR__ . '/header.php';
 
         <div class="results-afterparty" id="resultsAfterparty">
         <?php if ($participantCount > 0): ?>
+            <?php if (!$isHostResults && $myResult !== null): ?>
+                <section class="results-review" aria-labelledby="resultsReviewTitle">
+                    <div class="results-review-heading">
+                        <div>
+                            <h2 id="resultsReviewTitle">Review your answers</h2>
+                            <p>See your choice and the correct answer for each question you answered.</p>
+                        </div>
+                        <span><?= count($playerQuestionReview) ?> answered</span>
+                    </div>
+                    <?php if (!empty($isUserLoggedIn)): ?>
+                    <?php if (empty($isUserLoggedIn)): ?>
+                    <div class="mb-4 p-3 rounded text-center" style="background: #faf7fe; border: 1px dashed #d0bfe3; color: #46178f; font-size: 13px;">
+                        <i class="fas fa-info-circle mr-1"></i> <a href="#" data-toggle="modal" data-target="#loginModal" class="font-weight-bold" style="color: #46178f; text-decoration: underline;">Đăng nhập</a> để mở tính năng lưu câu hỏi ôn tập vào Dashboard.
+                    </div>
+                    <?php endif; ?>
+                    <section class="results-saved-review" aria-labelledby="resultsSavedReviewTitle">
+                        <div class="results-saved-review-heading">
+                            <h3 id="resultsSavedReviewTitle"><i class="far fa-bookmark" aria-hidden="true"></i> Saved questions</h3>
+                            <span id="resultsSavedReviewCount"><?= count(array_filter($playerQuestionReview, static function ($question) { return !empty($question['is_saved']); })) ?></span>
+                        </div>
+                        <p class="results-saved-review-empty" id="resultsSavedReviewEmpty" <?= array_filter($playerQuestionReview, static function ($question) { return !empty($question['is_saved']); }) ? 'hidden' : '' ?>>Save questions here to revisit them later.</p>
+                        <ul class="results-saved-review-list" id="resultsSavedReviewList">
+                            <?php foreach ($playerQuestionReview as $savedQuestion): if (empty($savedQuestion['is_saved'])) continue; ?>
+                                <li data-saved-question="<?= (int) $savedQuestion['id_question'] ?>">
+                                    <a href="#review-question-<?= (int) $savedQuestion['id_question'] ?>">
+                                        <strong>Question <?= (int) $savedQuestion['number'] ?>:</strong>
+                                        <?= htmlspecialchars($savedQuestion['text'] ?? '') ?>
+                                    </a>
+                                </li>
+                            <?php endforeach; ?>
+                        </ul>
+                    </section>
+                    <?php endif; ?>
+                    <?php if (empty($playerQuestionReview)): ?>
+                        <p class="results-review-empty">No submitted answers were recorded for this game.</p>
+                    <?php else: ?>
+                        <div class="results-review-list">
+                            <?php foreach ($playerQuestionReview as $reviewQuestion):
+                                $reviewImageUrl = $reviewMediaUrl($reviewQuestion['image'] ?? null);
+                                $reviewImageExt = strtolower(pathinfo(parse_url($reviewImageUrl, PHP_URL_PATH) ?? '', PATHINFO_EXTENSION));
+                                $reviewIsVideo = in_array($reviewImageExt, ['mp4', 'webm'], true) || ($reviewQuestion['media_type'] ?? '') === 'video';
+                                $reviewSymbols = ['▲', '◆', '●', '■'];
+                            ?>
+                                <article class="results-review-question" id="review-question-<?= (int) $reviewQuestion['id_question'] ?>">
+                                    <div class="results-review-question-heading">
+                                        <span class="results-review-number">Question <?= (int) $reviewQuestion['number'] ?></span>
+                                        <div class="results-review-question-actions">
+                                            <span class="results-review-outcome <?= $reviewQuestion['player_was_correct'] ? 'is-correct' : 'is-incorrect' ?>">
+                                                <?= $reviewQuestion['player_was_correct'] ? 'Correct' : 'Incorrect' ?>
+                                            </span>
+                                            <?php if (!empty($isUserLoggedIn)): ?>
+                                            <button class="results-review-save <?= $reviewQuestion['is_saved'] ? 'is-saved' : '' ?>" type="button"
+                                                data-question-id="<?= (int) $reviewQuestion['id_question'] ?>"
+                                                data-question-number="<?= (int) $reviewQuestion['number'] ?>"
+                                                aria-pressed="<?= $reviewQuestion['is_saved'] ? 'true' : 'false' ?>">
+                                                <i class="<?= $reviewQuestion['is_saved'] ? 'fas' : 'far' ?> fa-bookmark" aria-hidden="true"></i>
+                                                <span><?= $reviewQuestion['is_saved'] ? 'Saved' : 'Save for review' ?></span>
+                                            </button>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                    <h3><?= htmlspecialchars($reviewQuestion['text'] ?? '') ?></h3>
+                                    <?php if ($reviewImageUrl): ?>
+                                        <div class="results-review-media">
+                                            <?php if ($reviewIsVideo): ?>
+                                                <video src="<?= htmlspecialchars($reviewImageUrl, ENT_QUOTES, 'UTF-8') ?>" controls preload="metadata"></video>
+                                            <?php else: ?>
+                                                <img src="<?= htmlspecialchars($reviewImageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Question illustration" loading="lazy">
+                                            <?php endif; ?>
+                                        </div>
+                                    <?php endif; ?>
+                                    <div class="results-review-answers">
+                                        <?php foreach ($reviewQuestion['answers'] as $answerIndex => $reviewAnswer):
+                                            $answerImageUrl = $reviewMediaUrl($reviewAnswer['image_path'] ?? null);
+                                            $isCorrectAnswer = (int) $reviewAnswer['is_correct'] === 1;
+                                            $isPlayerChoice = !empty($reviewAnswer['is_player_choice']);
+                                        ?>
+                                            <div class="results-review-answer <?= $isCorrectAnswer ? 'is-correct-answer' : '' ?> <?= $isPlayerChoice ? 'is-player-choice' : '' ?>">
+                                                <span class="results-review-answer-symbol"><?= htmlspecialchars($reviewSymbols[$answerIndex % 4]) ?></span>
+                                                <div class="results-review-answer-content">
+                                                    <?php if (!empty($reviewAnswer['text'])): ?>
+                                                        <span><?= htmlspecialchars($reviewAnswer['text']) ?></span>
+                                                    <?php endif; ?>
+                                                    <?php if ($answerImageUrl): ?>
+                                                        <img src="<?= htmlspecialchars($answerImageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Answer illustration" loading="lazy">
+                                                    <?php endif; ?>
+                                                </div>
+                                                <div class="results-review-answer-labels">
+                                                    <?php if ($isPlayerChoice): ?><span class="results-review-choice-label">Your answer</span><?php endif; ?>
+                                                    <?php if ($isCorrectAnswer): ?><span class="results-review-correct-label">Correct answer</span><?php endif; ?>
+                                                </div>
+                                            </div>
+                                        <?php endforeach; ?>
+                                    </div>
+                                </article>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
+                </section>
+            <?php endif; ?>
+
             <?php if ($participantCount > 3): ?>
                 <div class="results-runners" id="resultsRunners">
                     <span>A big hand for our runners-up</span>
@@ -147,6 +325,70 @@ require __DIR__ . '/header.php';
         <audio id="resultsAudio" preload="none" loop src="<?= BASE_URL ?>assets/audio/podium-soundtrack.mp3"></audio>
     <?php endif; ?>
 </div>
+<?php if (!$isHostResults && $myResult !== null && !empty($isUserLoggedIn)): ?>
+<script>
+const savedReviewConfig = <?= json_encode([
+    'url' => BASE_URL . 'modules/api/toggle_saved_review_question.php',
+    'playerId' => $resultsPlayerId,
+    'roomId' => (int) $room['id_room'],
+    'token' => (string) (!empty($token) ? $token : substr(md5($resultsPlayerId . '_' . (int)$room['id_room'] . '_kahoot_secret_2026'), 0, 16))
+], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?>;
+
+document.querySelectorAll('.results-review-save').forEach(function(button) {
+    button.addEventListener('click', async function() {
+        const questionId = Number(button.dataset.questionId);
+        const shouldSave = button.getAttribute('aria-pressed') !== 'true';
+        button.disabled = true;
+
+        try {
+            const response = await fetch(savedReviewConfig.url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id_player: savedReviewConfig.playerId,
+                    id_room: savedReviewConfig.roomId,
+                    id_question: questionId,
+                    token: savedReviewConfig.token,
+                    saved: shouldSave
+                })
+            });
+            const result = await response.json();
+            if (!response.ok || !result.success) throw new Error(result.message || 'Unable to save this question.');
+
+            button.setAttribute('aria-pressed', result.saved ? 'true' : 'false');
+            button.classList.toggle('is-saved', result.saved);
+            button.querySelector('i').className = (result.saved ? 'fas' : 'far') + ' fa-bookmark';
+            button.querySelector('span').textContent = result.saved ? 'Saved' : 'Save for review';
+
+            const savedList = document.getElementById('resultsSavedReviewList');
+            const savedItem = savedList.querySelector('[data-saved-question="' + questionId + '"]');
+            if (result.saved && !savedItem) {
+                const questionCard = document.getElementById('review-question-' + questionId);
+                const item = document.createElement('li');
+                item.dataset.savedQuestion = String(questionId);
+                const link = document.createElement('a');
+                link.href = '#review-question-' + questionId;
+                const label = document.createElement('strong');
+                label.textContent = 'Question ' + button.dataset.questionNumber + ': ';
+                link.append(label, document.createTextNode(questionCard.querySelector('h3').textContent));
+                item.appendChild(link);
+                savedList.appendChild(item);
+            } else if (!result.saved && savedItem) {
+                savedItem.remove();
+            }
+
+            const savedCount = savedList.children.length;
+            document.getElementById('resultsSavedReviewCount').textContent = String(savedCount);
+            document.getElementById('resultsSavedReviewEmpty').hidden = savedCount > 0;
+        } catch (error) {
+            window.alert('Could not update your saved questions. Please try again.');
+        } finally {
+            button.disabled = false;
+        }
+    });
+});
+</script>
+<?php endif; ?>
 <script src="<?= BASE_URL ?>assets/js/final-results.js" defer></script>
 </body>
 </html>

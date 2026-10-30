@@ -1,4 +1,8 @@
 <?php
+require_once __DIR__ . '/player_characters.php';
+
+$selectedCharacter = (string)($selectedCharacter ?? default_player_character());
+$selectedAccessory = (string)($selectedAccessory ?? '');
 $pickerCharacters = player_character_catalog();
 $pickerAccessories = player_accessory_catalog();
 ?>

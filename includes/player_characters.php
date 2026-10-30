@@ -48,7 +48,7 @@ function player_character_file(array $room, int $playerId): string {
     return '';
 }
 
-function save_player_character(array $room, int $playerId, string $characterId, string $accessoryId = ''): void {
+function save_player_character(array|int $room, int $playerId, string $characterId, string $accessoryId = ''): void {
     if ($playerId <= 0 || !isset(player_character_catalog()[$characterId])) {
         throw new InvalidArgumentException('Invalid player character.');
     }
@@ -69,11 +69,11 @@ function save_player_character(array $room, int $playerId, string $characterId, 
     db_execute($sql, $params);
 }
 
-function get_player_character(array $room, int $playerId): string {
+function get_player_character(array|int $room, int $playerId): string {
     return get_player_appearance($room, $playerId)['character_id'];
 }
 
-function get_player_appearance(array $room, int $playerId): array {
+function get_player_appearance(array|int $room, int $playerId): array {
     $fallback = ['character_id' => default_player_character(), 'accessory_id' => ''];
     if ($playerId <= 0) return $fallback;
     $roomId = is_array($room) ? (int)($room['id_room'] ?? 0) : (int)$room;

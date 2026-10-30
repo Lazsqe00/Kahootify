@@ -101,6 +101,49 @@
 .results-you { display: inline-block; background: #46178f; color: white; font-size: 9px; padding: 3px 5px; border-radius: 3px; margin-left: 5px; vertical-align: middle; }
 .results-tie-note { margin: 16px 0 0; color: #78668b; font-size: 11px; }
 
+.results-review { margin: 28px auto 0; padding: 24px; border-radius: 10px; background: #fff; color: #2f2045; box-shadow: 0 8px 0 #21094844; }
+.results-review-heading { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:18px; }
+.results-review-heading h2 { margin:0; font-size:20px; font-weight:800; }
+.results-review-heading p { margin:5px 0 0; color:#78668b; font-size:13px; }
+.results-review-heading > span { flex-shrink:0; padding:6px 10px; border-radius:20px; background:#f0eaf7; color:#46178f; font-size:11px; font-weight:800; }
+.results-saved-review { margin:0 0 18px; padding:14px 16px; border:1px solid #e8def3; border-radius:8px; background:#faf7fe; }
+.results-saved-review-heading { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+.results-saved-review-heading h3 { margin:0; color:#46178f; font-size:14px; font-weight:800; }
+.results-saved-review-heading h3 i { margin-right:5px; }
+.results-saved-review-heading > span { display:grid; place-items:center; min-width:25px; height:25px; padding:0 6px; border-radius:20px; background:#46178f; color:#fff; font-size:11px; font-weight:800; }
+.results-saved-review-empty { margin:8px 0 0; color:#78668b; font-size:12px; }
+.results-saved-review-list { display:grid; gap:6px; margin:10px 0 0; padding:0; list-style:none; }
+.results-saved-review-list li { min-width:0; }
+.results-saved-review-list a { display:block; padding:8px 10px; border-radius:5px; background:#fff; color:#392256; font-size:12px; overflow-wrap:anywhere; text-decoration:none; }
+.results-saved-review-list a:hover,.results-saved-review-list a:focus { background:#eee7f7; color:#32105e; text-decoration:underline; }
+.results-review-list { display:grid; gap:14px; }
+.results-review-question { padding:18px; border:1px solid #eee9f5; border-radius:8px; background:#fff; }
+.results-review-question-heading { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:9px; }
+.results-review-question-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; align-items:center; gap:8px; }
+.results-review-save { display:inline-flex; align-items:center; gap:6px; padding:5px 9px; border:1px solid #d9cde8; border-radius:20px; background:#fff; color:#46178f; font-size:10px; font-weight:800; cursor:pointer; }
+.results-review-save:hover,.results-review-save:focus { border-color:#46178f; background:#f5effb; }
+.results-review-save.is-saved { border-color:#46178f; background:#46178f; color:#fff; }
+.results-review-save:disabled { cursor:wait; opacity:.65; }
+.results-review-number { color:#78668b; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; }
+.results-review-outcome { padding:5px 9px; border-radius:20px; font-size:10px; font-weight:800; text-transform:uppercase; }
+.results-review-outcome.is-correct { background:#e8f7e5; color:#207514; }
+.results-review-outcome.is-incorrect { background:#ffebee; color:#b31630; }
+.results-review-question h3 { margin:0 0 12px; color:#2f2045; font-size:17px; font-weight:800; overflow-wrap:anywhere; }
+.results-review-media { margin:0 0 14px; text-align:center; }
+.results-review-media img,.results-review-media video { display:inline-block; max-width:100%; max-height:300px; border-radius:7px; object-fit:contain; }
+.results-review-answers { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; }
+.results-review-answer { display:flex; align-items:center; gap:9px; min-width:0; padding:10px; border:1px solid #eee9f5; border-radius:7px; background:#faf9fc; }
+.results-review-answer.is-correct-answer { border:2px solid #26890c; background:#f3fff0; }
+.results-review-answer.is-player-choice:not(.is-correct-answer) { border:2px solid #e21b3c; background:#fff5f6; }
+.results-review-answer-symbol { display:grid; place-items:center; width:28px; height:28px; flex:0 0 28px; border-radius:5px; background:#46178f; color:#fff; font-size:14px; }
+.results-review-answer-content { display:flex; flex:1; flex-wrap:wrap; align-items:center; gap:7px; min-width:0; font-size:13px; font-weight:700; overflow-wrap:anywhere; }
+.results-review-answer-content img { max-width:100%; max-height:80px; border-radius:4px; object-fit:contain; }
+.results-review-answer-labels { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:4px; }
+.results-review-choice-label,.results-review-correct-label { padding:4px 6px; border-radius:4px; font-size:9px; font-weight:800; white-space:nowrap; }
+.results-review-choice-label { background:#eee7f7; color:#46178f; }
+.results-review-correct-label { background:#26890c; color:#fff; }
+.results-review-empty { margin:0; padding:18px; border-radius:7px; background:#faf9fc; color:#78668b; text-align:center; font-size:13px; }
+
 .results-empty { position:absolute; top:30%; width:100%; text-align:center; padding:0 20px; }.results-empty > span { font-size:80px; color:#ffda62; }.results-empty h2 { font-size:26px; }.results-empty p { color:#e3d2fa; }
 .results-footer { text-align:center; color:#d6c1ed; font-size:11px; padding:28px 0 20px; }.results-footer p { margin:18px 0 0; }
 .results-confetti { position:fixed; inset:0; width:100%; height:100%; pointer-events:none; z-index:10; }
@@ -114,6 +157,7 @@
  .results-place-1 { --plinth-height:265px; }.results-place-2 { --plinth-height:215px; }.results-place-3 { --plinth-height:170px; }
  .results-plinth { padding:12px 3px 20px; }.results-medal { width:62px; height:68px; max-width:80%; }.results-winner-score { font-size:9px; }.results-winner-score strong { font-size:18px; }.results-winner-correct { font-size:10px; }.results-spotlight > span { top:35%; }
  .results-afterparty { padding:0 12px; }.results-standings { padding:16px 8px; }.results-standings-heading { padding:0 6px; }.results-standings-heading h2 { font-size:17px; }
+ .results-review { padding:16px 10px; }.results-review-heading h2 { font-size:17px; }.results-review-question { padding:13px 10px; }.results-review-question h3 { font-size:15px; }.results-review-answers { grid-template-columns:1fr; }.results-review-answer { flex-wrap:wrap; }.results-review-answer-labels { margin-left:auto; }.results-review-question-actions { gap:5px; }.results-review-save { padding:5px 7px; font-size:9px; }
  .results-place-3 .results-medal { width:62px; height:68px; }
  .results-table { font-size:12px; }.results-table th,.results-table td { padding:10px 5px; }.results-table th:first-child,.results-table td:first-child { width:42px; }.results-table th:nth-child(3),.results-table td:nth-child(3) { width:56px; }.results-table th:last-child,.results-table td:last-child { width:78px; }
  .results-table-character { width:26px; height:26px; }.results-player-name { gap:5px; }.results-question-total { display:none; }.results-tie-note { padding:0 6px; font-size:10px; }

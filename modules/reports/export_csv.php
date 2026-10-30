@@ -38,7 +38,7 @@ $sql = "SELECT p.*,
         FROM players p
         WHERE p.id_room = :id_room
         ORDER BY p.score DESC, p.playeradd ASC";
-$players = db_fetch_all($sql, [':id_room' => $roomId]);
+$players = filter_room_players($roomId, db_fetch_all($sql, [':id_room' => $roomId]));
 
 // Tên file theo định dạng: Kahoot_Report_PIN_[MãPIN]_[Ngày].csv
 $dateStr = date('Y-m-d', strtotime($room['roomadd'] ?? 'now'));

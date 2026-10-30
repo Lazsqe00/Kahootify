@@ -37,13 +37,13 @@ $sql = "
         (
             SELECT nickname 
             FROM players 
-            WHERE id_room = r.id_room 
+            WHERE id_room = r.id_room AND is_kicked = 0 
             ORDER BY score DESC, playeradd ASC 
             LIMIT 1
         ) as winner_nickname
     FROM room r
     JOIN quiz q ON r.id_quiz = q.id_quiz
-    LEFT JOIN players p ON r.id_room = p.id_room
+    LEFT JOIN players p ON r.id_room = p.id_room AND p.is_kicked = 0
     WHERE r.id_creator = :c AND r.status = 'finished'
     GROUP BY r.id_room
     ORDER BY r.id_room DESC

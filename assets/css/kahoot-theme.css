@@ -514,4 +514,19 @@ h1, h2, h3, h4, h5, h6, .brand-font {
     animation: fireGlow 1.2s infinite ease-in-out;
 }
 
+/* Lobby player cards reveal the kick action on hover or keyboard focus. */
+.host-players-list { display:flex; flex-wrap:wrap; justify-content:center; gap:12px; }
+.host-player-card { position:relative; display:inline-flex; align-items:center; gap:8px; min-height:58px; max-width:100%; padding:6px 12px 6px 7px; border-radius:12px; background:#fff; color:#302047; box-shadow:0 4px 12px #190b3030; }
+.host-player-avatar { display:grid; place-items:center; width:46px; height:46px; flex:0 0 46px; overflow:hidden; border-radius:50%; background:#f2edf8; }
+.host-player-avatar .player-avatar { display:block; width:46px; height:46px; }
+.host-player-name { max-width:min(220px,55vw); overflow:hidden; color:#302047; font-size:16px; font-weight:800; text-overflow:ellipsis; white-space:nowrap; }
+.kick-player { position:absolute; z-index:2; top:50%; right:-5px; transform:translate(5px,-50%); visibility:hidden; opacity:0; pointer-events:none; border:1px solid #e21b3c; border-radius:5px; padding:7px 12px; background:#fff; color:#e21b3c; font-size:14px; font-weight:700; cursor:pointer; box-shadow:0 3px 8px #190b3025; transition:opacity .15s ease,transform .15s ease,visibility .15s ease; }
+.host-player-card:hover .kick-player,.host-player-card:focus-within .kick-player { visibility:visible; opacity:1; pointer-events:auto; transform:translate(0,-50%); }
+.kick-player:hover,.kick-player:focus-visible { background:#e21b3c; color:#fff; outline:none; }
+.kick-player:disabled { cursor:wait; opacity:.65; }
+#kickPlayerStatus { color:#fff; }
+@media (hover:none), (pointer:coarse) {
+    .kick-player { position:static; transform:none; visibility:visible; opacity:1; pointer-events:auto; box-shadow:none; }
+}
+
 
