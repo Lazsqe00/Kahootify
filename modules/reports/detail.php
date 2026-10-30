@@ -54,7 +54,7 @@ $sqlPlayers = "
     WHERE p.id_room = :r
     ORDER BY p.score DESC, p.playeradd ASC
 ";
-$players = db_fetch_all($sqlPlayers, [':r' => $roomId]);
+$players = filter_room_players($roomId, db_fetch_all($sqlPlayers, [':r' => $roomId]));
 $totalPlayers = count($players);
 
 // 4. Tính toán các chỉ số KPI Cards

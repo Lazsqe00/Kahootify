@@ -12,6 +12,7 @@ $flash = get_flash_message();
 $creatorId = intval($_SESSION['id_creator']);
 
 $totalQuizzes = db_count('quiz', 'id_creator = :c', [':c' => $creatorId]);
+$totalSavedQuestions = db_count('saved_review_questions', 'id_creator = :c', [':c' => $creatorId]);
 $totalRooms   = db_count('room', 'id_creator = :c', [':c' => $creatorId]);
 $totalPlayers = db_fetch_one(
     "SELECT COUNT(*) as total FROM players p JOIN room r ON p.id_room = r.id_room WHERE r.id_creator = :c",
@@ -44,6 +45,9 @@ $quizzes = db_fetch_all(
             <p class="text-muted mb-0">Welcome, <b><?= htmlspecialchars($_SESSION['nameCreator']) ?></b>! Manage your quizzes and hosted games.</p>
         </div>
         <div>
+            <a href="<?= BASE_URL ?>modules/quiz/saved_questions.php" class="btn btn-warning font-weight-bold text-dark mr-2 shadow-sm" style="border-radius: 8px;">
+                <i class="fas fa-bookmark mr-1 text-danger"></i> Câu hỏi đã lưu (<?= $totalSavedQuestions ?>)
+            </a>
             <a href="<?= BASE_URL ?>modules/reports/list.php" class="btn btn-outline-primary font-weight-bold mr-2">
                 <i class="fas fa-chart-pie mr-1"></i> Báo cáo & Thống kê
             </a>
@@ -54,7 +58,7 @@ $quizzes = db_fetch_all(
     </div>
 
     <div class="row mb-4">
-        <div class="col-md-4 mb-3">
+        <div class="col-md-6 col-lg-3 mb-3">
             <div class="card border-0 shadow-sm text-white" style="background: linear-gradient(135deg, #46178F, #6a2cc9); border-radius: 10px;">
                 <div class="card-body d-flex justify-content-between align-items-center p-4">
                     <div>
@@ -68,7 +72,7 @@ $quizzes = db_fetch_all(
             </div>
         </div>
 
-        <div class="col-md-4 mb-3">
+        <div class="col-md-6 col-lg-3 mb-3">
             <a href="<?= BASE_URL ?>modules/reports/list.php" class="text-decoration-none">
                 <div class="card border-0 shadow-sm text-white" style="background: linear-gradient(135deg, #1368ce, #2980b9); border-radius: 10px; transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform='translateY(0)'">
                     <div class="card-body d-flex justify-content-between align-items-center p-4">
@@ -85,7 +89,7 @@ $quizzes = db_fetch_all(
             </a>
         </div>
 
-        <div class="col-md-4 mb-3">
+        <div class="col-md-6 col-lg-3 mb-3">
             <div class="card border-0 shadow-sm text-white" style="background: linear-gradient(135deg, #26890c, #2ecc71); border-radius: 10px;">
                 <div class="card-body d-flex justify-content-between align-items-center p-4">
                     <div>
@@ -97,6 +101,23 @@ $quizzes = db_fetch_all(
                     </div>
                 </div>
             </div>
+        </div>
+
+        <div class="col-md-6 col-lg-3 mb-3">
+            <a href="<?= BASE_URL ?>modules/quiz/saved_questions.php" class="text-decoration-none">
+                <div class="card border-0 shadow-sm text-white" style="background: linear-gradient(135deg, #d97706, #f59e0b); border-radius: 10px; transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform='translateY(0)'">
+                    <div class="card-body d-flex justify-content-between align-items-center p-4">
+                        <div>
+                            <h6 class="text-uppercase mb-2 font-weight-bold text-white" style="opacity: 0.85;">Câu hỏi đã lưu</h6>
+                            <h2 class="display-4 font-weight-bold mb-0 text-white"><?= $totalSavedQuestions ?></h2>
+                            <small class="text-white-50"><i class="fas fa-bookmark mr-1"></i> Xem câu hỏi đã lưu &raquo;</small>
+                        </div>
+                        <div style="font-size: 3rem; opacity: 0.3;">
+                            <i class="fas fa-bookmark"></i>
+                        </div>
+                    </div>
+                </div>
+            </a>
         </div>
     </div>
 

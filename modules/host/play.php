@@ -2,6 +2,8 @@
 
 require_once __DIR__ . '/../../includes/auth_check.php';
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../includes/room_access.php';
+require_once __DIR__ . '/../../includes/player_characters.php';
 
 $roomId = intval($_SESSION['id_room'] ?? 0);
 $room = db_fetch_one("SELECT r.*, q.name as quiz_name FROM room r JOIN quiz q ON r.id_quiz = q.id_quiz WHERE r.id_room = :r AND r.id_creator = :c", [':r' => $roomId, ':c' => (int)$_SESSION['id_creator']]);

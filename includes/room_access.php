@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../config/database.php';
 // Room locks and removed players are stored directly in MySQL (room.is_locked, players.is_kicked)
 // without generating runtime files on disk.
 

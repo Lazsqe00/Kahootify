@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/../config/config.php';
+
 $isLoggedIn = !empty($_SESSION['id_creator']);
 $creatorName = $_SESSION['nameCreator'] ?? 'Creator';
 $creatorAvatar = $_SESSION['avatar'] ?? 'default.png';
@@ -50,6 +52,9 @@ $creatorAvatar = $_SESSION['avatar'] ?? 'default.png';
                         <div class="dropdown-menu dropdown-menu-right shadow" aria-labelledby="userDropdown">
                             <a class="dropdown-item" href="<?= BASE_URL ?>modules/auth/dashboard.php">
                                 <i class="fas fa-tachometer-alt mr-2 text-primary"></i> Dashboard
+                            </a>
+                            <a class="dropdown-item" href="<?= BASE_URL ?>modules/quiz/saved_questions.php">
+                                <i class="fas fa-bookmark mr-2 text-warning"></i> Câu hỏi đã lưu
                             </a>
                             <a class="dropdown-item" href="<?= BASE_URL ?>modules/reports/list.php">
                                 <i class="fas fa-chart-bar mr-2 text-success"></i> Reports & Analytics
