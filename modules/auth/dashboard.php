@@ -59,29 +59,36 @@ $quizzes = db_fetch_all(
 
     <div class="row mb-4">
         <div class="col-md-6 col-lg-3 mb-3">
-            <div class="card border-0 shadow-sm text-white" style="background: linear-gradient(135deg, #46178F, #6a2cc9); border-radius: 10px;">
-                <div class="card-body d-flex justify-content-between align-items-center p-4">
-                    <div>
-                        <h6 class="text-uppercase mb-2 font-weight-bold" style="opacity: 0.85;">Kahoots Created</h6>
-                        <h2 class="display-4 font-weight-bold mb-0"><?= $totalQuizzes ?></h2>
-                    </div>
-                    <div style="font-size: 3rem; opacity: 0.3;">
-                        <i class="fas fa-question-circle"></i>
+            <a href="<?= BASE_URL ?>modules/quiz/list.php" class="text-decoration-none d-block h-100">
+                <div class="card h-100 border-0 shadow-sm text-white" style="background: linear-gradient(135deg, #46178F, #6a2cc9); border-radius: 12px; min-height: 145px; transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform='translateY(0)'">
+                    <div class="card-body d-flex justify-content-between align-items-center p-4 h-100">
+                        <div class="d-flex flex-column justify-content-between h-100">
+                            <div>
+                                <h6 class="text-uppercase mb-2 font-weight-bold text-white" style="opacity: 0.85; font-size: 0.82rem; letter-spacing: 0.5px;">Kahoots Created</h6>
+                                <h2 class="display-4 font-weight-bold mb-0 text-white" style="font-size: 2.6rem; line-height: 1;"><?= $totalQuizzes ?></h2>
+                            </div>
+                            <small class="text-white-50 mt-3 d-block"><i class="fas fa-th-list mr-1"></i> Quản lý Kahoots &raquo;</small>
+                        </div>
+                        <div style="font-size: 2.8rem; opacity: 0.35;" class="ml-2">
+                            <i class="fas fa-question-circle"></i>
+                        </div>
                     </div>
                 </div>
-            </div>
+            </a>
         </div>
 
         <div class="col-md-6 col-lg-3 mb-3">
-            <a href="<?= BASE_URL ?>modules/reports/list.php" class="text-decoration-none">
-                <div class="card border-0 shadow-sm text-white" style="background: linear-gradient(135deg, #1368ce, #2980b9); border-radius: 10px; transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform='translateY(0)'">
-                    <div class="card-body d-flex justify-content-between align-items-center p-4">
-                        <div>
-                            <h6 class="text-uppercase mb-2 font-weight-bold text-white" style="opacity: 0.85;">Hosted Sessions</h6>
-                            <h2 class="display-4 font-weight-bold mb-0 text-white"><?= $totalRooms ?></h2>
-                            <small class="text-white-50"><i class="fas fa-chart-line mr-1"></i> Xem báo cáo ván đấu &raquo;</small>
+            <a href="<?= BASE_URL ?>modules/reports/list.php" class="text-decoration-none d-block h-100">
+                <div class="card h-100 border-0 shadow-sm text-white" style="background: linear-gradient(135deg, #1368ce, #2980b9); border-radius: 12px; min-height: 145px; transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform='translateY(0)'">
+                    <div class="card-body d-flex justify-content-between align-items-center p-4 h-100">
+                        <div class="d-flex flex-column justify-content-between h-100">
+                            <div>
+                                <h6 class="text-uppercase mb-2 font-weight-bold text-white" style="opacity: 0.85; font-size: 0.82rem; letter-spacing: 0.5px;">Hosted Sessions</h6>
+                                <h2 class="display-4 font-weight-bold mb-0 text-white" style="font-size: 2.6rem; line-height: 1;"><?= $totalRooms ?></h2>
+                            </div>
+                            <small class="text-white-50 mt-3 d-block"><i class="fas fa-chart-line mr-1"></i> Xem báo cáo &raquo;</small>
                         </div>
-                        <div style="font-size: 3rem; opacity: 0.3;">
+                        <div style="font-size: 2.8rem; opacity: 0.35;" class="ml-2">
                             <i class="fas fa-broadcast-tower"></i>
                         </div>
                     </div>
@@ -90,13 +97,16 @@ $quizzes = db_fetch_all(
         </div>
 
         <div class="col-md-6 col-lg-3 mb-3">
-            <div class="card border-0 shadow-sm text-white" style="background: linear-gradient(135deg, #26890c, #2ecc71); border-radius: 10px;">
-                <div class="card-body d-flex justify-content-between align-items-center p-4">
-                    <div>
-                        <h6 class="text-uppercase mb-2 font-weight-bold" style="opacity: 0.85;">Total Players</h6>
-                        <h2 class="display-4 font-weight-bold mb-0"><?= $totalPlayers ?></h2>
+            <div class="card h-100 border-0 shadow-sm text-white" style="background: linear-gradient(135deg, #26890c, #2ecc71); border-radius: 12px; min-height: 145px;">
+                <div class="card-body d-flex justify-content-between align-items-center p-4 h-100">
+                    <div class="d-flex flex-column justify-content-between h-100">
+                        <div>
+                            <h6 class="text-uppercase mb-2 font-weight-bold text-white" style="opacity: 0.85; font-size: 0.82rem; letter-spacing: 0.5px;">Total Players</h6>
+                            <h2 class="display-4 font-weight-bold mb-0 text-white" style="font-size: 2.6rem; line-height: 1;"><?= $totalPlayers ?></h2>
+                        </div>
+                        <small class="text-white-50 mt-3 d-block"><i class="fas fa-users mr-1"></i> Người chơi tham gia</small>
                     </div>
-                    <div style="font-size: 3rem; opacity: 0.3;">
+                    <div style="font-size: 2.8rem; opacity: 0.35;" class="ml-2">
                         <i class="fas fa-users"></i>
                     </div>
                 </div>
@@ -104,15 +114,17 @@ $quizzes = db_fetch_all(
         </div>
 
         <div class="col-md-6 col-lg-3 mb-3">
-            <a href="<?= BASE_URL ?>modules/quiz/saved_questions.php" class="text-decoration-none">
-                <div class="card border-0 shadow-sm text-white" style="background: linear-gradient(135deg, #d97706, #f59e0b); border-radius: 10px; transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform='translateY(0)'">
-                    <div class="card-body d-flex justify-content-between align-items-center p-4">
-                        <div>
-                            <h6 class="text-uppercase mb-2 font-weight-bold text-white" style="opacity: 0.85;">Câu hỏi đã lưu</h6>
-                            <h2 class="display-4 font-weight-bold mb-0 text-white"><?= $totalSavedQuestions ?></h2>
-                            <small class="text-white-50"><i class="fas fa-bookmark mr-1"></i> Xem câu hỏi đã lưu &raquo;</small>
+            <a href="<?= BASE_URL ?>modules/quiz/saved_questions.php" class="text-decoration-none d-block h-100">
+                <div class="card h-100 border-0 shadow-sm text-white" style="background: linear-gradient(135deg, #d97706, #f59e0b); border-radius: 12px; min-height: 145px; transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform='translateY(0)'">
+                    <div class="card-body d-flex justify-content-between align-items-center p-4 h-100">
+                        <div class="d-flex flex-column justify-content-between h-100">
+                            <div>
+                                <h6 class="text-uppercase mb-2 font-weight-bold text-white" style="opacity: 0.85; font-size: 0.82rem; letter-spacing: 0.5px;">Câu hỏi đã lưu</h6>
+                                <h2 class="display-4 font-weight-bold mb-0 text-white" style="font-size: 2.6rem; line-height: 1;"><?= $totalSavedQuestions ?></h2>
+                            </div>
+                            <small class="text-white-50 mt-3 d-block"><i class="fas fa-bookmark mr-1"></i> Xem câu hỏi đã lưu &raquo;</small>
                         </div>
-                        <div style="font-size: 3rem; opacity: 0.3;">
+                        <div style="font-size: 2.8rem; opacity: 0.35;" class="ml-2">
                             <i class="fas fa-bookmark"></i>
                         </div>
                     </div>
