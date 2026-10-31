@@ -5,7 +5,7 @@ require_once __DIR__ . '/../../config/database.php';
 
 $creatorId = intval($_SESSION['id_creator']);
 
-// Xử lý xóa ván đấu nếu có yêu cầu
+// Handle delete action
 if (isset($_GET['action']) && $_GET['action'] === 'delete') {
     $roomId = intval($_GET['id_room'] ?? $_GET['id'] ?? 0);
     if ($roomId > 0) {
@@ -15,15 +15,15 @@ if (isset($_GET['action']) && $_GET['action'] === 'delete') {
         ]);
         if ($check) {
             db_execute("DELETE FROM room WHERE id_room = :r", [':r' => $roomId]);
-            set_flash_message('success', 'Báo cáo ván đấu đã được xóa thành công!');
+            set_flash_message('success', 'Game session report deleted successfully!');
         } else {
-            set_flash_message('danger', 'Không tìm thấy ván đấu hoặc bạn không có quyền xóa!');
+            set_flash_message('danger', 'Report not found or you do not have permission to delete it!');
         }
     }
     redirect('modules/reports/list.php');
 }
 
-// Lấy danh sách các phòng đã kết thúc của giáo viên hiện tại
+// Fetch all finished rooms hosted by current creator
 $sql = "
     SELECT 
         r.id_room,
@@ -37,13 +37,13 @@ $sql = "
         (
             SELECT nickname 
             FROM players 
-            WHERE id_room = r.id_room AND is_kicked = 0 
+            WHERE id_room = r.id_room 
             ORDER BY score DESC, playeradd ASC 
             LIMIT 1
         ) as winner_nickname
     FROM room r
     JOIN quiz q ON r.id_quiz = q.id_quiz
-    LEFT JOIN players p ON r.id_room = p.id_room AND p.is_kicked = 0
+    LEFT JOIN players p ON r.id_room = p.id_room
     WHERE r.id_creator = :c AND r.status = 'finished'
     GROUP BY r.id_room
     ORDER BY r.id_room DESC
@@ -51,188 +51,260 @@ $sql = "
 
 $reports = db_fetch_all($sql, [':c' => $creatorId]);
 
-// Tính toán các chỉ số tóm tắt nhanh
+// Compute KPI summaries
 $totalCompletedGames = count($reports);
 $totalClassParticipants = array_sum(array_column($reports, 'total_players'));
 $allTimeTopScore = !empty($reports) ? max(array_column($reports, 'top_score')) : 0;
 
-$pageTitle = "Báo cáo & Thống kê ván đấu | Reports & Analytics";
+$pageTitle = "Reports & Analytics | Kahoot!";
 require_once __DIR__ . '/../../includes/header.php';
 require_once __DIR__ . '/../../includes/navbar.php';
 ?>
 
-<div class="container my-4">
-    <!-- Tiêu đề trang -->
-    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
+<link rel="stylesheet" href="<?= BASE_URL ?>assets/css/reports-analytics.css">
+
+<div class="reports-dashboard container my-4" style="max-width: 1140px;">
+
+    <!-- 1. Header & Actions (Linear / Stripe Style) -->
+    <div class="d-flex flex-wrap justify-content-between align-items-end mb-4 pb-2 border-bottom">
         <div>
-            <h2 class="font-weight-bold mb-1" style="color: var(--kahoot-purple);">
-                <i class="fas fa-chart-pie mr-2"></i>Báo cáo & Thống kê ván đấu
+            <div class="text-uppercase mb-1" style="font-size: 11px; font-weight: 700; letter-spacing: 0.06em; color: #7c3aed;">
+                <i class="fas fa-chart-pie mr-1"></i> Reports & Analytics
+            </div>
+            <h2 class="font-weight-bold mb-1" style="font-size: 24px; color: #0f172a; letter-spacing: -0.02em;">
+                Game Session History
             </h2>
-            <p class="text-muted mb-0">Theo dõi, phân tích kết quả học tập và xuất bảng điểm chi tiết các ván đấu đã tổ chức.</p>
+            <p class="text-muted mb-0" style="font-size: 13.5px;">
+                Review student performance, analyze question accuracy, and download detailed grade reports.
+            </p>
         </div>
-        <div>
-            <a href="<?= BASE_URL ?>modules/quiz/list.php" class="btn btn-kahoot btn-kahoot-purple">
-                <i class="fas fa-play-circle mr-1"></i> Tổ chức ván mới
+        <div class="mt-3 mt-md-0 d-flex align-items-center" style="gap: 8px;">
+            <a href="<?= BASE_URL ?>modules/quiz/list.php" class="saas-btn saas-btn-solid" style="background: linear-gradient(135deg, #7c3aed, #6d28d9); border-color: #6d28d9; box-shadow: 0 2px 4px rgba(109, 40, 217, 0.25);">
+                <i class="fas fa-play" style="font-size: 11px;"></i>
+                <span>Host New Game</span>
             </a>
         </div>
     </div>
 
-    <!-- Khối thẻ chỉ số tổng quan nhanh -->
+    <!-- 2. Summary KPI Cards -->
     <div class="row mb-4">
-        <div class="col-md-4 mb-3">
-            <div class="card border-0 shadow-sm text-white" style="background: linear-gradient(135deg, #46178F, #6a2cc9); border-radius: 12px;">
-                <div class="card-body d-flex justify-content-between align-items-center p-3">
-                    <div>
-                        <div class="text-uppercase small font-weight-bold" style="opacity: 0.85;">Ván đấu đã hoàn thành</div>
-                        <h2 class="font-weight-bold mb-0 mt-1"><?= number_format($totalCompletedGames) ?></h2>
+        <!-- KPI 1: Completed Sessions -->
+        <div class="col-md-4 mb-3 mb-md-0">
+            <div class="saas-kpi-card saas-kpi-purple">
+                <div class="saas-kpi-header">
+                    <span class="saas-kpi-label" style="color: #6d28d9;">Completed Sessions</span>
+                    <div class="saas-kpi-icon icon-purple">
+                        <i class="fas fa-flag-checkered"></i>
                     </div>
-                    <div style="font-size: 2.5rem; opacity: 0.35;">
+                </div>
+                <div class="saas-kpi-value tabular-nums">
+                    <?= number_format($totalCompletedGames) ?>
+                </div>
+                <div class="saas-kpi-footer">
+                    Total finished game sessions
+                </div>
+            </div>
+        </div>
+
+        <!-- KPI 2: Total Participants -->
+        <div class="col-md-4 mb-3 mb-md-0">
+            <div class="saas-kpi-card saas-kpi-blue">
+                <div class="saas-kpi-header">
+                    <span class="saas-kpi-label" style="color: #1d4ed8;">Total Participants</span>
+                    <div class="saas-kpi-icon icon-blue">
+                        <i class="fas fa-users"></i>
+                    </div>
+                </div>
+                <div class="saas-kpi-value tabular-nums">
+                    <?= number_format($totalClassParticipants) ?>
+                </div>
+                <div class="saas-kpi-footer">
+                    Total student entries recorded
+                </div>
+            </div>
+        </div>
+
+        <!-- KPI 3: All-Time High Score -->
+        <div class="col-md-4 mb-3 mb-md-0">
+            <div class="saas-kpi-card saas-kpi-amber">
+                <div class="saas-kpi-header">
+                    <span class="saas-kpi-label" style="color: #b45309;">All-Time High Score</span>
+                    <div class="saas-kpi-icon icon-amber">
                         <i class="fas fa-trophy"></i>
                     </div>
                 </div>
-            </div>
-        </div>
-
-        <div class="col-md-4 mb-3">
-            <div class="card border-0 shadow-sm text-white" style="background: linear-gradient(135deg, #1368ce, #2980b9); border-radius: 12px;">
-                <div class="card-body d-flex justify-content-between align-items-center p-3">
-                    <div>
-                        <div class="text-uppercase small font-weight-bold" style="opacity: 0.85;">Tổng lượt người chơi</div>
-                        <h2 class="font-weight-bold mb-0 mt-1"><?= number_format($totalClassParticipants) ?></h2>
-                    </div>
-                    <div style="font-size: 2.5rem; opacity: 0.35;">
-                        <i class="fas fa-user-friends"></i>
-                    </div>
+                <div class="saas-kpi-value tabular-nums">
+                    <?= number_format($allTimeTopScore) ?>
+                    <span style="font-size: 14px; font-weight: 500; color: #64748b;">pts</span>
                 </div>
-            </div>
-        </div>
-
-        <div class="col-md-4 mb-3">
-            <div class="card border-0 shadow-sm text-white" style="background: linear-gradient(135deg, #26890c, #2ecc71); border-radius: 12px;">
-                <div class="card-body d-flex justify-content-between align-items-center p-3">
-                    <div>
-                        <div class="text-uppercase small font-weight-bold" style="opacity: 0.85;">Điểm kỷ lục cao nhất</div>
-                        <h2 class="font-weight-bold mb-0 mt-1"><?= number_format($allTimeTopScore) ?> <small style="font-size: 0.9rem;">pts</small></h2>
-                    </div>
-                    <div style="font-size: 2.5rem; opacity: 0.35;">
-                        <i class="fas fa-crown"></i>
-                    </div>
+                <div class="saas-kpi-footer">
+                    Highest score recorded across all games
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Bảng danh sách báo cáo -->
-    <div class="card border-0 shadow-sm" style="border-radius: 12px; overflow: hidden;">
-        <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center border-bottom">
-            <h5 class="font-weight-bold mb-0 text-dark">
-                <i class="fas fa-history mr-2 text-primary"></i>Lịch sử các ván đấu đã kết thúc
+    <!-- 3. Sessions Data Table -->
+    <div class="saas-table-card">
+        <div class="saas-table-header">
+            <h5 class="saas-table-title">
+                <i class="fas fa-history" style="color: #7c3aed; font-size: 14px;"></i>
+                <span>All Game Sessions</span>
             </h5>
-            <span class="badge badge-pill badge-secondary py-2 px-3"><?= count($reports) ?> ván đấu</span>
+            <span class="saas-badge saas-badge-purple">
+                <i class="fas fa-list-ul mr-1" style="font-size: 10px;"></i> <?= count($reports) ?> <?= count($reports) === 1 ? 'session' : 'sessions' ?>
+            </span>
         </div>
 
-        <div class="card-body p-0">
-            <?php if (empty($reports)): ?>
-                <div class="text-center py-5 px-3">
-                    <div class="mb-3">
-                        <i class="fas fa-clipboard-list fa-4x text-muted" style="opacity: 0.5;"></i>
-                    </div>
-                    <h4 class="font-weight-bold text-dark">Chưa có báo cáo ván đấu nào!</h4>
-                    <p class="text-muted max-w-500 mx-auto" style="max-width: 500px;">
-                        Các ván đấu Kahoot sau khi bạn tổ chức và kết thúc sẽ tự động được lưu trữ và tổng hợp phân tích học tập chi tiết tại đây.
-                    </p>
-                    <a href="<?= BASE_URL ?>modules/quiz/list.php" class="btn btn-kahoot btn-kahoot-green font-weight-bold">
-                        <i class="fas fa-play mr-1"></i> Tổ chức ván Kahoot ngay
-                    </a>
+        <?php if (empty($reports)): ?>
+            <div class="text-center py-5 px-3">
+                <div class="saas-kpi-icon mx-auto mb-3" style="width: 48px; height: 48px; font-size: 20px; background: #f5f3ff; color: #7c3aed; border: 1px dashed #ddd6fe;">
+                    <i class="far fa-folder-open"></i>
                 </div>
-            <?php else: ?>
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
-                        <thead class="thead-light">
+                <h6 class="font-weight-bold" style="color: #0f172a; margin-bottom: 4px;">No session reports yet</h6>
+                <p class="text-muted mx-auto" style="max-width: 420px; font-size: 13px;">
+                    Once you host and finish a live quiz game, performance reports and analytics will automatically appear here.
+                </p>
+                <a href="<?= BASE_URL ?>modules/quiz/list.php" class="saas-btn saas-btn-solid mt-2" style="background: #7c3aed; border-color: #7c3aed;">
+                    <i class="fas fa-play" style="font-size: 11px;"></i>
+                    <span>Host Your First Game</span>
+                </a>
+            </div>
+        <?php else: ?>
+            <div class="table-responsive" style="min-height: 250px;">
+                <table class="saas-table table-hover" id="reportsTable">
+                    <thead>
+                        <tr>
+                            <th class="text-center" style="width: 50px;">#</th>
+                            <th class="text-left">Quiz Name</th>
+                            <th class="text-center" style="width: 120px;">PIN</th>
+                            <th class="text-left" style="width: 180px;">Hosted Date</th>
+                            <th class="text-right" style="width: 130px;">Players</th>
+                            <th class="text-left" style="width: 230px;">Winner / High Score</th>
+                            <th class="text-right" style="width: 130px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($reports as $index => $rep): ?>
                             <tr>
-                                <th style="width: 50px;" class="text-center">#</th>
-                                <th>Tên bài Quiz</th>
-                                <th class="text-center" style="width: 130px;">Mã PIN</th>
-                                <th style="width: 170px;">Thời gian tổ chức</th>
-                                <th class="text-center" style="width: 120px;">Người chơi</th>
-                                <th style="width: 200px;">Người dẫn đầu / Điểm</th>
-                                <th class="text-center" style="width: 260px;">Thao tác</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($reports as $index => $rep): ?>
-                                <tr>
-                                    <td class="text-center font-weight-bold text-muted">
-                                        <?= $index + 1 ?>
-                                    </td>
-                                    <td>
-                                        <div class="font-weight-bold text-dark" style="font-size: 1.05rem;">
-                                            <a href="<?= BASE_URL ?>modules/reports/detail.php?id_room=<?= $rep['id_room'] ?>" class="text-dark text-decoration-none">
-                                                <?= htmlspecialchars($rep['quiz_name']) ?>
-                                            </a>
+                                <td class="text-center saas-numeric" style="color: #94a3b8; font-size: 12px;">
+                                    <?= $index + 1 ?>
+                                </td>
+                                <td class="text-left">
+                                    <a href="<?= BASE_URL ?>modules/reports/detail.php?id_room=<?= $rep['id_room'] ?>" class="font-weight-bold text-decoration-none" style="color: #0f172a; font-size: 14px;">
+                                        <?= htmlspecialchars($rep['quiz_name']) ?>
+                                    </a>
+                                    <div style="font-size: 11.5px; color: #94a3b8; margin-top: 2px;">
+                                        Session ID: #<?= $rep['id_room'] ?>
+                                    </div>
+                                </td>
+                                <td class="text-center">
+                                    <span class="saas-badge saas-badge-amber font-mono font-weight-bold" style="letter-spacing: 0.04em;">
+                                        <?= htmlspecialchars($rep['pin']) ?>
+                                    </span>
+                                </td>
+                                <td class="text-left" style="font-size: 13px;">
+                                    <div class="font-weight-medium" style="color: #334155;">
+                                        <?= date('M d, Y', strtotime($rep['roomadd'] ?? 'now')) ?>
+                                    </div>
+                                    <div style="font-size: 11.5px; color: #94a3b8;">
+                                        <?= date('h:i A', strtotime($rep['roomadd'] ?? 'now')) ?>
+                                    </div>
+                                </td>
+                                <td class="text-right">
+                                    <span class="saas-numeric font-weight-bold" style="color: #0f172a; font-size: 13.5px;">
+                                        <?= intval($rep['total_players']) ?>
+                                    </span>
+                                    <span style="font-size: 11.5px; color: #64748b;"><?= intval($rep['total_players']) === 1 ? 'player' : 'players' ?></span>
+                                </td>
+                                <td class="text-left">
+                                    <?php if ($rep['total_players'] > 0 && !empty($rep['winner_nickname'])): ?>
+                                        <div class="d-flex align-items-center" style="gap: 6px;">
+                                            <i class="fas fa-crown" style="color: #f59e0b; font-size: 13px;" title="Game Winner"></i>
+                                            <span class="font-weight-medium text-truncate" style="max-width: 110px; color: #0f172a;" title="<?= htmlspecialchars($rep['winner_nickname']) ?>">
+                                                <?= htmlspecialchars($rep['winner_nickname']) ?>
+                                            </span>
+                                            <span class="saas-badge saas-badge-emerald tabular-nums">
+                                                <?= number_format($rep['top_score']) ?> pts
+                                            </span>
                                         </div>
-                                        <small class="text-muted">ID ván: #<?= $rep['id_room'] ?></small>
-                                    </td>
-                                    <td class="text-center">
-                                        <span class="badge badge-warning text-dark font-weight-bold px-2 py-1" style="font-size: 0.95rem; letter-spacing: 1px;">
-                                            <?= htmlspecialchars($rep['pin']) ?>
+                                    <?php else: ?>
+                                        <span style="color: #94a3b8; font-size: 12px; font-style: italic;">
+                                            No players
                                         </span>
-                                    </td>
-                                    <td class="text-muted small">
-                                        <div><i class="far fa-calendar-alt mr-1"></i><?= date('d/m/Y', strtotime($rep['roomadd'] ?? 'now')) ?></div>
-                                        <div><i class="far fa-clock mr-1"></i><?= date('H:i', strtotime($rep['roomadd'] ?? 'now')) ?></div>
-                                    </td>
-                                    <td class="text-center">
-                                        <span class="badge badge-pill badge-info px-3 py-1 font-weight-bold">
-                                            <i class="fas fa-users mr-1"></i><?= intval($rep['total_players']) ?>
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <?php if ($rep['total_players'] > 0 && !empty($rep['winner_nickname'])): ?>
-                                            <div class="d-flex align-items-center">
-                                                <i class="fas fa-crown text-warning mr-2" title="Quán quân ván đấu"></i>
+                                    <?php endif; ?>
+                                </td>
+                                <td class="text-right">
+                                    <!-- 3-IN-1 CONSOLIDATED ACTION DROPDOWN MENU -->
+                                    <div class="dropdown saas-action-dropdown">
+                                        <button class="saas-dropdown-btn" type="button" id="actionMenu_<?= $rep['id_room'] ?>" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                            <span>Actions</span>
+                                            <i class="fas fa-chevron-down" style="font-size: 10px; color: #64748b;"></i>
+                                        </button>
+                                        <div class="dropdown-menu dropdown-menu-right saas-dropdown-menu shadow" aria-labelledby="actionMenu_<?= $rep['id_room'] ?>">
+                                            <!-- Action 1: View Details -->
+                                            <a class="dropdown-item saas-dropdown-item" href="<?= BASE_URL ?>modules/reports/detail.php?id_room=<?= $rep['id_room'] ?>">
+                                                <span class="saas-menu-icon icon-purple">
+                                                    <i class="fas fa-chart-line"></i>
+                                                </span>
                                                 <div>
-                                                    <span class="font-weight-bold text-dark"><?= htmlspecialchars($rep['winner_nickname']) ?></span>
-                                                    <span class="badge badge-success font-weight-bold ml-1"><?= number_format($rep['top_score']) ?> pts</span>
+                                                    <div class="font-weight-medium">View Details</div>
+                                                    <small class="text-muted" style="font-size: 11px;">Leaderboard & question analytics</small>
                                                 </div>
-                                            </div>
-                                        <?php else: ?>
-                                            <span class="text-muted small font-italic">Không có người chơi</span>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td class="text-center">
-                                        <div class="btn-group" role="group">
-                                            <!-- Xem chi tiết -->
-                                            <a href="<?= BASE_URL ?>modules/reports/detail.php?id_room=<?= $rep['id_room'] ?>" 
-                                               class="btn btn-sm btn-primary font-weight-bold px-2 py-1" 
-                                               title="Xem báo cáo chi tiết">
-                                                <i class="fas fa-eye mr-1"></i> Chi tiết
                                             </a>
 
-                                            <!-- Xuất Excel / CSV -->
-                                            <a href="<?= BASE_URL ?>modules/reports/export_csv.php?id_room=<?= $rep['id_room'] ?>" 
-                                               class="btn btn-sm btn-success font-weight-bold px-2 py-1" 
-                                               title="Tải bảng điểm CSV">
-                                                <i class="fas fa-file-download mr-1"></i> CSV
+                                            <!-- Action 2: Download CSV -->
+                                            <a class="dropdown-item saas-dropdown-item" href="<?= BASE_URL ?>modules/reports/export_csv.php?id_room=<?= $rep['id_room'] ?>">
+                                                <span class="saas-menu-icon icon-emerald">
+                                                    <i class="fas fa-file-excel"></i>
+                                                </span>
+                                                <div>
+                                                    <div class="font-weight-medium">Download CSV</div>
+                                                    <small class="text-muted" style="font-size: 11px;">Excel-compatible grade report</small>
+                                                </div>
                                             </a>
 
-                                            <!-- Xóa báo cáo ván này -->
-                                            <a href="<?= BASE_URL ?>modules/reports/list.php?action=delete&id_room=<?= $rep['id_room'] ?>" 
-                                               class="btn btn-sm btn-outline-danger px-2 py-1" 
-                                               onclick="return confirm('Bạn có chắc chắn muốn xóa báo cáo ván đấu PIN: <?= htmlspecialchars($rep['pin']) ?> (Bài: <?= htmlspecialchars(addslashes($rep['quiz_name'])) ?>)? Dữ liệu điểm số liên quan sẽ bị xóa.');" 
-                                               title="Xóa báo cáo ván này">
-                                                <i class="fas fa-trash-alt"></i>
+                                            <div class="dropdown-divider my-1"></div>
+
+                                            <!-- Action 3: Delete Session -->
+                                            <a class="dropdown-item saas-dropdown-item text-danger" href="<?= BASE_URL ?>modules/reports/list.php?action=delete&id_room=<?= $rep['id_room'] ?>" onclick="return confirm('Are you sure you want to delete session PIN: <?= htmlspecialchars($rep['pin']) ?> (Quiz: <?= htmlspecialchars(addslashes($rep['quiz_name'])) ?>)? All associated player scores will be permanently deleted.');">
+                                                <span class="saas-menu-icon icon-rose">
+                                                    <i class="far fa-trash-alt"></i>
+                                                </span>
+                                                <div>
+                                                    <div class="font-weight-medium">Delete Session</div>
+                                                    <small style="color: #be123c; font-size: 11px;">Permanently remove records</small>
+                                                </div>
                                             </a>
                                         </div>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-            <?php endif; ?>
-        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Integrated Pagination Footer -->
+            <div id="reportsPagination" class="saas-pagination-bar"></div>
+        <?php endif; ?>
     </div>
+
 </div>
+
+<script src="<?= BASE_URL ?>assets/js/reports-pagination.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    if (document.getElementById('reportsTable') && document.getElementById('reportsPagination')) {
+        new SaasTablePagination({
+            table: '#reportsTable',
+            container: '#reportsPagination',
+            itemNoun: 'sessions',
+            pageSize: 10,
+            allowedPageSizes: [10, 25, 50]
+        });
+    }
+});
+</script>
 
 <?php require_once __DIR__ . '/../../includes/footer.php'; ?>

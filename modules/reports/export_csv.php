@@ -7,11 +7,11 @@ $creatorId = intval($_SESSION['id_creator']);
 $roomId = intval($_GET['id_room'] ?? $_GET['id'] ?? 0);
 
 if ($roomId <= 0) {
-    set_flash_message('danger', 'Mã phòng không hợp lệ!');
+    set_flash_message('danger', 'Invalid game room ID!');
     redirect('modules/reports/list.php');
 }
 
-// Kiểm tra quyền sở hữu phòng
+// Verify room ownership
 $room = db_fetch_one("
     SELECT r.*, q.name as quiz_name
     FROM room r
@@ -20,11 +20,11 @@ $room = db_fetch_one("
 ", [':r' => $roomId, ':c' => $creatorId]);
 
 if (!$room) {
-    set_flash_message('danger', 'Không tìm thấy ván đấu hoặc bạn không có quyền tải báo cáo này!');
+    set_flash_message('danger', 'Game report not found or you do not have permission to download it!');
     redirect('modules/reports/list.php');
 }
 
-// Lấy tổng số câu hỏi đã chơi trong ván (nếu bốc ngẫu nhiên N câu thì lấy N)
+// Get total questions played in this session
 $selectedQIds = !empty($room['question_order']) ? json_decode($room['question_order'], true) : null;
 if (is_array($selectedQIds) && !empty($selectedQIds)) {
     $totalQuestions = count($selectedQIds);
@@ -32,34 +32,35 @@ if (is_array($selectedQIds) && !empty($selectedQIds)) {
     $totalQuestions = db_count('questions', 'id_quiz = :q', [':q' => $room['id_quiz']]);
 }
 
-// Lấy danh sách người chơi xếp hạng
+// Fetch ranked player scores
 $sql = "SELECT p.*,
         (SELECT COUNT(*) FROM votes v JOIN answers a ON v.id_answer = a.id_answer WHERE v.id_player = p.id_player AND a.is_correct = 1) as correct_count
         FROM players p
         WHERE p.id_room = :id_room
         ORDER BY p.score DESC, p.playeradd ASC";
-$players = filter_room_players($roomId, db_fetch_all($sql, [':id_room' => $roomId]));
+$rawPlayers = db_fetch_all($sql, [':id_room' => $roomId]);
+$players = function_exists('filter_room_players') ? filter_room_players($roomId, $rawPlayers) : $rawPlayers;
 
-// Tên file theo định dạng: Kahoot_Report_PIN_[MãPIN]_[Ngày].csv
+// File naming: Kahoot_Report_PIN_[PIN]_[Date].csv
 $dateStr = date('Y-m-d', strtotime($room['roomadd'] ?? 'now'));
 $filename = "Kahoot_Report_PIN_" . preg_replace('/[^A-Za-z0-9_-]/', '', $room['pin']) . "_" . $dateStr . ".csv";
 
-// Thiết lập Headers cho trình duyệt
+// Download headers
 header('Content-Type: text/csv; charset=UTF-8');
 header('Content-Disposition: attachment; filename="' . $filename . '"');
 header('Cache-Control: max-age=0, no-cache, no-store, must-revalidate');
 header('Pragma: no-cache');
 header('Expires: 0');
 
-// Ghi mã BOM UTF-8 để Microsoft Excel trên Windows mở không bị lỗi font tiếng Việt
+// Output UTF-8 BOM so Microsoft Excel renders accented/UTF-8 characters cleanly
 echo "\xEF\xBB\xBF";
 
 $output = fopen('php://output', 'w');
 
-// Tiêu đề các cột theo yêu cầu: Hạng, Tên người chơi, Tổng điểm, Số câu đúng, Tổng số câu, Tỷ lệ đúng (%)
-fputcsv($output, ['Hạng', 'Tên người chơi', 'Tổng điểm', 'Số câu đúng', 'Tổng số câu', 'Tỷ lệ đúng (%)']);
+// English CSV Column Headers
+fputcsv($output, ['Rank', 'Student Nickname', 'Total Score', 'Correct Answers', 'Total Questions', 'Accuracy Rate (%)']);
 
-// Xuất thông tin từng học sinh
+// Output student records
 foreach ($players as $idx => $p) {
     $rank = $idx + 1;
     $correct = intval($p['correct_count'] ?? $p['answers_correct'] ?? 0);

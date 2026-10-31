@@ -1,0 +1,801 @@
+/* ==========================================================================
+   Reports & Analytics Modern B2B SaaS Design System
+   Inspired by Stripe Dashboard, Linear.app, Tailwind UI, and shadcn/ui
+   ========================================================================== */
+
+:root {
+  --saas-slate-50: #f8fafc;
+  --saas-slate-100: #f1f5f9;
+  --saas-slate-200: #e2e8f0;
+  --saas-slate-300: #cbd5e1;
+  --saas-slate-400: #94a3b8;
+  --saas-slate-500: #64748b;
+  --saas-slate-600: #475569;
+  --saas-slate-700: #334155;
+  --saas-slate-800: #1e293b;
+  --saas-slate-900: #0f172a;
+  
+  --saas-emerald-50: #ecfdf5;
+  --saas-emerald-100: #d1fae5;
+  --saas-emerald-200: #a7f3d0;
+  --saas-emerald-500: #10b981;
+  --saas-emerald-600: #059669;
+  --saas-emerald-700: #047857;
+
+  --saas-amber-50: #fffbeb;
+  --saas-amber-100: #fef3c7;
+  --saas-amber-200: #fde68a;
+  --saas-amber-500: #f59e0b;
+  --saas-amber-600: #d97706;
+  --saas-amber-700: #b45309;
+
+  --saas-rose-50: #fff1f2;
+  --saas-rose-100: #ffe4e6;
+  --saas-rose-200: #fecdd3;
+  --saas-rose-500: #f43f5e;
+  --saas-rose-600: #e11d48;
+  --saas-rose-700: #be123c;
+
+  --saas-blue-50: #eff6ff;
+  --saas-blue-100: #dbeafe;
+  --saas-blue-200: #bfdbfe;
+  --saas-blue-500: #3b82f6;
+  --saas-blue-600: #2563eb;
+  --saas-blue-700: #1d4ed8;
+
+  --saas-purple-50: #f5f3ff;
+  --saas-purple-100: #ede9fe;
+  --saas-purple-200: #ddd6fe;
+  --saas-purple-500: #8b5cf6;
+  --saas-purple-600: #7c3aed;
+  --saas-purple-700: #6d28d9;
+}
+
+/* Base typography & container enhancements */
+.reports-dashboard {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", "Helvetica Neue", Arial, sans-serif;
+  color: var(--saas-slate-800);
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* ==========================================================================
+   1. KPI CARDS (B2B SAAS SPEC WITH ACCENT TOP BARS)
+   ========================================================================== */
+.saas-kpi-card {
+  background: #ffffff;
+  border: 1px solid var(--saas-slate-200);
+  border-radius: 10px;
+  box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.04);
+  padding: 20px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.saas-kpi-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--saas-slate-300);
+  box-shadow: 0 6px 12px -2px rgba(15, 23, 42, 0.08);
+}
+
+/* Vibrant top accent line */
+.saas-kpi-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3.5px;
+  background: var(--saas-slate-300);
+}
+
+.saas-kpi-purple::before {
+  background: linear-gradient(90deg, #7c3aed, #a855f7);
+}
+
+.saas-kpi-blue::before {
+  background: linear-gradient(90deg, #2563eb, #38bdf8);
+}
+
+.saas-kpi-emerald::before {
+  background: linear-gradient(90deg, #059669, #34d399);
+}
+
+.saas-kpi-amber::before {
+  background: linear-gradient(90deg, #d97706, #fbbf24);
+}
+
+.saas-kpi-rose::before {
+  background: linear-gradient(90deg, #e11d48, #fb7185);
+}
+
+.saas-kpi-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.saas-kpi-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--saas-slate-500);
+  margin: 0;
+}
+
+.saas-kpi-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  background-color: var(--saas-slate-100);
+  color: var(--saas-slate-600);
+  border: 1px solid var(--saas-slate-200);
+  flex-shrink: 0;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+}
+
+.saas-kpi-icon.icon-blue {
+  background: linear-gradient(135deg, #eff6ff, #dbeafe);
+  color: var(--saas-blue-600);
+  border-color: var(--saas-blue-200);
+}
+
+.saas-kpi-icon.icon-emerald {
+  background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+  color: var(--saas-emerald-600);
+  border-color: var(--saas-emerald-200);
+}
+
+.saas-kpi-icon.icon-purple {
+  background: linear-gradient(135deg, #f5f3ff, #ede9fe);
+  color: var(--saas-purple-600);
+  border-color: var(--saas-purple-200);
+}
+
+.saas-kpi-icon.icon-amber {
+  background: linear-gradient(135deg, #fffbeb, #fef3c7);
+  color: var(--saas-amber-600);
+  border-color: var(--saas-amber-200);
+}
+
+.saas-kpi-icon.icon-rose {
+  background: linear-gradient(135deg, #fff1f2, #ffe4e6);
+  color: var(--saas-rose-600);
+  border-color: var(--saas-rose-200);
+}
+
+.saas-kpi-value {
+  font-size: 27px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--saas-slate-900);
+  font-variant-numeric: tabular-nums;
+  margin: 0 0 6px 0;
+}
+
+.saas-kpi-footer {
+  font-size: 12.5px;
+  color: var(--saas-slate-500);
+  line-height: 1.4;
+  margin: 0;
+}
+
+/* ==========================================================================
+   2. DATA TABLE & WRAPPERS
+   ========================================================================== */
+.saas-table-card {
+  background: #ffffff;
+  border: 1px solid var(--saas-slate-200);
+  border-radius: 10px;
+  box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.03);
+  overflow: visible; /* Cho phép dropdown bung ra ngoài */
+}
+
+.saas-table-header {
+  padding: 16px 20px;
+  background: #ffffff;
+  border-bottom: 1px solid var(--saas-slate-200);
+  border-top-left-radius: 10px;
+  border-top-right-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.saas-table-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--saas-slate-900);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.saas-table-card .table-responsive {
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
+.saas-table {
+  width: 100%;
+  margin-bottom: 0;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.saas-table thead th {
+  background-color: var(--saas-slate-50);
+  color: var(--saas-slate-500);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 11px 16px;
+  border-top: none;
+  border-bottom: 1px solid var(--saas-slate-200);
+  white-space: nowrap;
+}
+
+.saas-table tbody td {
+  padding: 14px 16px;
+  vertical-align: middle;
+  border-top: none;
+  border-bottom: 1px solid var(--saas-slate-100);
+  color: var(--saas-slate-700);
+  font-size: 13.5px;
+  position: relative;
+}
+
+.saas-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.saas-table tbody tr {
+  transition: background-color 0.12s ease;
+}
+
+.saas-table tbody tr:hover {
+  background-color: #fbfcfe;
+}
+
+/* Alignments */
+.saas-table .text-left { text-align: left !important; }
+.saas-table .text-center { text-align: center !important; }
+.saas-table .text-right { text-align: right !important; }
+
+/* Numeric styling */
+.saas-numeric {
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  color: var(--saas-slate-900);
+}
+
+/* ==========================================================================
+   3. PROGRESS BARS (VIBRANT GRADIENT ACCENTS, 6px)
+   ========================================================================== */
+.saas-progress-track {
+  width: 100%;
+  height: 6px;
+  background-color: var(--saas-slate-100);
+  border-radius: 9999px;
+  overflow: hidden;
+  display: flex;
+}
+
+.saas-progress-bar {
+  height: 100%;
+  border-radius: 9999px;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.saas-progress-emerald {
+  background: linear-gradient(90deg, #10b981, #059669);
+}
+
+.saas-progress-amber {
+  background: linear-gradient(90deg, #f59e0b, #d97706);
+}
+
+.saas-progress-rose {
+  background: linear-gradient(90deg, #f43f5e, #e11d48);
+}
+
+.saas-progress-blue {
+  background: linear-gradient(90deg, #3b82f6, #2563eb);
+}
+
+/* ==========================================================================
+   4. STATUS CHIPS & BADGES (PASTEL SHADCN STYLE)
+   ========================================================================== */
+.saas-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.saas-badge-slate {
+  background-color: var(--saas-slate-100);
+  color: var(--saas-slate-700);
+  border: 1px solid var(--saas-slate-200);
+}
+
+.saas-badge-emerald {
+  background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+  color: var(--saas-emerald-700);
+  border: 1px solid var(--saas-emerald-200);
+  font-weight: 600;
+}
+
+.saas-badge-amber {
+  background: linear-gradient(135deg, #fffbeb, #fef3c7);
+  color: var(--saas-amber-700);
+  border: 1px solid var(--saas-amber-200);
+  font-weight: 600;
+}
+
+.saas-badge-rose {
+  background: linear-gradient(135deg, #fff1f2, #ffe4e6);
+  color: var(--saas-rose-700);
+  border: 1px solid var(--saas-rose-200);
+  font-weight: 600;
+}
+
+.saas-badge-blue {
+  background: linear-gradient(135deg, #eff6ff, #dbeafe);
+  color: var(--saas-blue-700);
+  border: 1px solid var(--saas-blue-200);
+  font-weight: 600;
+}
+
+.saas-badge-purple {
+  background: linear-gradient(135deg, #f5f3ff, #ede9fe);
+  color: var(--saas-purple-700);
+  border: 1px solid var(--saas-purple-200);
+  font-weight: 600;
+}
+
+/* Rank badges - Premium metallic chips */
+.saas-rank-chip {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.saas-rank-1 {
+  background: linear-gradient(135deg, #fef08a, #facc15);
+  color: #713f12;
+  border: 1px solid #eab308;
+  box-shadow: 0 2px 4px rgba(234, 179, 8, 0.25);
+}
+
+.saas-rank-2 {
+  background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+  color: #1e293b;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 2px 4px rgba(148, 163, 184, 0.2);
+}
+
+.saas-rank-3 {
+  background: linear-gradient(135deg, #fed7aa, #fb923c);
+  color: #7c2d12;
+  border: 1px solid #f97316;
+  box-shadow: 0 2px 4px rgba(249, 115, 22, 0.25);
+}
+
+.saas-rank-other {
+  background-color: transparent;
+  color: var(--saas-slate-500);
+  border: 1px solid transparent;
+}
+
+/* ==========================================================================
+   5. BUTTONS & ACTION DROPDOWN MENU (GỘP CHUNG 3 THAO TÁC)
+   ========================================================================== */
+.saas-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-decoration: none !important;
+  line-height: 1.4;
+  border: 1px solid transparent;
+}
+
+.saas-btn-outline {
+  background-color: #ffffff;
+  color: var(--saas-slate-700);
+  border-color: var(--saas-slate-200);
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+}
+
+.saas-btn-outline:hover {
+  background-color: var(--saas-slate-50);
+  border-color: var(--saas-slate-300);
+  color: var(--saas-slate-900);
+}
+
+.saas-btn-solid {
+  background-color: var(--saas-slate-900);
+  color: #ffffff;
+  border-color: var(--saas-slate-900);
+}
+
+.saas-btn-solid:hover {
+  background-color: var(--saas-slate-800);
+  color: #ffffff;
+}
+
+/* Action Dropdown Menu */
+.saas-action-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.saas-dropdown-btn {
+  background-color: #ffffff;
+  border: 1px solid var(--saas-slate-200);
+  color: var(--saas-slate-700);
+  border-radius: 6px;
+  padding: 5px 11px;
+  font-size: 12.5px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+}
+
+/* Remove duplicate Bootstrap caret on dropdown-toggle */
+.saas-dropdown-btn.dropdown-toggle::after,
+.saas-dropdown-btn::after {
+  display: none !important;
+}
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+}
+
+.saas-dropdown-btn:hover,
+.saas-dropdown-btn:focus,
+.show > .saas-dropdown-btn {
+  background-color: var(--saas-slate-50);
+  border-color: var(--saas-slate-300);
+  color: var(--saas-slate-900);
+}
+
+.saas-dropdown-menu {
+  min-width: 220px;
+  padding: 6px;
+  margin-top: 4px;
+  background: #ffffff;
+  border: 1px solid var(--saas-slate-200);
+  border-radius: 8px;
+  box-shadow: 0 10px 15px -3px rgba(15, 23, 42, 0.08), 0 4px 6px -2px rgba(15, 23, 42, 0.04);
+  z-index: 1050;
+}
+
+.saas-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--saas-slate-700);
+  border-radius: 6px;
+  transition: all 0.12s ease;
+  text-decoration: none !important;
+  cursor: pointer;
+}
+
+.saas-dropdown-item:hover {
+  background-color: var(--saas-slate-100);
+  color: var(--saas-slate-900);
+}
+
+.saas-dropdown-item.text-danger {
+  color: var(--saas-rose-700) !important;
+}
+
+.saas-dropdown-item.text-danger:hover {
+  background-color: var(--saas-rose-50);
+  color: var(--saas-rose-700) !important;
+}
+
+.saas-menu-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.saas-menu-icon.icon-purple {
+  background-color: var(--saas-purple-50);
+  color: var(--saas-purple-700);
+  border: 1px solid var(--saas-purple-200);
+}
+
+.saas-menu-icon.icon-emerald {
+  background-color: var(--saas-emerald-50);
+  color: var(--saas-emerald-700);
+  border: 1px solid var(--saas-emerald-200);
+}
+
+.saas-menu-icon.icon-rose {
+  background-color: var(--saas-rose-50);
+  color: var(--saas-rose-700);
+  border: 1px solid var(--saas-rose-200);
+}
+
+/* ==========================================================================
+   6. PAGINATION FOOTER COMPONENT
+   ========================================================================== */
+.saas-pagination-bar {
+  border-top: 1px solid var(--saas-slate-200);
+  padding: 12px 16px;
+  background-color: #ffffff;
+  border-bottom-left-radius: 10px;
+  border-bottom-right-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.saas-pagination-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.saas-pagination-info {
+  font-size: 13px;
+  color: var(--saas-slate-500);
+  margin: 0;
+}
+
+.saas-pagination-info .highlight {
+  font-weight: 600;
+  color: var(--saas-slate-800);
+  font-variant-numeric: tabular-nums;
+}
+
+.saas-pagination-size-select {
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--saas-slate-700);
+  border: 1px solid var(--saas-slate-200);
+  border-radius: 6px;
+  background-color: #ffffff;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.saas-pagination-size-select:focus {
+  border-color: var(--saas-slate-400);
+}
+
+.saas-pagination-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.saas-page-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--saas-slate-600);
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.12s ease;
+  text-decoration: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.saas-page-btn:hover:not(.active):not(.disabled):not(.dots) {
+  background-color: var(--saas-slate-100);
+  color: var(--saas-slate-900);
+}
+
+.saas-page-btn.active {
+  background-color: var(--saas-slate-900);
+  color: #ffffff;
+  border-color: var(--saas-slate-900);
+  cursor: default;
+}
+
+.saas-page-btn.dots {
+  cursor: default;
+  color: var(--saas-slate-400);
+}
+
+.saas-page-nav-btn {
+  padding: 0 10px;
+  height: 32px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--saas-slate-700);
+  background-color: #ffffff;
+  border: 1px solid var(--saas-slate-200);
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.02);
+}
+
+.saas-page-nav-btn:hover:not(.disabled) {
+  background-color: var(--saas-slate-50);
+  border-color: var(--saas-slate-300);
+  color: var(--saas-slate-900);
+}
+
+.saas-page-nav-btn.disabled,
+.saas-page-nav-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+  background-color: var(--saas-slate-50);
+  border-color: var(--saas-slate-200);
+}
+
+/* ==========================================================================
+   7. SEGMENTED CONTROL TABS (SHADCN / LINEAR STYLE)
+   ========================================================================== */
+.saas-tabs-container {
+  display: inline-flex;
+  align-items: center;
+  background-color: var(--saas-slate-100);
+  border-radius: 8px;
+  padding: 3px;
+  border: 1px solid var(--saas-slate-200);
+}
+
+.saas-tab-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--saas-slate-600);
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-decoration: none !important;
+  transition: all 0.15s ease;
+}
+
+.saas-tab-link:hover:not(.active) {
+  color: var(--saas-slate-900);
+}
+
+.saas-tab-link.active {
+  background-color: #ffffff;
+  color: var(--saas-slate-900);
+  font-weight: 600;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+}
+
+.saas-tab-count {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  background-color: var(--saas-slate-200);
+  color: var(--saas-slate-700);
+}
+
+.saas-tab-link.active .saas-tab-count {
+  background-color: var(--saas-slate-100);
+  color: var(--saas-slate-800);
+}
+
+/* ==========================================================================
+   8. QUESTION ANALYSIS REFINEMENTS
+   ========================================================================== */
+.saas-question-card {
+  background: #ffffff;
+  border: 1px solid var(--saas-slate-200);
+  border-radius: 10px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.02);
+  overflow: hidden;
+}
+
+.saas-question-header {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--saas-slate-100);
+  background-color: #ffffff;
+}
+
+.saas-question-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--saas-slate-900);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.saas-answer-item {
+  border: 1px solid var(--saas-slate-200);
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 12px 14px;
+  height: 100%;
+  transition: border-color 0.15s ease;
+}
+
+.saas-answer-item.correct {
+  border-color: var(--saas-emerald-500);
+  background-color: #fcfdfc;
+}
+
+.saas-answer-symbol {
+  width: 24px;
+  height: 24px;
+  border-radius: 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
