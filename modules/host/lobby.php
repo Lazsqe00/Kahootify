@@ -270,7 +270,7 @@ require_once __DIR__ . '/../../includes/header.php';
                 <label for="toggleShowQuestions" class="mb-0 mr-3 text-dark font-weight-bold" style="font-family: 'Montserrat', sans-serif; font-size: 0.98rem; font-weight: 800; color: #111111; cursor: pointer; user-select: none;">
                     Show questions &amp; answers on player devices:
                 </label>
-                <span id="settingStatusLabel" class="badge <?= $showOnPlayers ? 'badge-success' : 'badge-secondary' ?> font-weight-bold mr-3 px-2 py-1" style="font-size: 0.85rem; letter-spacing: 0.5px;">
+                <span id="settingStatusLabel" class="badge <?= $showOnPlayers ? 'badge-success' : 'badge-secondary' ?> font-weight-bold mr-3 px-2 py-1" style="font-size: 0.85rem; letter-spacing: 0.5px; cursor: pointer;" onclick="$('#toggleShowQuestions').click()" title="Click to toggle">
                     <?= $showOnPlayers ? 'ON' : 'OFF' ?>
                 </span>
                 <div class="custom-control custom-switch" style="transform: scale(1.3); transform-origin: center center;">
@@ -396,9 +396,14 @@ require_once __DIR__ . '/../../includes/header.php';
                                 Useful for remote learning or large screens. When enabled, player devices show full question text, media, and button labels.
                             </p>
                         </div>
-                        <div class="custom-control custom-switch pl-4" style="transform: scale(1.3); transform-origin: right center;">
-                            <input type="checkbox" class="custom-control-input" id="modalToggleShowQuestions" <?= $showOnPlayers ? 'checked' : '' ?> onchange="updateShowQuestions(this.checked)">
-                            <label class="custom-control-label" for="modalToggleShowQuestions" style="cursor: pointer;"></label>
+                        <div class="d-flex align-items-center">
+                            <span id="modalSettingStatusLabel" class="badge <?= $showOnPlayers ? 'badge-success' : 'badge-secondary' ?> font-weight-bold mr-2 px-2 py-1" style="font-size: 0.85rem; cursor: pointer;" onclick="$('#modalToggleShowQuestions').click()" title="Click to toggle">
+                                <?= $showOnPlayers ? 'ON' : 'OFF' ?>
+                            </span>
+                            <div class="custom-control custom-switch pl-4" style="transform: scale(1.3); transform-origin: right center;">
+                                <input type="checkbox" class="custom-control-input" id="modalToggleShowQuestions" <?= $showOnPlayers ? 'checked' : '' ?> onchange="updateShowQuestions(this.checked)">
+                                <label class="custom-control-label" for="modalToggleShowQuestions" style="cursor: pointer;"></label>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -466,8 +471,46 @@ function updateAudioUI(isPlaying) {
     }
 }
 
+const roomId = <?= $roomId ?>;
 let currentShowQuestions = <?= $showOnPlayers ? 1 : 0 ?>;
 const totalQuizQuestions = <?= $totalQuizQuestions ?>;
+
+function updateShowQuestions(checked) {
+    currentShowQuestions = checked ? 1 : 0;
+
+    $('#toggleShowQuestions').prop('checked', checked);
+    $('#modalToggleShowQuestions').prop('checked', checked);
+
+    updateStartGameHref();
+
+    const label = $('#settingStatusLabel');
+    if (label.length) {
+        label.text(checked ? 'ON' : 'OFF')
+             .removeClass('badge-success badge-secondary')
+             .addClass(checked ? 'badge-success' : 'badge-secondary');
+    }
+
+    const modalLabel = $('#modalSettingStatusLabel');
+    if (modalLabel.length) {
+        modalLabel.text(checked ? 'ON' : 'OFF')
+                  .removeClass('badge-success badge-secondary')
+                  .addClass(checked ? 'badge-success' : 'badge-secondary');
+    }
+
+    $.ajax({
+        url: '<?= BASE_URL ?>modules/api/game_state.php',
+        type: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({
+            action: 'update_settings',
+            id_room: roomId,
+            show_questions_on_players: currentShowQuestions
+        }),
+        error: function(err) {
+            console.error('Failed to update room settings:', err);
+        }
+    });
+}
 
 function getSelectedQuestionConfig() {
     const isRandom = $('#lobbyModeRandom').is(':checked') || $('#modalModeRandom').is(':checked');
