@@ -142,7 +142,7 @@ require __DIR__ . '/header.php';
             <div class="results-toolbar">
                 <?php if ($isHostResults && $participantCount > 0): ?>
                     <button class="results-icon-button" id="resultsFullscreen" type="button" aria-label="Enter fullscreen" title="Fullscreen" hidden>&#x26F6;</button>
-                    <button class="results-button" id="resultsMusic" type="button" aria-pressed="false" hidden>Music: Off</button>
+                    <button class="results-button" id="resultsMusic" type="button" aria-pressed="true" hidden>Music: On</button>
                     <button class="results-button results-button-light" id="resultsSkip" type="button" hidden>Skip</button>
                 <?php endif; ?>
             </div>
@@ -322,7 +322,7 @@ require __DIR__ . '/header.php';
         </div>
     </main>
     <?php if ($isHostResults && $participantCount > 0): ?>
-        <audio id="resultsAudio" preload="none" loop src="<?= BASE_URL ?>assets/audio/podium-soundtrack.mp3"></audio>
+        <audio id="resultsAudio" preload="auto" loop src="<?= BASE_URL ?>assets/audio/podium-soundtrack.mp3"></audio>
     <?php endif; ?>
 </div>
 <?php if (!$isHostResults && $myResult !== null && !empty($isUserLoggedIn)): ?>

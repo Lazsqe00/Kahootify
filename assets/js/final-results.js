@@ -22,7 +22,7 @@
     let timers = [];
     let animationFrame = 0;
     let playing = false;
-    let musicEnabled = false;
+    let musicEnabled = true;
     let musicRequest = 0;
     let cue = null;
 
@@ -147,7 +147,18 @@
         skip.hidden = false;
         replay.hidden = true;
         announcement.textContent = 'And the winners are...';
-        if (musicEnabled && audio) audio.currentTime = 0;
+        if (musicEnabled && audio) {
+            audio.currentTime = 0;
+            audio.play().catch(() => {
+                const playOnGesture = () => {
+                    if (musicEnabled && audio && audio.paused) {
+                        audio.play().catch(() => {});
+                    }
+                };
+                window.addEventListener('click', playOnGesture, { once: true });
+                window.addEventListener('keydown', playOnGesture, { once: true });
+            });
+        }
         // Match the reference: each step rises in the center before moving aside.
         timers.push(setTimeout(() => reveal(3, 'third'), 1400));
         timers.push(setTimeout(() => reveal(2, 'second'), 5000));
@@ -195,6 +206,7 @@
             music.textContent = enabled ? 'Music: On' : 'Music: Off';
             music.setAttribute('aria-pressed', String(enabled));
         }
+        updateMusic(true);
         music.addEventListener('click', async () => {
             const request = ++musicRequest;
             if (musicEnabled) {
@@ -252,9 +264,9 @@
         if (event.persisted) {
             finish();
             if (music) {
-                musicEnabled = false;
-                music.textContent = 'Music: Off';
-                music.setAttribute('aria-pressed', 'false');
+                musicEnabled = true;
+                music.textContent = 'Music: On';
+                music.setAttribute('aria-pressed', 'true');
             }
         }
     });
