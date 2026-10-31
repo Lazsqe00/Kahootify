@@ -27,21 +27,25 @@ if (!is_array($selectedQIds) || empty($selectedQIds)) {
     $fallbackQuestions = db_fetch_all("SELECT id_question FROM questions WHERE id_quiz = :q ORDER BY id_question ASC", [':q' => $room['id_quiz']]);
     $selectedQIds = array_column($fallbackQuestions, 'id_question');
 }
+$selectedQIds = array_values(array_filter(array_map('intval', (array)$selectedQIds)));
 $totalQuestions = count($selectedQIds);
 
-if (isset($_GET['action']) && $_GET['action'] === 'show_result') {
-    if (is_numeric($status)) {
-        db_execute("UPDATE room SET status = :s WHERE id_room = :r", [
-            ':s' => 'res_' . $status,
-            ':r' => $roomId
-        ]);
-    }
-    redirect('modules/host/play.php');
-}
-
+// CRITICAL: Handle actions FIRST before checking $isResultPhase!
 if (isset($_GET['action']) && $_GET['action'] === 'next_question') {
-    $currentQId = intval(str_replace('res_', '', $status));
-    $currentIdx = array_search($currentQId, $selectedQIds);
+    $currentQId = 0;
+    if (isset($_GET['qid']) && intval($_GET['qid']) > 0) {
+        $currentQId = intval($_GET['qid']);
+    }
+    if ($currentQId <= 0) {
+        $currentQId = intval(str_replace('res_', '', $status));
+    }
+    $currentIdx = array_search((int)$currentQId, $selectedQIds, true);
+    if ($currentIdx === false) {
+        $currentIdx = array_search((int)$currentQId, $selectedQIds);
+    }
+    if ($currentIdx === false && isset($_SESSION['question_index'])) {
+        $currentIdx = intval($_SESSION['question_index']);
+    }
 
     if ($currentIdx !== false && isset($selectedQIds[$currentIdx + 1])) {
         $nextQId = intval($selectedQIds[$currentIdx + 1]);
@@ -57,8 +61,29 @@ if (isset($_GET['action']) && $_GET['action'] === 'next_question') {
     }
 }
 
+// When show_result is triggered (either all answered or time is up),
+// immediately update status to res_<qid> and go straight to leaderboard
+if (isset($_GET['action']) && $_GET['action'] === 'show_result') {
+    if (is_numeric($status)) {
+        db_execute("UPDATE room SET status = :s WHERE id_room = :r", [
+            ':s' => 'res_' . $status,
+            ':r' => $roomId
+        ]);
+        $toQId = intval($status);
+    } else {
+        $toQId = intval(str_replace('res_', '', $status));
+    }
+    redirect('modules/host/leaderboard.php?qid=' . $toQId);
+}
+
+// If room is in result phase (and no action requested), directly show leaderboard
 $isResultPhase = (strpos($status, 'res_') === 0);
-$qId = $isResultPhase ? intval(str_replace('res_', '', $status)) : intval($status);
+if ($isResultPhase) {
+    $toQId = intval(str_replace('res_', '', $status));
+    redirect('modules/host/leaderboard.php?qid=' . $toQId);
+}
+
+$qId = intval($status);
 
 $currentQuestion = db_fetch_one("SELECT * FROM questions WHERE id_question = :qid", [':qid' => $qId]);
 $answers = db_fetch_all("SELECT * FROM answers WHERE id_question = :qid ORDER BY id_answer ASC", [':qid' => $qId]);
@@ -98,26 +123,23 @@ $startTime = !empty($room['question_start_time']) ? intval($room['question_start
 $elapsed = time() - $startTime;
 $remainingSeconds = max(0, $timeLimit - $elapsed);
 
-$currentIdx = array_search($qId, $selectedQIds);
+$currentIdx = array_search((int)$qId, $selectedQIds, true);
 $questionNumber = ($currentIdx !== false) ? ($currentIdx + 1) : 1;
 
 $questionAudioFile = null;
-if (!$isResultPhase) {
-    $audioDir = __DIR__ . '/../../assets/audio';
-    if (is_dir($audioDir)) {
-        $searchKey = $timeLimit . ' Second';
-        $audioFiles = scandir($audioDir);
-        $matchedAudios = [];
-        foreach ($audioFiles as $af) {
-            if ($af === '.' || $af === '..') continue;
-            if (stripos($af, $searchKey) !== false && preg_match('/\.(mp3|wav|ogg)$/i', $af)) {
-                $matchedAudios[] = $af;
-            }
+$audioDir = __DIR__ . '/../../assets/audio';
+if (is_dir($audioDir)) {
+    $searchKey = $timeLimit . ' Second';
+    $audioFiles = scandir($audioDir);
+    $matchedAudios = [];
+    foreach ($audioFiles as $af) {
+        if ($af === '.' || $af === '..') continue;
+        if (stripos($af, $searchKey) !== false && preg_match('/\.(mp3|wav|ogg)$/i', $af)) {
+            $matchedAudios[] = $af;
         }
-        if (!empty($matchedAudios)) {
-
-            $questionAudioFile = $matchedAudios[($questionNumber - 1) % count($matchedAudios)];
-        }
+    }
+    if (!empty($matchedAudios)) {
+        $questionAudioFile = $matchedAudios[($questionNumber - 1) % count($matchedAudios)];
     }
 }
 
@@ -129,8 +151,7 @@ $bodyClass = "backgroundColorChanges";
 require_once __DIR__ . '/../../includes/header.php';
 ?>
 
-<?php if (!$isResultPhase && $questionAudioFile): ?>
-
+<?php if ($questionAudioFile): ?>
 <audio id="questionAudio" preload="auto">
     <source src="<?= BASE_URL ?>assets/audio/<?= rawurlencode($questionAudioFile) ?>" type="audio/mpeg">
 </audio>
@@ -143,26 +164,16 @@ require_once __DIR__ . '/../../includes/header.php';
         <span class="text-white font-weight-bold">Question <?= $questionNumber ?> / <?= $totalQuestions ?></span>
     </div>
     <div class="d-flex align-items-center">
-        <?php if (!$isResultPhase && $questionAudioFile): ?>
-
+        <?php if ($questionAudioFile): ?>
             <button type="button" id="audioToggleBtn" class="btn btn-sm btn-light font-weight-bold shadow-sm rounded-pill mr-2 px-3" onclick="toggleQuestionAudio()" title="Toggle countdown music">
                 <i class="fas fa-volume-up text-success mr-1" id="audioIcon"></i>
                 <span id="audioLabel">Music: ON</span>
             </button>
         <?php endif; ?>
 
-        <?php if ($isResultPhase): ?>
-            <a href="<?= BASE_URL ?>modules/host/leaderboard.php?qid=<?= $qId ?>" class="btn btn-warning font-weight-bold mr-2">
-                <i class="fas fa-trophy mr-1"></i> Leaderboard &raquo;
-            </a>
-            <a href="play.php?action=next_question" class="btn btn-primary font-weight-bold">
-                <?= $questionNumber >= $totalQuestions ? 'Final Results 🏆' : 'Next Question &raquo;' ?>
-            </a>
-        <?php else: ?>
-            <a href="play.php?action=show_result" onclick="stopQuestionAudio()" class="btn btn-outline-light font-weight-bold">
-                Skip to Results &raquo;
-            </a>
-        <?php endif; ?>
+        <a href="play.php?action=show_result" onclick="stopQuestionAudio()" class="btn btn-outline-light font-weight-bold">
+            Skip to Leaderboard &raquo;
+        </a>
     </div>
 </nav>
 
@@ -188,77 +199,24 @@ require_once __DIR__ . '/../../includes/header.php';
         <?php endif; ?>
     </div>
 
-    <?php if ($isResultPhase): ?>
-        <div class="card border-0 shadow-sm mx-auto my-3" style="max-width: 600px; background: rgba(255,255,255,0.95); border-radius: 14px;">
-            <div class="card-body py-2 px-4 text-center">
-                <div class="d-flex justify-content-between align-items-center mb-1">
-                    <span class="font-weight-bold text-dark" style="font-size: 1.05rem;">
-                        <i class="fas fa-hourglass-half text-warning mr-2"></i>Auto-transition to Leaderboard in: <span id="autoLeaderboardCountdown" class="badge badge-warning text-dark font-weight-bold ml-1 px-2 py-1" style="font-size: 1.1rem;">5</span>s
-                    </span>
-                    <a href="<?= BASE_URL ?>modules/host/leaderboard.php?qid=<?= $qId ?>" class="btn btn-sm btn-primary font-weight-bold">
-                        View now &raquo;
-                    </a>
-                </div>
-                <div class="progress" style="height: 6px; border-radius: 4px; background: #e9ecef;">
-                    <div id="autoProgress" class="progress-bar bg-warning progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%; transition: width 1s linear;"></div>
-                </div>
-            </div>
-        </div>
-    <?php endif; ?>
-
     <div class="d-flex justify-content-between align-items-center my-3 px-3">
-
         <div>
-            <?php if (!$isResultPhase): ?>
-                <div id="timerBox" class="timer-circle <?= $remainingSeconds <= 5 ? 'warning' : '' ?>">
-                    <span id="timerSeconds"><?= $remainingSeconds ?></span>
-                </div>
-            <?php else: ?>
-                <div class="timer-circle" style="background: #28a745; color: #fff; border-color: #1e7e34;">
-                    <i class="fas fa-check"></i>
-                </div>
-            <?php endif; ?>
+            <div id="timerBox" class="timer-circle <?= $remainingSeconds <= 5 ? 'warning' : '' ?>">
+                <span id="timerSeconds"><?= $remainingSeconds ?></span>
+            </div>
         </div>
 
         <div class="text-center">
-            <?php if (!$isResultPhase): ?>
-                <div class="bg-white rounded-pill px-4 py-2 shadow-sm font-weight-bold text-dark" style="font-size: 1.2rem;">
-                    <i class="fas fa-paper-plane text-primary mr-1"></i>
-                    <span id="voteCount"><?= $votedCount ?></span> / <span id="totalPlayerCount"><?= $totalPlayers ?></span> Answers
-                </div>
-            <?php else: ?>
-                <span class="badge badge-light px-4 py-2 font-weight-bold" style="font-size: 1.1rem;">
-                    Time is up!
-                </span>
-            <?php endif; ?>
+            <div class="bg-white rounded-pill px-4 py-2 shadow-sm font-weight-bold text-dark" style="font-size: 1.2rem;">
+                <i class="fas fa-paper-plane text-primary mr-1"></i>
+                <span id="voteCount"><?= $votedCount ?></span> / <span id="totalPlayerCount"><?= $totalPlayers ?></span> Answers
+            </div>
         </div>
     </div>
 
     <div class="row">
-        <?php
-
-        $voteStats = [];
-        if ($isResultPhase && !empty($answers)) {
-            $ansIds = array_column($answers, 'id_answer');
-            $inClause = implode(',', array_map('intval', $ansIds));
-            $statsRows = db_fetch_all(
-                "SELECT v.id_answer, v.id_player
-                 FROM votes v
-                 JOIN players p ON v.id_player = p.id_player
-                 WHERE p.id_room = :r AND v.id_answer IN ($inClause)",
-                [':r' => $roomId]
-            );
-            foreach (filter_room_players($roomId, $statsRows) as $sr) {
-                $voteStats[$sr['id_answer']] = ($voteStats[$sr['id_answer']] ?? 0) + 1;
-            }
-        }
-        ?>
-
         <?php foreach ($answers as $idx => $a):
             $cIdx = $idx % 4;
-            $isCorrect = ($a['is_correct'] == 1);
-            $opacity = ($isResultPhase && !$isCorrect) ? 'opacity: 0.35;' : 'opacity: 1;';
-            $ansCount = $voteStats[$a['id_answer']] ?? 0;
             $ansImgUrl = '';
             if (!empty($a['image_path'])) {
                 if (preg_match('#^https?://#i', $a['image_path'])) {
@@ -274,7 +232,7 @@ require_once __DIR__ . '/../../includes/header.php';
         ?>
             <div class="col-md-6 mb-3">
                 <div class="answer-box shadow-sm d-flex justify-content-between align-items-center"
-                     style="background-color: <?= $colors[$cIdx] ?>; <?= $opacity ?> cursor: default;">
+                     style="background-color: <?= $colors[$cIdx] ?>; cursor: default;">
                     <div class="d-flex align-items-center flex-grow-1 mr-2">
                         <span class="symbol mr-3" style="font-size: 2rem;"><?= $icons[$cIdx] ?></span>
                         <?php if ($ansImgUrl): ?>
@@ -284,19 +242,6 @@ require_once __DIR__ . '/../../includes/header.php';
                             <span style="font-size: 1.3rem;"><?= htmlspecialchars($a['text']) ?></span>
                         <?php endif; ?>
                     </div>
-
-                    <?php if ($isResultPhase): ?>
-                        <div class="text-right">
-                            <span class="badge badge-dark px-3 py-2 font-weight-bold" style="font-size: 1rem;">
-                                <?= $ansCount ?> answers
-                            </span>
-                            <?php if ($isCorrect): ?>
-                                <span class="badge badge-light text-success font-weight-bold ml-1 px-2 py-1" style="font-size: 1.1rem;">
-                                    ✓ CORRECT
-                                </span>
-                            <?php endif; ?>
-                        </div>
-                    <?php endif; ?>
                 </div>
             </div>
         <?php endforeach; ?>
@@ -304,24 +249,7 @@ require_once __DIR__ . '/../../includes/header.php';
 </div>
 
 <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
-<?php if ($isResultPhase): ?>
 <script>
-
-let autoSec = 5;
-const autoTimer = setInterval(function() {
-    autoSec--;
-    if (autoSec <= 0) {
-        clearInterval(autoTimer);
-        window.location.href = '<?= BASE_URL ?>modules/host/leaderboard.php?qid=<?= $qId ?>';
-    } else {
-        $('#autoLeaderboardCountdown').text(autoSec);
-        $('#autoProgress').css('width', (autoSec / 5 * 100) + '%');
-    }
-}, 1000);
-</script>
-<?php else: ?>
-<script>
-
 const qAudio = document.getElementById('questionAudio');
 let isAudioPlaying = false;
 
@@ -406,10 +334,12 @@ let remaining = <?= $remainingSeconds ?>;
 const roomId = <?= $roomId ?>;
 const qId = <?= $qId ?>;
 
+// Countdown timer: when time runs out, auto-transition immediately to leaderboard
 const timerInterval = setInterval(function() {
     remaining--;
     if (remaining <= 0) {
         clearInterval(timerInterval);
+        clearInterval(pollInterval);
         stopQuestionAudio();
         $('#timerSeconds').text('0');
 
@@ -422,6 +352,7 @@ const timerInterval = setInterval(function() {
     }
 }, 1000);
 
+// Polling: when ALL participants have answered, immediately transition to leaderboard
 const pollInterval = setInterval(function() {
     $.getJSON('<?= BASE_URL ?>modules/api/game_state.php?action=get_question_status&id_room=' + roomId + '&id_question=' + qId, function(data) {
         if (data && data.success) {
@@ -436,8 +367,7 @@ const pollInterval = setInterval(function() {
             }
         }
     });
-}, 1000);
+}, 800);
 </script>
-<?php endif; ?>
 </body>
 </html>
