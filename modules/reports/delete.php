@@ -14,9 +14,9 @@ if ($roomId > 0) {
 
     if ($room) {
         db_execute("DELETE FROM room WHERE id_room = :r", [':r' => $roomId]);
-        set_flash_message('success', 'Đã xóa báo cáo ván đấu thành công!');
+        set_flash_message('success', 'Game session report deleted successfully!');
     } else {
-        set_flash_message('danger', 'Không tìm thấy ván đấu hoặc bạn không có quyền xóa ván này!');
+        set_flash_message('danger', 'Report not found or you do not have permission to delete it!');
     }
 }
 

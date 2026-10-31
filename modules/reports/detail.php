@@ -7,11 +7,11 @@ $creatorId = intval($_SESSION['id_creator']);
 $roomId    = intval($_GET['id_room'] ?? $_GET['id'] ?? 0);
 
 if ($roomId <= 0) {
-    set_flash_message('danger', 'Mã phòng không hợp lệ!');
+    set_flash_message('danger', 'Invalid game room ID!');
     redirect('modules/reports/list.php');
 }
 
-// 1. Kiểm tra quyền sở hữu phòng ván đấu
+// 1. Verify session ownership
 $room = db_fetch_one("
     SELECT r.*, q.name as quiz_name, q.description as quiz_description
     FROM room r
@@ -20,11 +20,11 @@ $room = db_fetch_one("
 ", [':r' => $roomId, ':c' => $creatorId]);
 
 if (!$room) {
-    set_flash_message('danger', 'Không tìm thấy ván đấu hoặc bạn không có quyền xem báo cáo này!');
+    set_flash_message('danger', 'Game report not found or you do not have permission to view it!');
     redirect('modules/auth/dashboard.php');
 }
 
-// 2. Lấy danh sách câu hỏi của ván đấu (nếu bốc ngẫu nhiên N câu thì lấy đúng N câu đã chơi theo thứ tự)
+// 2. Fetch questions played in this session (respecting randomized order if saved)
 $selectedQIds = !empty($room['question_order']) ? json_decode($room['question_order'], true) : null;
 if (is_array($selectedQIds) && !empty($selectedQIds)) {
     $inClause = implode(',', array_map('intval', $selectedQIds));
@@ -42,7 +42,7 @@ if (is_array($selectedQIds) && !empty($selectedQIds)) {
 }
 $totalQuestions = count($questions);
 
-// 3. Lấy danh sách người chơi kèm số câu đúng
+// 3. Fetch player scoreboard
 $sqlPlayers = "
     SELECT p.*,
            (SELECT COUNT(*) FROM votes v 
@@ -54,10 +54,11 @@ $sqlPlayers = "
     WHERE p.id_room = :r
     ORDER BY p.score DESC, p.playeradd ASC
 ";
-$players = filter_room_players($roomId, db_fetch_all($sqlPlayers, [':r' => $roomId]));
+$rawPlayers = db_fetch_all($sqlPlayers, [':r' => $roomId]);
+$players = function_exists('filter_room_players') ? filter_room_players($roomId, $rawPlayers) : $rawPlayers;
 $totalPlayers = count($players);
 
-// 4. Tính toán các chỉ số KPI Cards
+// 4. Compute KPI summaries
 $totalScore = array_sum(array_column($players, 'score'));
 $avgScore   = $totalPlayers > 0 ? round($totalScore / $totalPlayers) : 0;
 
@@ -65,29 +66,29 @@ $totalCorrectCount = array_sum(array_column($players, 'correct_count'));
 $totalPossibleAnswers = $totalPlayers * $totalQuestions;
 $classAccuracy = $totalPossibleAnswers > 0 ? round(($totalCorrectCount / $totalPossibleAnswers) * 100, 1) : 0;
 
-// 5. Thống kê chi tiết từng câu hỏi & tìm câu hỏi khó nhất (Difficult Question)
+// 5. Compute question breakdown & identify most difficult question
 $questionAnalytics = [];
 $mostDifficultQuestion = null;
 $maxIncorrectRate = -1;
 
 $kahootSymbols = [
-    0 => ['symbol' => '▲', 'name' => 'A', 'color' => '#e21b3c', 'class' => 'badge-danger'],
-    1 => ['symbol' => '◆', 'name' => 'B', 'color' => '#1368ce', 'class' => 'badge-primary'],
-    2 => ['symbol' => '●', 'name' => 'C', 'color' => '#d89e00', 'class' => 'badge-warning'],
-    3 => ['symbol' => '■', 'name' => 'D', 'color' => '#26890c', 'class' => 'badge-success']
+    0 => ['symbol' => '▲', 'name' => 'A', 'color' => '#e21b3c'],
+    1 => ['symbol' => '◆', 'name' => 'B', 'color' => '#1368ce'],
+    2 => ['symbol' => '●', 'name' => 'C', 'color' => '#d89e00'],
+    3 => ['symbol' => '■', 'name' => 'D', 'color' => '#26890c']
 ];
 
 foreach ($questions as $qIndex => $q) {
     $qId = intval($q['id_question']);
 
-    // Lấy tất cả đáp án của câu hỏi
+    // Fetch all answers for this question
     $answers = db_fetch_all("
         SELECT * FROM answers 
         WHERE id_question = :qid 
         ORDER BY id_answer ASC
     ", [':qid' => $qId]);
 
-    // Lấy số lượt bình chọn từng đáp án của học sinh phòng này
+    // Fetch student votes for this question in this session
     $votesRows = db_fetch_all("
         SELECT v.id_answer, COUNT(*) as vote_count
         FROM votes v
@@ -109,7 +110,6 @@ foreach ($questions as $qIndex => $q) {
         $voteCnt = $votesMap[$aId] ?? 0;
         $ans['vote_count'] = $voteCnt;
         
-        // Tỷ lệ chọn tính trên số người chơi trong phòng (hoặc số người đã trả lời)
         $denominator = ($totalPlayers > 0) ? $totalPlayers : max(1, $qTotalVotes);
         $ans['vote_percent'] = round(($voteCnt / $denominator) * 100, 1);
 
@@ -117,14 +117,14 @@ foreach ($questions as $qIndex => $q) {
             $qCorrectVotes += $voteCnt;
         }
 
-        $styleMeta = $kahootSymbols[$ansIdx % 4] ?? ['symbol' => '●', 'name' => chr(65 + $ansIdx), 'color' => '#6c757d', 'class' => 'badge-secondary'];
+        $styleMeta = $kahootSymbols[$ansIdx % 4] ?? ['symbol' => '●', 'name' => chr(65 + $ansIdx), 'color' => '#64748b'];
         $ans['symbol'] = $styleMeta['symbol'];
         $ans['label'] = $styleMeta['name'];
         $ans['color'] = $styleMeta['color'];
     }
     unset($ans);
 
-    // Tỷ lệ đúng và sai của cả lớp cho câu hỏi này
+    // Accuracy and incorrect rate
     $denominatorQ = ($totalPlayers > 0) ? $totalPlayers : max(1, $qTotalVotes);
     $qAccuracy = round(($qCorrectVotes / $denominatorQ) * 100, 1);
     $qIncorrectRate = 100 - $qAccuracy;
@@ -140,7 +140,7 @@ foreach ($questions as $qIndex => $q) {
     ];
     $questionAnalytics[] = $itemData;
 
-    // Xác định câu hỏi khó nhất (tỷ lệ trả lời sai cao nhất)
+    // Detect most difficult question
     if ($totalPlayers > 0 && $qIncorrectRate > $maxIncorrectRate) {
         $maxIncorrectRate = $qIncorrectRate;
         $mostDifficultQuestion = [
@@ -154,363 +154,462 @@ foreach ($questions as $qIndex => $q) {
     }
 }
 
-$pageTitle = "Báo cáo ván đấu PIN: " . htmlspecialchars($room['pin']) . " | Reports";
+$pageTitle = "Report PIN: " . htmlspecialchars($room['pin']) . " | Reports";
 require_once __DIR__ . '/../../includes/header.php';
 require_once __DIR__ . '/../../includes/navbar.php';
 ?>
 
-<div class="container my-4">
+<link rel="stylesheet" href="<?= BASE_URL ?>assets/css/reports-analytics.css">
 
-    <!-- Header & Nút Điều Hướng -->
-    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
+<div class="reports-dashboard container my-4" style="max-width: 1140px;">
+
+    <!-- 1. Header & Actions (Linear / Stripe Style) -->
+    <div class="d-flex flex-wrap justify-content-between align-items-end mb-4 pb-2 border-bottom">
         <div>
-            <div class="mb-1">
-                <a href="<?= BASE_URL ?>modules/reports/list.php" class="text-muted font-weight-bold">
-                    <i class="fas fa-arrow-left mr-1"></i> Quay lại danh sách báo cáo
+            <div class="d-flex align-items-center mb-1" style="gap: 8px;">
+                <a href="<?= BASE_URL ?>modules/reports/list.php" class="text-decoration-none" style="font-size: 12px; font-weight: 600; color: #7c3aed;">
+                    <i class="fas fa-arrow-left mr-1"></i> Session Reports
                 </a>
-            </div>
-            <h2 class="font-weight-bold mb-1" style="color: var(--kahoot-purple);">
-                <i class="fas fa-poll-h mr-2"></i>Báo cáo chi tiết: <?= htmlspecialchars($room['quiz_name']) ?>
-            </h2>
-            <div class="d-flex flex-wrap align-items-center text-muted small mt-1">
-                <span class="badge badge-warning text-dark font-weight-bold mr-2 px-2 py-1" style="font-size: 0.95rem;">
+                <span style="color: #cbd5e1; font-size: 11px;">/</span>
+                <span class="saas-badge saas-badge-amber font-mono font-weight-bold" style="font-size: 11px;">
                     PIN: <?= htmlspecialchars($room['pin']) ?>
                 </span>
-                <span class="mr-3">
-                    <i class="far fa-calendar-alt mr-1"></i> Ngày: <?= date('d/m/Y', strtotime($room['roomadd'])) ?>
-                </span>
-                <span class="mr-3">
-                    <i class="far fa-clock mr-1"></i> Giờ: <?= date('H:i', strtotime($room['roomadd'])) ?>
+            </div>
+
+            <h2 class="font-weight-bold mb-1" style="font-size: 24px; color: #0f172a; letter-spacing: -0.02em;">
+                <?= htmlspecialchars($room['quiz_name']) ?>
+            </h2>
+
+            <div class="d-flex flex-wrap align-items-center" style="gap: 14px; font-size: 13px; color: #64748b; margin-top: 4px;">
+                <span>
+                    <i class="far fa-calendar-alt mr-1" style="color: #7c3aed;"></i> Date: <?= date('M d, Y', strtotime($room['roomadd'])) ?>
                 </span>
                 <span>
-                    <i class="fas fa-question-circle mr-1"></i> <?= $totalQuestions ?> câu hỏi
+                    <i class="far fa-clock mr-1" style="color: #3b82f6;"></i> <?= date('h:i A', strtotime($room['roomadd'])) ?>
+                </span>
+                <span>
+                    <i class="far fa-question-circle mr-1" style="color: #10b981;"></i> <?= $totalQuestions ?> <?= $totalQuestions === 1 ? 'question' : 'questions' ?>
                 </span>
             </div>
         </div>
 
-        <div class="mt-3 mt-md-0 d-flex">
-            <a href="<?= BASE_URL ?>modules/reports/export_csv.php?id_room=<?= $roomId ?>" class="btn btn-kahoot btn-kahoot-green mr-2 shadow-sm font-weight-bold">
-                <i class="fas fa-file-excel mr-1"></i> Tải bảng điểm (CSV)
+        <!-- Action dropdown & Quick download -->
+        <div class="mt-3 mt-md-0 d-flex align-items-center" style="gap: 8px;">
+            <a href="<?= BASE_URL ?>modules/reports/export_csv.php?id_room=<?= $roomId ?>" class="saas-btn saas-btn-solid" style="background: linear-gradient(135deg, #059669, #047857); border-color: #047857; box-shadow: 0 2px 4px rgba(5, 150, 105, 0.25);">
+                <i class="fas fa-file-excel mr-1" style="font-size: 12px;"></i>
+                <span>Download CSV</span>
             </a>
-            <button type="button" class="btn btn-outline-secondary shadow-sm font-weight-bold" onclick="window.print();">
-                <i class="fas fa-print mr-1"></i> In báo cáo
-            </button>
-        </div>
-    </div>
 
-    <!-- PHẦN 1: THẺ TÓM TẮT TỔNG QUAN (KPI CARDS) -->
-    <div class="row mb-4">
-        <!-- 1. Tổng số người chơi -->
-        <div class="col-md-3 col-sm-6 mb-3">
-            <div class="card border-0 shadow-sm text-white h-100" style="background: linear-gradient(135deg, #1368ce, #2980b9); border-radius: 12px;">
-                <div class="card-body p-3 d-flex flex-column justify-content-between">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <span class="text-uppercase small font-weight-bold" style="opacity: 0.9;">Tổng số người chơi</span>
-                        <i class="fas fa-users fa-2x" style="opacity: 0.4;"></i>
-                    </div>
-                    <div class="mt-3">
-                        <h2 class="display-4 font-weight-bold mb-0" style="font-size: 2.8rem;"><?= $totalPlayers ?></h2>
-                        <small style="opacity: 0.9;">học sinh tham gia ván đấu</small>
-                    </div>
-                </div>
-            </div>
-        </div>
+            <div class="dropdown saas-action-dropdown">
+                <button class="saas-dropdown-btn" type="button" id="detailMenuBtn" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" style="padding: 6px 12px; font-size: 13px;">
+                    <i class="fas fa-ellipsis-v mr-1" style="font-size: 12px; color: #64748b;"></i>
+                    <span>Options</span>
+                    <i class="fas fa-chevron-down ml-1" style="font-size: 10px; color: #64748b;"></i>
+                </button>
+                <div class="dropdown-menu dropdown-menu-right saas-dropdown-menu shadow" aria-labelledby="detailMenuBtn">
+                    <!-- 1. Download CSV -->
+                    <a class="dropdown-item saas-dropdown-item" href="<?= BASE_URL ?>modules/reports/export_csv.php?id_room=<?= $roomId ?>">
+                        <span class="saas-menu-icon icon-emerald"><i class="fas fa-file-excel"></i></span>
+                        <div>
+                            <div class="font-weight-medium">Download CSV</div>
+                            <small class="text-muted" style="font-size: 11px;">Excel-compatible grade scorecard</small>
+                        </div>
+                    </a>
 
-        <!-- 2. Tỷ lệ trả lời đúng trung bình cả lớp -->
-        <div class="col-md-3 col-sm-6 mb-3">
-            <div class="card border-0 shadow-sm text-white h-100" style="background: linear-gradient(135deg, #26890c, #2ecc71); border-radius: 12px;">
-                <div class="card-body p-3 d-flex flex-column justify-content-between">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <span class="text-uppercase small font-weight-bold" style="opacity: 0.9;">Tỷ lệ đúng của lớp</span>
-                        <i class="fas fa-bullseye fa-2x" style="opacity: 0.4;"></i>
-                    </div>
-                    <div class="mt-3">
-                        <h2 class="display-4 font-weight-bold mb-0" style="font-size: 2.8rem;"><?= $classAccuracy ?>%</h2>
-                        <small style="opacity: 0.9;"><?= $totalCorrectCount ?>/<?= max(1, $totalPossibleAnswers) ?> câu trả lời đúng</small>
-                    </div>
-                </div>
-            </div>
-        </div>
+                    <!-- 2. Print Report -->
+                    <a class="dropdown-item saas-dropdown-item" href="javascript:void(0)" onclick="window.print();">
+                        <span class="saas-menu-icon icon-blue"><i class="fas fa-print"></i></span>
+                        <div>
+                            <div class="font-weight-medium">Print Report</div>
+                            <small class="text-muted" style="font-size: 11px;">Print page or save as clean PDF</small>
+                        </div>
+                    </a>
 
-        <!-- 3. Điểm số trung bình toàn phòng -->
-        <div class="col-md-3 col-sm-6 mb-3">
-            <div class="card border-0 shadow-sm text-white h-100" style="background: linear-gradient(135deg, #46178F, #6a2cc9); border-radius: 12px;">
-                <div class="card-body p-3 d-flex flex-column justify-content-between">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <span class="text-uppercase small font-weight-bold" style="opacity: 0.9;">Điểm số trung bình</span>
-                        <i class="fas fa-star fa-2x" style="opacity: 0.4;"></i>
-                    </div>
-                    <div class="mt-3">
-                        <h2 class="display-4 font-weight-bold mb-0" style="font-size: 2.8rem;"><?= number_format($avgScore) ?></h2>
-                        <small style="opacity: 0.9;">điểm / người chơi</small>
-                    </div>
-                </div>
-            </div>
-        </div>
+                    <div class="dropdown-divider my-1"></div>
 
-        <!-- 4. Câu hỏi khó nhất (Difficult Question) -->
-        <div class="col-md-3 col-sm-6 mb-3">
-            <div class="card border-0 shadow-sm text-white h-100" style="background: linear-gradient(135deg, #e21b3c, #ff4757); border-radius: 12px;">
-                <div class="card-body p-3 d-flex flex-column justify-content-between">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <span class="text-uppercase small font-weight-bold" style="opacity: 0.9;">Câu hỏi khó nhất</span>
-                        <i class="fas fa-exclamation-triangle fa-2x" style="opacity: 0.4;"></i>
-                    </div>
-                    <div class="mt-2">
-                        <?php if ($mostDifficultQuestion && $totalPlayers > 0): ?>
-                            <div class="font-weight-bold" style="font-size: 1.1rem;">
-                                Câu #<?= $mostDifficultQuestion['number'] ?>
-                            </div>
-                            <div class="small mb-1 text-truncate" title="<?= htmlspecialchars($mostDifficultQuestion['text']) ?>">
-                                <?= htmlspecialchars(mb_strimwidth($mostDifficultQuestion['text'], 0, 45, '...')) ?>
-                            </div>
-                            <span class="badge badge-light text-danger font-weight-bold px-2 py-1">
-                                <?= $mostDifficultQuestion['incorrect_rate'] ?>% học sinh làm sai
-                            </span>
-                        <?php else: ?>
-                            <div class="font-weight-bold mt-2" style="font-size: 1.1rem;">Không có câu khó</div>
-                            <small style="opacity: 0.9;">Cả lớp đều làm tốt hoặc chưa có lượt trả lời</small>
-                        <?php endif; ?>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- TABS ĐIỀU HƯỚNG BÁO CÁO -->
-    <ul class="nav nav-tabs nav-fill mb-4 font-weight-bold" id="reportTabs" role="tablist">
-        <li class="nav-item">
-            <a class="nav-link active py-3" id="players-tab" data-toggle="tab" href="#players" role="tab" aria-controls="players" aria-selected="true" style="font-size: 1.05rem;">
-                <i class="fas fa-trophy mr-2 text-warning"></i> Bảng xếp hạng người chơi (Leaderboard)
-                <span class="badge badge-primary badge-pill ml-2"><?= $totalPlayers ?></span>
-            </a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link py-3" id="questions-tab" data-toggle="tab" href="#questions" role="tab" aria-controls="questions" aria-selected="false" style="font-size: 1.05rem;">
-                <i class="fas fa-chart-bar mr-2 text-info"></i> Phân tích từng câu hỏi (Question Analysis)
-                <span class="badge badge-secondary badge-pill ml-2"><?= $totalQuestions ?></span>
-            </a>
-        </li>
-    </ul>
-
-    <div class="tab-content" id="reportTabsContent">
-
-        <!-- PHẦN 2: TAB BẢNG XẾP HẠNG NGƯỜI CHƠI (PLAYERS LEADERBOARD) -->
-        <div class="tab-pane fade show active" id="players" role="tabpanel" aria-labelledby="players-tab">
-            <div class="card border-0 shadow-sm" style="border-radius: 12px; overflow: hidden;">
-                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-                    <h5 class="font-weight-bold mb-0 text-dark">
-                        <i class="fas fa-medal mr-2 text-warning"></i>Kết quả xếp hạng học sinh
-                    </h5>
-                    <a href="<?= BASE_URL ?>modules/reports/export_csv.php?id_room=<?= $roomId ?>" class="btn btn-sm btn-outline-success font-weight-bold">
-                        <i class="fas fa-file-csv mr-1"></i> Xuất file CSV
+                    <!-- 3. Back to Reports -->
+                    <a class="dropdown-item saas-dropdown-item" href="<?= BASE_URL ?>modules/reports/list.php">
+                        <span class="saas-menu-icon icon-purple"><i class="fas fa-arrow-left"></i></span>
+                        <div>
+                            <div class="font-weight-medium">Back to Reports</div>
+                            <small class="text-muted" style="font-size: 11px;">View all game sessions</small>
+                        </div>
                     </a>
                 </div>
+            </div>
+        </div>
+    </div>
 
-                <div class="card-body p-0">
-                    <?php if (empty($players)): ?>
-                        <div class="text-center py-5">
-                            <i class="fas fa-user-slash fa-3x text-muted mb-3" style="opacity: 0.5;"></i>
-                            <h5 class="text-muted font-weight-bold">Ván đấu này không có người chơi nào tham gia!</h5>
-                        </div>
+    <!-- 2. Summary KPI Cards with Vibrant Accent Lines -->
+    <div class="row mb-4">
+        <!-- KPI 1: Total Players -->
+        <div class="col-md-3 col-sm-6 mb-3 mb-md-0">
+            <div class="saas-kpi-card saas-kpi-blue">
+                <div class="saas-kpi-header">
+                    <span class="saas-kpi-label" style="color: #1d4ed8;">Total Players</span>
+                    <div class="saas-kpi-icon icon-blue">
+                        <i class="fas fa-users"></i>
+                    </div>
+                </div>
+                <div class="saas-kpi-value tabular-nums">
+                    <?= $totalPlayers ?>
+                </div>
+                <div class="saas-kpi-footer">
+                    Students participated in this session
+                </div>
+            </div>
+        </div>
+
+        <!-- KPI 2: Class Accuracy Rate -->
+        <div class="col-md-3 col-sm-6 mb-3 mb-md-0">
+            <div class="saas-kpi-card saas-kpi-emerald">
+                <div class="saas-kpi-header">
+                    <span class="saas-kpi-label" style="color: #047857;">Class Accuracy</span>
+                    <div class="saas-kpi-icon icon-emerald">
+                        <i class="fas fa-bullseye"></i>
+                    </div>
+                </div>
+                <div class="saas-kpi-value tabular-nums">
+                    <?= $classAccuracy ?><span style="font-size: 15px; font-weight: 500; color: #64748b;">%</span>
+                </div>
+                <div class="saas-kpi-footer">
+                    <?= $totalCorrectCount ?> / <?= max(1, $totalPossibleAnswers) ?> total correct answers
+                </div>
+            </div>
+        </div>
+
+        <!-- KPI 3: Average Room Score -->
+        <div class="col-md-3 col-sm-6 mb-3 mb-md-0">
+            <div class="saas-kpi-card saas-kpi-purple">
+                <div class="saas-kpi-header">
+                    <span class="saas-kpi-label" style="color: #6d28d9;">Average Score</span>
+                    <div class="saas-kpi-icon icon-purple">
+                        <i class="fas fa-award"></i>
+                    </div>
+                </div>
+                <div class="saas-kpi-value tabular-nums">
+                    <?= number_format($avgScore) ?>
+                    <span style="font-size: 13px; font-weight: 500; color: #64748b;">pts</span>
+                </div>
+                <div class="saas-kpi-footer">
+                    Average points per student
+                </div>
+            </div>
+        </div>
+
+        <!-- KPI 4: Difficult Question -->
+        <div class="col-md-3 col-sm-6 mb-3 mb-md-0">
+            <div class="saas-kpi-card saas-kpi-rose">
+                <div class="saas-kpi-header">
+                    <span class="saas-kpi-label" style="color: #be123c;">Difficult Question</span>
+                    <div class="saas-kpi-icon icon-rose">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                </div>
+                <div class="saas-kpi-value">
+                    <?php if ($mostDifficultQuestion && $totalPlayers > 0): ?>
+                        <span class="tabular-nums" style="color: #e11d48;">Question #<?= $mostDifficultQuestion['number'] ?></span>
                     <?php else: ?>
-                        <div class="table-responsive">
-                            <table class="table table-hover align-middle mb-0">
-                                <thead class="thead-light">
-                                    <tr>
-                                        <th style="width: 70px;" class="text-center">Hạng</th>
-                                        <th>Nickname học sinh</th>
-                                        <th class="text-right" style="width: 170px;">Tổng điểm</th>
-                                        <th class="text-center" style="width: 180px;">Số câu đúng</th>
-                                        <th style="width: 240px;">Tỷ lệ chính xác</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php foreach ($players as $idx => $p): 
-                                        $rank = $idx + 1;
-                                        $correct = intval($p['correct_count']);
-                                        $accuracy = $totalQuestions > 0 ? round(($correct / $totalQuestions) * 100, 1) : 0;
-                                        
-                                        $rankBadgeClass = 'badge-light text-dark';
-                                        $rankIcon = '';
-                                        if ($rank === 1) {
-                                            $rankBadgeClass = 'badge-warning text-dark';
-                                            $rankIcon = '👑 ';
-                                        } elseif ($rank === 2) {
-                                            $rankBadgeClass = 'badge-secondary text-white';
-                                            $rankIcon = '🥈 ';
-                                        } elseif ($rank === 3) {
-                                            $rankBadgeClass = 'badge-danger text-white';
-                                            $rankIcon = '🥉 ';
-                                        }
-
-                                        $progressColor = 'bg-success';
-                                        if ($accuracy < 40) {
-                                            $progressColor = 'bg-danger';
-                                        } elseif ($accuracy < 70) {
-                                            $progressColor = 'bg-warning';
-                                        }
-                                    ?>
-                                        <tr>
-                                            <td class="text-center">
-                                                <span class="badge <?= $rankBadgeClass ?> font-weight-bold" style="font-size: 1.05rem; width: 34px; height: 34px; line-height: 24px; border-radius: 50%;">
-                                                    <?= $rank ?>
-                                                </span>
-                                            </td>
-                                            <td>
-                                                <div class="font-weight-bold text-dark" style="font-size: 1.1rem;">
-                                                    <?= $rankIcon ?><?= htmlspecialchars($p['nickname']) ?>
-                                                </div>
-                                                <small class="text-muted">Đã trả lời <?= intval($p['total_answered']) ?> / <?= $totalQuestions ?> câu</small>
-                                            </td>
-                                            <td class="text-right">
-                                                <span class="font-weight-bold text-success" style="font-size: 1.25rem;">
-                                                    <?= number_format($p['score']) ?>
-                                                </span>
-                                                <small class="text-muted font-weight-bold">pts</small>
-                                            </td>
-                                            <td class="text-center">
-                                                <span class="badge badge-pill badge-primary px-3 py-2 font-weight-bold" style="font-size: 0.95rem;">
-                                                    <?= $correct ?> / <?= $totalQuestions ?> câu
-                                                </span>
-                                            </td>
-                                            <td>
-                                                <div class="d-flex align-items-center">
-                                                    <span class="font-weight-bold mr-2 text-dark" style="width: 45px;"><?= $accuracy ?>%</span>
-                                                    <div class="progress flex-grow-1" style="height: 10px; border-radius: 5px;">
-                                                        <div class="progress-bar <?= $progressColor ?>" role="progressbar" style="width: <?= $accuracy ?>%;" aria-valuenow="<?= $accuracy ?>" aria-valuemin="0" aria-valuemax="100"></div>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </div>
+                        <span style="font-size: 17px; font-weight: 500; color: #64748b;">None</span>
+                    <?php endif; ?>
+                </div>
+                <div class="saas-kpi-footer">
+                    <?php if ($mostDifficultQuestion && $totalPlayers > 0): ?>
+                        <span class="saas-badge saas-badge-rose tabular-nums" style="font-size: 11px; padding: 1px 6px;">
+                            <?= $mostDifficultQuestion['incorrect_rate'] ?>% incorrect
+                        </span>
+                        <span class="text-truncate d-inline-block align-middle ml-1" style="max-width: 110px; font-size: 11.5px; color: #64748b;" title="<?= htmlspecialchars($mostDifficultQuestion['text']) ?>">
+                            <?= htmlspecialchars($mostDifficultQuestion['text']) ?>
+                        </span>
+                    <?php else: ?>
+                        All questions answered proficiently
                     <?php endif; ?>
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- PHẦN 3: TAB PHÂN TÍCH TỪNG CÂU HỎI (QUESTION ANALYSIS) -->
-        <div class="tab-pane fade" id="questions" role="tabpanel" aria-labelledby="questions-tab">
-            <?php if (empty($questionAnalytics)): ?>
-                <div class="card border-0 shadow-sm p-5 text-center" style="border-radius: 12px;">
-                    <i class="fas fa-question-circle fa-3x text-muted mb-3" style="opacity: 0.5;"></i>
-                    <h5 class="text-muted font-weight-bold">Không có câu hỏi nào trong bài trắc nghiệm này!</h5>
+    <!-- 3. Segmented Control Tab Navigation (Linear / shadcn style) -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="saas-tabs-container" role="tablist">
+            <button class="saas-tab-link active" id="tabBtnPlayers" type="button" onclick="switchReportTab('players')">
+                <i class="fas fa-trophy" style="font-size: 12px; color: #f59e0b;"></i>
+                <span>Players Leaderboard</span>
+                <span class="saas-tab-count"><?= $totalPlayers ?></span>
+            </button>
+            <button class="saas-tab-link" id="tabBtnQuestions" type="button" onclick="switchReportTab('questions')">
+                <i class="fas fa-chart-bar" style="font-size: 12px; color: #3b82f6;"></i>
+                <span>Question Analysis</span>
+                <span class="saas-tab-count"><?= $totalQuestions ?></span>
+            </button>
+        </div>
+    </div>
+
+    <!-- 4. TAB 1: PLAYERS LEADERBOARD & PAGINATION -->
+    <div id="tabContentPlayers" class="tab-pane-content">
+        <div class="saas-table-card">
+            <div class="saas-table-header">
+                <h5 class="saas-table-title">
+                    <i class="fas fa-medal" style="color: #f59e0b; font-size: 14px;"></i>
+                    <span>Student Final Standings</span>
+                </h5>
+                <a href="<?= BASE_URL ?>modules/reports/export_csv.php?id_room=<?= $roomId ?>" class="saas-btn saas-btn-outline" style="font-size: 12px; padding: 4px 10px;">
+                    <i class="fas fa-file-excel" style="color: #10b981;"></i>
+                    <span>Export CSV</span>
+                </a>
+            </div>
+
+            <?php if (empty($players)): ?>
+                <div class="text-center py-5 px-3">
+                    <div class="saas-kpi-icon mx-auto mb-3" style="width: 44px; height: 44px; font-size: 18px; background: #eff6ff; color: #3b82f6; border: 1px dashed #bfdbfe;">
+                        <i class="fas fa-user-slash"></i>
+                    </div>
+                    <h6 class="font-weight-bold" style="color: #0f172a; margin-bottom: 4px;">No players recorded</h6>
+                    <p class="text-muted mx-auto" style="max-width: 380px; font-size: 13px;">
+                        No student participants joined or answered questions in this game session.
+                    </p>
                 </div>
             <?php else: ?>
-                <?php foreach ($questionAnalytics as $qa): 
-                    $q = $qa['question'];
-                    $qAcc = $qa['accuracy'];
-                    
-                    $accBadgeColor = 'badge-success';
-                    $progressColor = 'bg-success';
-                    if ($qAcc < 40) {
-                        $accBadgeColor = 'badge-danger';
-                        $progressColor = 'bg-danger';
-                    } elseif ($qAcc < 70) {
-                        $accBadgeColor = 'badge-warning text-dark';
-                        $progressColor = 'bg-warning';
-                    }
-                ?>
-                    <div class="card border-0 shadow-sm mb-4" style="border-radius: 12px; overflow: hidden;">
-                        <!-- Tiêu đề câu hỏi -->
-                        <div class="card-header bg-white py-3 border-bottom">
-                            <div class="d-flex flex-wrap justify-content-between align-items-center">
-                                <div class="pr-2" style="flex: 1 1 auto;">
-                                    <span class="badge badge-dark mr-2 px-2 py-1 font-weight-bold" style="font-size: 0.95rem;">
-                                        Câu #<?= $qa['index'] ?>
-                                    </span>
-                                    <span class="font-weight-bold text-dark" style="font-size: 1.15rem;">
-                                        <?= htmlspecialchars($q['text']) ?>
-                                    </span>
-                                </div>
-                                <div class="mt-2 mt-md-0 d-flex align-items-center">
-                                    <span class="badge badge-light text-muted border mr-2">
-                                        <i class="far fa-clock mr-1"></i><?= $q['time_limit'] ?>s
-                                    </span>
-                                    <span class="badge badge-light text-muted border mr-2">
-                                        <i class="fas fa-award mr-1"></i><?= $q['points'] ?> pts
-                                    </span>
-                                    <span class="badge <?= $accBadgeColor ?> px-3 py-2 font-weight-bold" style="font-size: 0.95rem;">
-                                        Đúng: <?= $qAcc ?>% (<?= $qa['correct_votes'] ?>/<?= max(1, $totalPlayers) ?>)
-                                    </span>
-                                </div>
-                            </div>
+                <div class="table-responsive">
+                    <table class="saas-table table-hover" id="playersTable">
+                        <thead>
+                            <tr>
+                                <th class="text-center" style="width: 70px;">Rank</th>
+                                <th class="text-left">Student Nickname</th>
+                                <th class="text-right" style="width: 150px;">Total Score</th>
+                                <th class="text-right" style="width: 150px;">Correct Answers</th>
+                                <th class="text-left" style="width: 260px;">Accuracy Rate</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($players as $idx => $p): 
+                                $rank = $idx + 1;
+                                $correct = intval($p['correct_count']);
+                                $accuracy = $totalQuestions > 0 ? round(($correct / $totalQuestions) * 100, 1) : 0;
+                                
+                                $rankClass = 'saas-rank-other';
+                                $rankPrefix = '';
+                                if ($rank === 1) {
+                                    $rankClass = 'saas-rank-1';
+                                    $rankPrefix = '<i class="fas fa-crown mr-1" style="color: #ca8a04; font-size: 10px;"></i>';
+                                } elseif ($rank === 2) {
+                                    $rankClass = 'saas-rank-2';
+                                    $rankPrefix = '<i class="fas fa-medal mr-1" style="color: #64748b; font-size: 10px;"></i>';
+                                } elseif ($rank === 3) {
+                                    $rankClass = 'saas-rank-3';
+                                    $rankPrefix = '<i class="fas fa-award mr-1" style="color: #ea580c; font-size: 10px;"></i>';
+                                }
 
-                            <!-- Thanh tỷ lệ đúng của lớp -->
-                            <div class="progress mt-3" style="height: 6px; border-radius: 3px;">
-                                <div class="progress-bar <?= $progressColor ?>" role="progressbar" style="width: <?= $qAcc ?>%;" aria-valuenow="<?= $qAcc ?>" aria-valuemin="0" aria-valuemax="100"></div>
-                            </div>
-                        </div>
-
-                        <!-- Thống kê lựa chọn từng đáp án -->
-                        <div class="card-body p-3">
-                            <div class="row">
-                                <?php foreach ($qa['answers'] as $ans): 
-                                    $isCorrect = ($ans['is_correct'] == 1);
-                                    $cardBorder = $isCorrect ? 'border: 2px solid #26890c; background-color: #f6fff4;' : 'border: 1px solid #e9ecef; background-color: #fafafa;';
-                                ?>
-                                    <div class="col-md-6 mb-3">
-                                        <div class="p-3 h-100 rounded position-relative shadow-2xs" style="<?= $cardBorder ?> border-radius: 8px;">
-                                            <div class="d-flex justify-content-between align-items-start mb-2">
-                                                <div class="d-flex align-items-center">
-                                                    <span class="badge text-white font-weight-bold mr-2" style="background-color: <?= $ans['color'] ?>; font-size: 1rem; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px;">
-                                                        <?= $ans['symbol'] ?>
-                                                    </span>
-                                                    <span class="font-weight-bold text-dark" style="font-size: 1.05rem;">
-                                                        <?= htmlspecialchars($ans['text']) ?>
-                                                    </span>
-                                                </div>
-                                                <?php if ($isCorrect): ?>
-                                                    <span class="badge badge-success px-2 py-1 font-weight-bold text-uppercase" style="font-size: 0.75rem;">
-                                                        <i class="fas fa-check mr-1"></i>Đáp án đúng
-                                                    </span>
-                                                <?php endif; ?>
-                                            </div>
-
-                                            <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top">
-                                                <span class="text-muted small">
-                                                    <b><?= $ans['vote_count'] ?></b> học sinh chọn
-                                                </span>
-                                                <span class="font-weight-bold <?= $isCorrect ? 'text-success' : 'text-dark' ?>" style="font-size: 1.1rem;">
-                                                    <?= $ans['vote_percent'] ?>%
-                                                </span>
-                                            </div>
-
-                                            <div class="progress mt-1" style="height: 6px; border-radius: 3px;">
-                                                <div class="progress-bar" role="progressbar" style="width: <?= $ans['vote_percent'] ?>%; background-color: <?= $ans['color'] ?>;" aria-valuenow="<?= $ans['vote_percent'] ?>" aria-valuemin="0" aria-valuemax="100"></div>
-                                            </div>
+                                $progressClass = 'saas-progress-emerald';
+                                if ($accuracy < 40) {
+                                    $progressClass = 'saas-progress-rose';
+                                } elseif ($accuracy < 70) {
+                                    $progressClass = 'saas-progress-amber';
+                                }
+                            ?>
+                                <tr>
+                                    <td class="text-center">
+                                        <span class="saas-rank-chip <?= $rankClass ?>">
+                                            <?= $rankPrefix ?><?= $rank ?>
+                                        </span>
+                                    </td>
+                                    <td class="text-left">
+                                        <div class="font-weight-medium" style="color: #0f172a; font-size: 14px;">
+                                            <?= htmlspecialchars($p['nickname']) ?>
                                         </div>
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
-                        </div>
-                    </div>
-                <?php endforeach; ?>
+                                        <div style="font-size: 11.5px; color: #94a3b8; margin-top: 1px;">
+                                            Submitted <?= intval($p['total_answered']) ?> / <?= $totalQuestions ?> questions
+                                        </div>
+                                    </td>
+                                    <td class="text-right">
+                                        <span class="saas-numeric font-weight-bold" style="color: #0f172a; font-size: 14px;">
+                                            <?= number_format($p['score']) ?>
+                                        </span>
+                                        <span style="font-size: 11.5px; color: #94a3b8;">pts</span>
+                                    </td>
+                                    <td class="text-right">
+                                        <span class="saas-numeric font-weight-medium" style="color: #1e293b; font-size: 13.5px;">
+                                            <?= $correct ?>
+                                        </span>
+                                        <span style="font-size: 11.5px; color: #64748b;">/ <?= $totalQuestions ?> correct</span>
+                                    </td>
+                                    <td class="text-left">
+                                        <div class="d-flex align-items-center" style="gap: 12px;">
+                                            <div class="saas-progress-track flex-grow-1">
+                                                <div class="saas-progress-bar <?= $progressClass ?>" style="width: <?= $accuracy ?>%;"></div>
+                                            </div>
+                                            <span class="saas-numeric font-weight-bold" style="font-size: 12.5px; color: #334155; width: 44px; text-align: right;">
+                                                <?= $accuracy ?>%
+                                            </span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Integrated Pagination Footer -->
+                <div id="playersPagination" class="saas-pagination-bar"></div>
             <?php endif; ?>
         </div>
-
     </div>
+
+    <!-- 5. TAB 2: QUESTION ANALYSIS -->
+    <div id="tabContentQuestions" class="tab-pane-content" style="display: none;">
+        <?php if (empty($questionAnalytics)): ?>
+            <div class="saas-table-card text-center py-5 px-3">
+                <div class="saas-kpi-icon mx-auto mb-3" style="width: 44px; height: 44px; font-size: 18px; background: #f5f3ff; color: #7c3aed;">
+                    <i class="far fa-question-circle"></i>
+                </div>
+                <h6 class="font-weight-bold" style="color: #0f172a;">No questions found</h6>
+                <p class="text-muted" style="font-size: 13px;">This quiz contains no questions.</p>
+            </div>
+        <?php else: ?>
+            <?php foreach ($questionAnalytics as $qa): 
+                $q = $qa['question'];
+                $qAcc = $qa['accuracy'];
+                
+                $accBadge = 'saas-badge-emerald';
+                $accProgress = 'saas-progress-emerald';
+                if ($qAcc < 40) {
+                    $accBadge = 'saas-badge-rose';
+                    $accProgress = 'saas-progress-rose';
+                } elseif ($qAcc < 70) {
+                    $accBadge = 'saas-badge-amber';
+                    $accProgress = 'saas-progress-amber';
+                }
+            ?>
+                <div class="saas-question-card">
+                    <div class="saas-question-header">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center" style="gap: 10px;">
+                            <div class="d-flex align-items-center" style="gap: 10px; flex: 1 1 500px;">
+                                <span class="saas-badge saas-badge-slate font-mono font-weight-bold" style="font-size: 11px;">
+                                    Question #<?= $qa['index'] ?>
+                                </span>
+                                <h6 class="saas-question-title mb-0">
+                                    <?= htmlspecialchars($q['text']) ?>
+                                </h6>
+                            </div>
+
+                            <div class="d-flex align-items-center" style="gap: 6px;">
+                                <span class="saas-badge saas-badge-slate" style="font-size: 11.5px;">
+                                    <i class="far fa-clock mr-1" style="color: #3b82f6;"></i><?= $q['time_limit'] ?>s
+                                </span>
+                                <span class="saas-badge saas-badge-slate" style="font-size: 11.5px;">
+                                    <i class="fas fa-award mr-1" style="color: #7c3aed;"></i><?= $q['points'] ?> pts
+                                </span>
+                                <span class="saas-badge <?= $accBadge ?> tabular-nums font-weight-bold" style="font-size: 12px;">
+                                    Accuracy: <?= $qAcc ?>% (<?= $qa['correct_votes'] ?>/<?= max(1, $totalPlayers) ?>)
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- 6px Sleek Accuracy Bar -->
+                        <div class="saas-progress-track mt-3">
+                            <div class="saas-progress-bar <?= $accProgress ?>" style="width: <?= $qAcc ?>%;"></div>
+                        </div>
+                    </div>
+
+                    <div class="p-3" style="background-color: #fafbfd;">
+                        <div class="row">
+                            <?php foreach ($qa['answers'] as $ans): 
+                                $isCorrect = ($ans['is_correct'] == 1);
+                            ?>
+                                <div class="col-md-6 mb-3">
+                                    <div class="saas-answer-item <?= $isCorrect ? 'correct' : '' ?>">
+                                        <div class="d-flex justify-content-between align-items-start mb-2" style="gap: 8px;">
+                                            <div class="d-flex align-items-center" style="gap: 8px;">
+                                                <span class="saas-answer-symbol" style="background-color: <?= $ans['color'] ?>;">
+                                                    <?= $ans['symbol'] ?>
+                                                </span>
+                                                <span class="font-weight-medium" style="color: #0f172a; font-size: 13.5px;">
+                                                    <?= htmlspecialchars($ans['text']) ?>
+                                                </span>
+                                            </div>
+                                            <?php if ($isCorrect): ?>
+                                                <span class="saas-badge saas-badge-emerald" style="font-size: 11px; padding: 2px 6px;">
+                                                    <i class="fas fa-check mr-1" style="font-size: 10px;"></i> Correct Answer
+                                                </span>
+                                            <?php endif; ?>
+                                        </div>
+
+                                        <div class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top" style="border-color: #f1f5f9 !important;">
+                                            <span style="font-size: 12px; color: #64748b;">
+                                                <b class="tabular-nums font-weight-semibold" style="color: #1e293b;"><?= $ans['vote_count'] ?></b> <?= $ans['vote_count'] === 1 ? 'student selected' : 'students selected' ?>
+                                            </span>
+                                            <span class="saas-numeric font-weight-bold <?= $isCorrect ? 'text-success' : '' ?>" style="font-size: 13px; color: <?= $isCorrect ? '#047857' : '#0f172a' ?>;">
+                                                <?= $ans['vote_percent'] ?>%
+                                            </span>
+                                        </div>
+
+                                        <div class="saas-progress-track mt-2">
+                                            <div class="saas-progress-bar" style="width: <?= $ans['vote_percent'] ?>%; background-color: <?= $ans['color'] ?>;"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        <?php endif; ?>
+    </div>
+
 </div>
+
+<script src="<?= BASE_URL ?>assets/js/reports-pagination.js"></script>
+<script>
+function switchReportTab(tabName) {
+    const btnPlayers = document.getElementById('tabBtnPlayers');
+    const btnQuestions = document.getElementById('tabBtnQuestions');
+    const panePlayers = document.getElementById('tabContentPlayers');
+    const paneQuestions = document.getElementById('tabContentQuestions');
+
+    if (tabName === 'players') {
+        btnPlayers.classList.add('active');
+        btnQuestions.classList.remove('active');
+        panePlayers.style.display = 'block';
+        paneQuestions.style.display = 'none';
+    } else {
+        btnQuestions.classList.add('active');
+        btnPlayers.classList.remove('active');
+        paneQuestions.style.display = 'block';
+        panePlayers.style.display = 'none';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    if (document.getElementById('playersTable') && document.getElementById('playersPagination')) {
+        new SaasTablePagination({
+            table: '#playersTable',
+            container: '#playersPagination',
+            itemNoun: 'players',
+            pageSize: 10,
+            allowedPageSizes: [10, 25, 50]
+        });
+    }
+});
+</script>
 
 <style>
 @media print {
     .navbar-kahoot,
-    .btn,
-    .nav-tabs,
+    .saas-btn,
+    .saas-tabs-container,
+    .saas-pagination-bar,
+    .saas-action-dropdown,
     .alert {
         display: none !important;
     }
-    .tab-content > .tab-pane {
+    .tab-pane-content {
         display: block !important;
-        opacity: 1 !important;
-        visibility: visible !important;
     }
-    .card {
+    .saas-kpi-card,
+    .saas-table-card,
+    .saas-question-card {
         box-shadow: none !important;
-        border: 1px solid #ddd !important;
+        border: 1px solid #cbd5e1 !important;
         page-break-inside: avoid;
     }
 }
