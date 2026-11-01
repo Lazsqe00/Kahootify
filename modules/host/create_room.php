@@ -6,7 +6,7 @@ require_once __DIR__ . '/../../config/database.php';
 $creatorId = intval($_SESSION['id_creator']);
 $quizId    = intval($_GET['id_quiz'] ?? 0);
 
-$quiz = db_fetch_one("SELECT id_quiz FROM quiz WHERE id_quiz = :q AND id_creator = :c", [':q' => $quizId, ':c' => $creatorId]);
+$quiz = db_fetch_one("SELECT id_quiz, game_type FROM quiz WHERE id_quiz = :q AND id_creator = :c", [':q' => $quizId, ':c' => $creatorId]);
 if (!$quiz) {
     set_flash_message('danger', 'Quiz not found or access denied.');
     redirect('modules/quiz/list.php');
@@ -19,6 +19,8 @@ if (empty($questions)) {
     redirect('modules/quiz/edit.php?id=' . $quizId);
 }
 
+$gameType = $quiz['game_type'] ?? 'classic';
+
 do {
     $pin = sprintf("%06d", mt_rand(100000, 999999));
     $existing = db_fetch_one("SELECT id_room FROM room WHERE pin = :pin AND status != 'finished'", [':pin' => $pin]);
@@ -27,11 +29,12 @@ do {
 db_execute("UPDATE room SET status = 'finished' WHERE id_creator = :c AND status != 'finished'", [':c' => $creatorId]);
 
 $roomId = db_insert(
-    "INSERT INTO room (id_quiz, id_creator, pin, status) VALUES (:q, :c, :pin, 'waiting')",
+    "INSERT INTO room (id_quiz, id_creator, pin, status, game_type, opened_pieces, buzzer_status) VALUES (:q, :c, :pin, 'waiting', :gt, '[]', 'idle')",
     [
         ':q'   => $quizId,
         ':c'   => $creatorId,
-        ':pin' => $pin
+        ':pin' => $pin,
+        ':gt'  => $gameType
     ]
 );
 

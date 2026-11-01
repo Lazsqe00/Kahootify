@@ -14,6 +14,16 @@ if (!$room) {
 
 $status = $room['status'];
 
+if (isset($_GET['action']) && $_GET['action'] === 'return_to_board') {
+    db_execute("UPDATE room SET status = 'board', buzzer_status = 'idle', buzzer_player_id = NULL, buzzer_time = NULL WHERE id_room = :r", [':r' => $roomId]);
+    redirect('modules/host/play.php');
+}
+
+if (($room['game_type'] ?? 'classic') === 'obstacle' && $status === 'board') {
+    require __DIR__ . '/../../includes/host_obstacle_board.php';
+    exit;
+}
+
 if ($status === 'waiting') {
     redirect('modules/host/lobby.php');
 }
@@ -171,9 +181,18 @@ require_once __DIR__ . '/../../includes/header.php';
             </button>
         <?php endif; ?>
 
-        <a href="play.php?action=show_result" onclick="stopQuestionAudio()" class="btn btn-outline-light font-weight-bold">
-            Skip to Leaderboard &raquo;
-        </a>
+        <?php if (($room['game_type'] ?? 'classic') === 'obstacle'): ?>
+            <a href="play.php?action=show_result" onclick="stopQuestionAudio()" class="btn btn-warning font-weight-bold mr-2">
+                <i class="fas fa-chart-bar mr-1"></i> Xem Kết Quả &raquo;
+            </a>
+            <a href="play.php?action=return_to_board" onclick="stopQuestionAudio()" class="btn btn-outline-light font-weight-bold">
+                <i class="fas fa-th mr-1"></i> Về Bảng Ghép
+            </a>
+        <?php else: ?>
+            <a href="play.php?action=show_result" onclick="stopQuestionAudio()" class="btn btn-outline-light font-weight-bold">
+                Skip to Leaderboard &raquo;
+            </a>
+        <?php endif; ?>
     </div>
 </nav>
 
@@ -333,6 +352,8 @@ $(document).ready(function() {
 let remaining = <?= $remainingSeconds ?>;
 const roomId = <?= $roomId ?>;
 const qId = <?= $qId ?>;
+const isObstacleGame = <?= ($room['game_type'] ?? 'classic') === 'obstacle' ? 'true' : 'false' ?>;
+const finishQuestionUrl = 'play.php?action=show_result';
 
 // Countdown timer: when time runs out, auto-transition immediately to leaderboard
 const timerInterval = setInterval(function() {
@@ -343,7 +364,7 @@ const timerInterval = setInterval(function() {
         stopQuestionAudio();
         $('#timerSeconds').text('0');
 
-        window.location.href = 'play.php?action=show_result';
+        window.location.href = finishQuestionUrl;
     } else {
         $('#timerSeconds').text(remaining);
         if (remaining <= 5) {
@@ -359,11 +380,19 @@ const pollInterval = setInterval(function() {
             $('#voteCount').text(data.voted_count);
             $('#totalPlayerCount').text(data.total_players);
 
-            if (data.total_players > 0 && data.voted_count >= data.total_players) {
+            if (data.status === 'finished') {
                 clearInterval(pollInterval);
                 clearInterval(timerInterval);
                 stopQuestionAudio();
-                window.location.href = 'play.php?action=show_result';
+                window.location.href = 'leaderboard.php?final=true';
+                return;
+            }
+
+            if ((data.total_players > 0 && data.voted_count >= data.total_players) || (data.status && data.status.startsWith('res_'))) {
+                clearInterval(pollInterval);
+                clearInterval(timerInterval);
+                stopQuestionAudio();
+                window.location.href = finishQuestionUrl;
             }
         }
     });

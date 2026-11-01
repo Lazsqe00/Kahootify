@@ -43,6 +43,18 @@ if (isset($_GET['start_game'])) {
     if ($totalQuizQuestions > 0) {
         $allQIds = array_column($questions, 'id_question');
 
+        if (($room['game_type'] ?? 'classic') === 'obstacle') {
+            db_execute(
+                "UPDATE room SET status = 'board', question_order = :qo, opened_pieces = '[]', buzzer_status = 'idle', buzzer_player_id = NULL, buzzer_time = NULL WHERE id_room = :r",
+                [
+                    ':qo' => json_encode(array_values($allQIds)),
+                    ':r'  => $roomId
+                ]
+            );
+            $_SESSION['question_index'] = 0;
+            redirect('modules/host/play.php');
+        }
+
         if (isset($_GET['show_questions'])) {
             $showQ = intval($_GET['show_questions']) ? 1 : 0;
             db_execute("UPDATE room SET show_questions_on_players = :sq WHERE id_room = :r", [

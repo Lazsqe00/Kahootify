@@ -34,6 +34,11 @@ if ($status === 'waiting') {
     redirect('modules/player/waiting.php?pid=' . $playerId . '&token=' . urlencode($token));
 }
 
+if (($room['game_type'] ?? 'classic') === 'obstacle' && $status === 'board') {
+    require __DIR__ . '/../../includes/player_obstacle_board.php';
+    exit;
+}
+
 if ($status === 'finished') {
     $leaderboard = get_room_leaderboard($roomId);
     $resultsPlayerId = $playerId;
@@ -57,6 +62,8 @@ $elapsed = max(0, time() - $startTime);
 $remainingSeconds = max(0, $timeLimit - $elapsed);
 
 $showOnDevice = !empty($room['show_questions_on_players']);
+$isObstacleMode = (($room['game_type'] ?? 'classic') === 'obstacle');
+$isDisqualified = ($isObstacleMode && !empty($player['is_disqualified_obstacle']));
 
 $hasQuestionImage = false;
 $questionImageUrl = '';
@@ -135,6 +142,16 @@ require_once __DIR__ . '/../../includes/header.php';
         <span class="badge badge-light text-dark font-weight-bold ml-2 px-2 py-1 shadow-sm" style="font-size: 0.85rem;">
             Question <?= $questionNumber ?> / <?= $totalQuestions ?>
         </span>
+        <?php if ($isObstacleMode && !empty($currentQuestion['piece_index'])): ?>
+            <span class="badge badge-warning text-dark font-weight-bold ml-2 px-2 py-1 shadow-sm" style="font-size: 0.85rem;">
+                <i class="fas fa-puzzle-piece mr-1"></i> Mảnh <?= intval($currentQuestion['piece_index']) ?>
+            </span>
+        <?php endif; ?>
+        <?php if ($isDisqualified): ?>
+            <span class="badge badge-danger text-white font-weight-bold ml-2 px-2 py-1 shadow-sm" style="font-size: 0.85rem;">
+                <i class="fas fa-ban mr-1"></i> ĐÃ BỊ HỦY TƯ CÁCH THI ĐẤU
+            </span>
+        <?php endif; ?>
     </div>
     <div class="d-flex align-items-center" style="gap: 10px;">
         <div class="font-weight-bold badge badge-light text-dark px-3 py-2" style="font-size: 0.95rem;">
@@ -191,49 +208,80 @@ require_once __DIR__ . '/../../includes/header.php';
 
     <div class="container py-3" style="max-width: 650px;">
 
-        <div class="card border-0 shadow text-white text-center mb-3"
-             style="background: <?= $isCorrect ? 'linear-gradient(135deg, #26890c, #1a6207)' : 'linear-gradient(135deg, #e21b3c, #9c1228)' ?>; border-radius: 16px;">
-            <div class="card-body py-3 px-4">
-                <div class="d-flex align-items-center justify-content-center" style="gap: 15px;">
-                    <div style="font-size: 3rem; line-height: 1;">
-                        <?= $isCorrect ? '🎉' : '❌' ?>
-                    </div>
-                    <div class="text-left">
-                        <h3 class="font-weight-bold mb-0">
-                            <?= $isCorrect ? 'Correct!' : 'Incorrect!' ?>
-                        </h3>
-                        <?php if ($isCorrect): ?>
-                            <?php if ($streakBonus > 0): ?>
-                                <p class="mb-0 font-weight-bold" style="font-size: 1.25rem; color: #fff;">
-                                    +<?= number_format($pointsEarned) ?> + <?= number_format($streakBonus) ?> Streak Bonus
-                                </p>
-                            <?php else: ?>
-                                <p class="mb-0 font-weight-bold" style="font-size: 1.15rem; color: #fff;">
-                                    +<?= number_format($pointsEarned) ?> pts
-                                </p>
-                            <?php endif; ?>
-                        <?php else: ?>
-                            <p class="mb-0 font-weight-bold" style="font-size: 1.15rem; color: #fff;">
-                                +0 pts
+        <?php if ($isDisqualified): ?>
+            <div class="card border-0 shadow text-white text-center mb-3"
+                 style="background: linear-gradient(135deg, #495057, #343a40); border-radius: 16px;">
+                <div class="card-body py-3 px-4">
+                    <div class="d-flex align-items-center justify-content-center" style="gap: 15px;">
+                        <div style="font-size: 3rem; line-height: 1;">🚫</div>
+                        <div class="text-left">
+                            <h3 class="font-weight-bold mb-0">Đã bị hủy tư cách thi đấu</h3>
+                            <p class="mb-0 font-weight-bold" style="font-size: 1rem; color: #ced4da;">
+                                Bạn không tham gia trả lời câu hỏi ở vòng này
                             </p>
-                            <?php if ($streakLost): ?>
-                                <div class="text-danger font-weight-bold small mt-1 bg-white px-2 py-1 rounded d-inline-block shadow-sm">
-                                    <i class="fas fa-heart-broken mr-1"></i> Answer streak lost!
-                                </div>
-                            <?php endif; ?>
-                        <?php endif; ?>
-                    </div>
-                </div>
-
-                <?php if ($isCorrect && $currentStreak >= 2): ?>
-                    <div class="mt-3">
-                        <div class="badge badge-warning text-dark font-weight-bold px-3 py-2 shadow-sm" style="font-size: 0.95rem;">
-                            <i class="fas fa-fire text-danger mr-1 streak-fire-anim"></i> Answer Streak: <?= $currentStreak ?> 🔥
                         </div>
                     </div>
-                <?php endif; ?>
+                </div>
             </div>
-        </div>
+        <?php else: ?>
+            <div class="card border-0 shadow text-white text-center mb-3"
+                 style="background: <?= $isCorrect ? 'linear-gradient(135deg, #26890c, #1a6207)' : 'linear-gradient(135deg, #e21b3c, #9c1228)' ?>; border-radius: 16px;">
+                <div class="card-body py-3 px-4">
+                    <div class="d-flex align-items-center justify-content-center" style="gap: 15px;">
+                        <div style="font-size: 3rem; line-height: 1;">
+                            <?= $isCorrect ? '🎉' : '❌' ?>
+                        </div>
+                        <div class="text-left">
+                            <h3 class="font-weight-bold mb-0">
+                                <?= $isCorrect ? 'Correct!' : 'Incorrect!' ?>
+                            </h3>
+                            <?php if ($isCorrect): ?>
+                                <?php if ($streakBonus > 0): ?>
+                                    <p class="mb-0 font-weight-bold" style="font-size: 1.25rem; color: #fff;">
+                                        +<?= number_format($pointsEarned) ?> + <?= number_format($streakBonus) ?> Streak Bonus
+                                    </p>
+                                <?php else: ?>
+                                    <p class="mb-0 font-weight-bold" style="font-size: 1.15rem; color: #fff;">
+                                        +<?= number_format($pointsEarned) ?> pts
+                                    </p>
+                                <?php endif; ?>
+                            <?php else: ?>
+                                <p class="mb-0 font-weight-bold" style="font-size: 1.15rem; color: #fff;">
+                                    +0 pts
+                                </p>
+                                <?php if ($streakLost): ?>
+                                    <div class="text-danger font-weight-bold small mt-1 bg-white px-2 py-1 rounded d-inline-block shadow-sm">
+                                        <i class="fas fa-heart-broken mr-1"></i> Answer streak lost!
+                                    </div>
+                                <?php endif; ?>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+
+                    <?php if ($isCorrect && $currentStreak >= 2): ?>
+                        <div class="mt-3">
+                            <div class="badge badge-warning text-dark font-weight-bold px-3 py-2 shadow-sm" style="font-size: 0.95rem;">
+                                <i class="fas fa-fire text-danger mr-1 streak-fire-anim"></i> Answer Streak: <?= $currentStreak ?> 🔥
+                            </div>
+                        </div>
+                    <?php endif; ?>
+
+                    <?php if (($room['game_type'] ?? 'classic') === 'obstacle' && !empty($currentQuestion['piece_index'])): ?>
+                        <div class="mt-3">
+                            <?php if ($isCorrect): ?>
+                                <div class="badge badge-warning text-dark font-weight-bold px-3 py-2 shadow-sm" style="font-size: 0.95rem;">
+                                    <i class="fas fa-unlock mr-1"></i> Mảnh ghép số <?= intval($currentQuestion['piece_index']) ?> trên bức tranh đã được mở khóa!
+                                </div>
+                            <?php else: ?>
+                                <div class="badge badge-secondary text-white font-weight-bold px-3 py-2 shadow-sm" style="font-size: 0.95rem;">
+                                    <i class="fas fa-lock mr-1"></i> Mảnh ghép số <?= intval($currentQuestion['piece_index']) ?> tiếp tục bị che kín!
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        <?php endif; ?>
 
         <div class="card border-0 shadow-sm mb-3 text-center" style="border-radius: 14px; background: #ffffff;">
             <div class="card-body py-2 px-3">
@@ -392,21 +440,36 @@ require_once __DIR__ . '/../../includes/header.php';
 
 <?php else: ?>
 
+    <?php if ($isDisqualified): ?>
+        <div class="container my-3" style="max-width: 850px;">
+            <div class="alert alert-danger text-center shadow-lg p-4" style="border-radius: 16px; border: 2px solid #dc3545; background-color: #fff5f5; color: #721c24;">
+                <div style="font-size: 2.5rem; color: #c0392b;" class="mb-2"><i class="fas fa-ban"></i></div>
+                <h4 class="font-weight-bold mb-2">BẠN ĐÃ BỊ HỦY TƯ CÁCH THI ĐẤU!</h4>
+                <p class="mb-0 font-weight-500" style="font-size: 1.05rem;">
+                    Do bạn đã bấm chuông và đoán sai từ khóa chướng ngại vật, bạn đã bị hủy tư cách chơi ở tất cả các vòng tiếp theo.
+                </p>
+                <div class="text-muted small mt-2">
+                    Bạn vẫn có thể tiếp tục quan sát trận đấu cho đến khi tìm ra Quán quân.
+                </div>
+            </div>
+        </div>
+    <?php endif; ?>
+
     <?php if (!$showOnDevice): ?>
-        <div class="player-buttons-grid">
-            <div class="player-btn red" onclick="submitAnswer(<?= $answers[0]['id_answer'] ?? 0 ?>)">
+        <div class="player-buttons-grid" <?= $isDisqualified ? 'style="pointer-events: none; opacity: 0.35; filter: grayscale(80%); cursor: not-allowed;"' : '' ?>>
+            <div class="player-btn red" onclick="<?= $isDisqualified ? 'return false;' : 'submitAnswer(' . ($answers[0]['id_answer'] ?? 0) . ')' ?>">
                 <span class="text-white">🔺</span>
             </div>
 
-            <div class="player-btn blue" onclick="submitAnswer(<?= $answers[1]['id_answer'] ?? 0 ?>)">
+            <div class="player-btn blue" onclick="<?= $isDisqualified ? 'return false;' : 'submitAnswer(' . ($answers[1]['id_answer'] ?? 0) . ')' ?>">
                 <span class="text-white">🔷</span>
             </div>
 
-            <div class="player-btn yellow" onclick="submitAnswer(<?= $answers[2]['id_answer'] ?? 0 ?>)">
+            <div class="player-btn yellow" onclick="<?= $isDisqualified ? 'return false;' : 'submitAnswer(' . ($answers[2]['id_answer'] ?? 0) . ')' ?>">
                 <span class="text-white">🟡</span>
             </div>
 
-            <div class="player-btn green" onclick="submitAnswer(<?= $answers[3]['id_answer'] ?? 0 ?>)">
+            <div class="player-btn green" onclick="<?= $isDisqualified ? 'return false;' : 'submitAnswer(' . ($answers[3]['id_answer'] ?? 0) . ')' ?>">
                 <span class="text-white">🟩</span>
             </div>
         </div>
@@ -435,9 +498,15 @@ require_once __DIR__ . '/../../includes/header.php';
                 </div>
 
                 <div class="text-right">
-                    <span class="badge badge-light px-4 py-2 font-weight-bold text-dark shadow-sm" style="font-size: 1.1rem; border-radius: 50px;">
-                        <i class="fas fa-hand-pointer text-primary mr-1"></i> Chọn 1 đáp án
-                    </span>
+                    <?php if ($isDisqualified): ?>
+                        <span class="badge badge-danger px-4 py-2 font-weight-bold shadow-sm" style="font-size: 1.1rem; border-radius: 50px;">
+                            <i class="fas fa-ban mr-1"></i> Bị hủy tư cách
+                        </span>
+                    <?php else: ?>
+                        <span class="badge badge-light px-4 py-2 font-weight-bold text-dark shadow-sm" style="font-size: 1.1rem; border-radius: 50px;">
+                            <i class="fas fa-hand-pointer text-primary mr-1"></i> Chọn 1 đáp án
+                        </span>
+                    <?php endif; ?>
                 </div>
             </div>
 
@@ -465,7 +534,7 @@ require_once __DIR__ . '/../../includes/header.php';
                 ?>
                     <div class="col-md-6 mb-3">
                         <div class="answer-box shadow-sm d-flex justify-content-between align-items-center <?= $colorClasses[$cIdx] ?>"
-                             onclick="submitAnswer(<?= $ansId ?>)">
+                             <?= $isDisqualified ? 'style="pointer-events: none; opacity: 0.35; filter: grayscale(80%); cursor: not-allowed;"' : ('onclick="submitAnswer(' . $ansId . ')"') ?>>
                             <div class="d-flex align-items-center flex-grow-1 mr-2">
                                 <span class="symbol mr-3" style="font-size: 2rem;"><?= $icons[$cIdx] ?></span>
                                 <?php if ($ansImgUrl): ?>
@@ -482,6 +551,20 @@ require_once __DIR__ . '/../../includes/header.php';
         </div>
     <?php endif; ?>
 
+    <?php if ($isObstacleMode): ?>
+        <div class="text-center my-4">
+            <?php if ($isDisqualified): ?>
+                <button type="button" class="btn btn-secondary font-weight-bold shadow-sm rounded-pill px-4 py-2" disabled>
+                    <i class="fas fa-ban mr-1"></i> BẠN ĐÃ BỊ HỦY TƯ CÁCH THI ĐẤU
+                </button>
+            <?php else: ?>
+                <button type="button" class="btn btn-danger font-weight-bold shadow rounded-pill px-4 py-3" style="font-size: 1.2rem;" onclick="claimBuzzerFromQuestion()">
+                    <i class="fas fa-bell mr-2"></i> 🔔 ĐOÁN BỨC TRANH
+                </button>
+            <?php endif; ?>
+        </div>
+    <?php endif; ?>
+
 <?php endif; ?>
 
 <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
@@ -490,6 +573,7 @@ const roomId = <?= $roomId ?>;
 const playerId = <?= $playerId ?>;
 const playerToken = '<?= htmlspecialchars($token) ?>';
 const currentStatus = '<?= $status ?>';
+const isDisqualified = <?= $isDisqualified ? 'true' : 'false' ?>;
 
 sessionStorage.setItem('kahoot_pid', playerId);
 sessionStorage.setItem('kahoot_token', playerToken);
@@ -498,8 +582,46 @@ function refreshPlayerPage() {
     window.location.href = 'play.php?pid=' + playerId + '&token=' + encodeURIComponent(playerToken);
 }
 
+function claimBuzzerFromQuestion() {
+    if (isDisqualified) {
+        alert('Bạn đã bị hủy tư cách thi đấu!');
+        return;
+    }
+    $.post('<?= BASE_URL ?>modules/api/obstacle_action.php?action=buzz&id_room=' + roomId, {
+        id_player: playerId,
+        token: playerToken
+    }, function(res) {
+        if (res && res.success && res.your_turn) {
+            var guess = prompt('🔔 LƯỢT ĐOÁN CỦA BẠN (20 giây):\nNhập từ khóa bức tranh bí mật:');
+            if (guess && guess.trim()) {
+                $.post('<?= BASE_URL ?>modules/api/obstacle_action.php?action=submit_guess&id_room=' + roomId, {
+                    id_player: playerId,
+                    token: playerToken,
+                    guess: guess.trim()
+                }, function(res2) {
+                    if (res2 && res2.success && res2.correct) {
+                        alert('🏆 CHÍNH XÁC! Bạn đã đoán đúng từ khóa và trở thành Quán quân!');
+                    } else if (res2 && res2.all_disqualified) {
+                        alert('Tất cả người chơi đều đã đoán sai từ khóa! Trò chơi kết thúc, chuyển đến Bảng xếp hạng trao giải.');
+                    } else {
+                        alert(res2.message || 'Đáp án chưa chính xác!');
+                    }
+                    refreshPlayerPage();
+                }, 'json');
+            } else {
+                $.post('<?= BASE_URL ?>modules/api/obstacle_action.php?action=buzzer_timeout&id_room=' + roomId);
+                refreshPlayerPage();
+            }
+        } else {
+            alert(res.message || 'Không thể bấm chuông lúc này');
+        }
+    }, 'json').fail(function() {
+        alert('Lỗi kết nối máy chủ');
+    });
+}
+
 function submitAnswer(answerId) {
-    if (!answerId) return;
+    if (!answerId || isDisqualified) return;
 
     // Phát âm thanh submit tension ngay khi chạm/click vào đáp án
     const submitAudio = document.getElementById('submitSfx');

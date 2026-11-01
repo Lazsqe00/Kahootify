@@ -64,9 +64,21 @@ function filter_room_players($roomId, $players, $state = null) {
 
 function room_question_counts($room, $questionId, $state = null) {
     $roomId = is_array($room) ? (int)($room['id_room'] ?? 0) : (int)$room;
-    $players = filter_room_players($roomId, db_fetch_all(
-        'SELECT id_player FROM players WHERE id_room = :r', [':r' => $roomId]
-    ), $state);
+    $gameType = 'classic';
+    if (is_array($room) && !empty($room['game_type'])) {
+        $gameType = $room['game_type'];
+    } elseif ($roomId > 0) {
+        $r = db_fetch_one('SELECT game_type FROM room WHERE id_room = :r', [':r' => $roomId]);
+        $gameType = $r['game_type'] ?? 'classic';
+    }
+    $isObstacle = ($gameType === 'obstacle');
+
+    $sql = 'SELECT id_player FROM players WHERE id_room = :r';
+    if ($isObstacle) {
+        $sql .= ' AND is_disqualified_obstacle = 0';
+    }
+
+    $players = filter_room_players($roomId, db_fetch_all($sql, [':r' => $roomId]), $state);
     $answered = db_fetch_all(
         'SELECT DISTINCT v.id_player FROM votes v JOIN answers a ON a.id_answer = v.id_answer JOIN players p ON p.id_player = v.id_player WHERE p.id_room = :r AND a.id_question = :q AND p.is_kicked = 0',
         [':r' => $roomId, ':q' => $questionId]

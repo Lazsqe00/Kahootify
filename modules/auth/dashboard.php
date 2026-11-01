@@ -166,6 +166,11 @@ $quizzes = db_fetch_all(
                                     <td>
                                         <div class="font-weight-bold text-dark" style="font-size: 1.05rem;">
                                             <?= htmlspecialchars($q['name']) ?>
+                                            <?php if (($q['game_type'] ?? 'classic') === 'obstacle'): ?>
+                                                <span class="badge badge-warning text-dark font-weight-bold ml-1">
+                                                    <i class="fas fa-puzzle-piece mr-1"></i> Obstacle (<?= intval($q['total_pieces']) ?>)
+                                                </span>
+                                            <?php endif; ?>
                                         </div>
                                         <?php if (!empty($q['description'])): ?>
                                             <small class="text-muted"><?= htmlspecialchars(mb_strimwidth($q['description'], 0, 70, '...')) ?></small>

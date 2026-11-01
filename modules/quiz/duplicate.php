@@ -19,11 +19,15 @@ if ($quizId > 0) {
         }
 
         $newQuizId = db_insert(
-            "INSERT INTO quiz (id_creator, name, description) VALUES (:c, :n, :d)",
+            "INSERT INTO quiz (id_creator, name, description, game_type, obstacle_image, obstacle_answer, total_pieces) VALUES (:c, :n, :d, :gt, :img, :ans, :tp)",
             [
-                ':c' => $creatorId,
-                ':n' => $newName,
-                ':d' => $srcQuiz['description']
+                ':c'   => $creatorId,
+                ':n'   => $newName,
+                ':d'   => $srcQuiz['description'],
+                ':gt'  => $srcQuiz['game_type'] ?? 'classic',
+                ':img' => $srcQuiz['obstacle_image'] ?? null,
+                ':ans' => $srcQuiz['obstacle_answer'] ?? null,
+                ':tp'  => $srcQuiz['total_pieces'] ?? 4
             ]
         );
 
@@ -35,7 +39,7 @@ if ($quizId > 0) {
 
             foreach ($questions as $q) {
                 $newQId = db_insert(
-                    "INSERT INTO questions (id_quiz, text, points, time_limit, image, question_type, media_type, sort_order) VALUES (:qz, :t, :p, :tl, :img, :qt, :mt, :so)",
+                    "INSERT INTO questions (id_quiz, text, points, time_limit, image, question_type, media_type, sort_order, piece_index) VALUES (:qz, :t, :p, :tl, :img, :qt, :mt, :so, :pi)",
                     [
                         ':qz'  => $newQuizId,
                         ':t'   => $q['text'],
@@ -44,7 +48,8 @@ if ($quizId > 0) {
                         ':img' => $q['image'],
                         ':qt'  => $q['question_type'] ?? 'multiple_choice',
                         ':mt'  => $q['media_type'] ?? null,
-                        ':so'  => $q['sort_order'] ?? 0
+                        ':so'  => $q['sort_order'] ?? 0,
+                        ':pi'  => $q['piece_index'] ?? 0
                     ]
                 );
 

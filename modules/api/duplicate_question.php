@@ -32,8 +32,8 @@ $qType  = $srcQ['question_type'] ?? 'multiple_choice';
 $mType  = $srcQ['media_type']    ?? null;
 
 $newQId = db_insert(
-    "INSERT INTO questions (id_quiz, text, points, time_limit, image, question_type, media_type, sort_order) VALUES (:qz,:t,:p,:tl,:img,:qt,:mt,:so)",
-    [':qz'=>$quizId,':t'=>$srcQ['text'],':p'=>$srcQ['points'],':tl'=>$srcQ['time_limit'],':img'=>$srcQ['image'],':qt'=>$qType,':mt'=>$mType,':so'=>$newSo]
+    "INSERT INTO questions (id_quiz, text, points, time_limit, image, question_type, media_type, sort_order, piece_index) VALUES (:qz,:t,:p,:tl,:img,:qt,:mt,:so,:pi)",
+    [':qz'=>$quizId,':t'=>$srcQ['text'],':p'=>$srcQ['points'],':tl'=>$srcQ['time_limit'],':img'=>$srcQ['image'],':qt'=>$qType,':mt'=>$mType,':so'=>$newSo,':pi'=>($srcQ['piece_index'] ?? 0)]
 );
 
 $srcAnswers = db_fetch_all("SELECT * FROM answers WHERE id_question = :q ORDER BY id_answer ASC", [':q' => $questionId]);

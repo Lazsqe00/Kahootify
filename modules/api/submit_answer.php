@@ -22,15 +22,19 @@ if (!player_request_is_valid($playerId, $roomId, $data['token'] ?? '')) {
     echo json_encode(['success' => false, 'message' => 'Invalid player session']);
     exit;
 }
-$room = db_fetch_one('SELECT id_room, pin FROM room WHERE id_room = :r', [':r' => $roomId]);
+$room = db_fetch_one('SELECT id_room, pin, game_type FROM room WHERE id_room = :r', [':r' => $roomId]);
 if (!$room) {
     echo json_encode(['success' => false, 'message' => 'Room does not exist']);
     exit;
 }
 
-$playerCheck = db_fetch_one("SELECT id_player, current_streak FROM players WHERE id_player = :p AND id_room = :r", [':p' => $playerId, ':r' => $roomId]);
+$playerCheck = db_fetch_one("SELECT id_player, current_streak, is_disqualified_obstacle FROM players WHERE id_player = :p AND id_room = :r", [':p' => $playerId, ':r' => $roomId]);
 if (!$playerCheck) {
     echo json_encode(['success' => false, 'message' => 'Player not found in this room']);
+    exit;
+}
+if (!empty($playerCheck['is_disqualified_obstacle']) && ($room['game_type'] ?? 'classic') === 'obstacle') {
+    echo json_encode(['success' => false, 'disqualified' => true, 'message' => 'Bạn đã bị hủy tư cách thi đấu do đoán sai từ khóa chướng ngại vật!']);
     exit;
 }
 $currentStreak = intval($playerCheck['current_streak'] ?? 0);
@@ -44,7 +48,7 @@ try {
         }
 
         $ans = db_fetch_one(
-            "SELECT a.*, q.points, q.time_limit, r.question_start_time, r.status
+            "SELECT a.*, q.points, q.time_limit, q.piece_index, r.question_start_time, r.status, r.game_type
              FROM answers a
              JOIN questions q ON a.id_question = q.id_question
              JOIN room r ON r.id_room = :r
@@ -112,6 +116,26 @@ try {
                 "UPDATE players SET score = score + :totalPts, answers_correct = answers_correct + 1, current_streak = :newStreak WHERE id_player = :p",
                 [':totalPts' => $totalPts, ':newStreak' => $newStreak, ':p' => $playerId]
             );
+
+            // Obstacle puzzle: unlock piece for this player
+            $unlockedPiece = null;
+            if (($ans['game_type'] ?? 'classic') === 'obstacle') {
+                $pieceIdx = intval($ans['piece_index'] ?? 0);
+                if ($pieceIdx > 0) {
+                    $pRow = db_fetch_one("SELECT unlocked_pieces FROM players WHERE id_player = :p", [':p' => $playerId]);
+                    $myUnlocked = !empty($pRow['unlocked_pieces']) ? json_decode($pRow['unlocked_pieces'], true) : [];
+                    if (!is_array($myUnlocked)) $myUnlocked = [];
+                    if (!in_array($pieceIdx, $myUnlocked)) {
+                        $myUnlocked[] = $pieceIdx;
+                        sort($myUnlocked);
+                        db_execute("UPDATE players SET unlocked_pieces = :up WHERE id_player = :p", [
+                            ':up' => json_encode($myUnlocked),
+                            ':p'  => $playerId
+                        ]);
+                    }
+                    $unlockedPiece = $pieceIdx;
+                }
+            }
         } else {
             $streakLost = ($currentStreak >= 2);
             $newStreak = 0;
@@ -143,12 +167,13 @@ try {
         }
 
         return [
-            'success'       => true,
-            'is_correct'    => $isCorrect,
-            'points_earned' => $pointsEarned,
-            'streak'        => $newStreak,
-            'streak_bonus'  => $streakBonus,
-            'streak_lost'   => $streakLost
+            'success'        => true,
+            'is_correct'     => $isCorrect,
+            'points_earned'  => $pointsEarned,
+            'streak'         => $newStreak,
+            'streak_bonus'   => $streakBonus,
+            'streak_lost'    => $streakLost,
+            'unlocked_piece' => $unlockedPiece ?? null
         ];
     });
     echo json_encode($result);

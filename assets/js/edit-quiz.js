@@ -49,12 +49,22 @@ function updateQuestionNumberLabels() {
     items.forEach(function (item, idx) {
         var numEl = item.querySelector('.q-thumb-num');
         if (numEl) {
-            numEl.textContent = 'Q' + (idx + 1);
+            if (EQ.gameType === 'obstacle') {
+                var pIdx = item.dataset.piece || (idx + 1);
+                numEl.textContent = '🧩 Mảnh ' + pIdx;
+            } else {
+                numEl.textContent = 'Q' + (idx + 1);
+            }
         }
         if (editingQuestionId && item.dataset.id == editingQuestionId) {
             var label = document.getElementById('canvasModeLabel');
             if (label) {
-                label.textContent = 'Editing Question ' + (idx + 1);
+                if (EQ.gameType === 'obstacle') {
+                    var pIdx = item.dataset.piece || (idx + 1);
+                    label.textContent = 'Sửa câu hỏi Mảnh ' + pIdx;
+                } else {
+                    label.textContent = 'Editing Question ' + (idx + 1);
+                }
             }
         }
     });
@@ -75,12 +85,24 @@ function initPropertiesPanel() {
         var el = document.getElementById(id);
         if (el) el.addEventListener('change', syncPropsToForm);
     });
+    var piEl = document.getElementById('propPieceIndex');
+    if (piEl) {
+        piEl.addEventListener('change', function () {
+            var hEl = document.getElementById('hiddenPieceIndex');
+            if (hEl) hEl.value = this.value;
+        });
+    }
 }
 
 function syncPropsToForm() {
     document.getElementById('hiddenQuestionType').value = document.getElementById('propQuestionType').value;
     document.getElementById('hiddenTimeLimit').value    = document.getElementById('propTimeLimit').value;
     document.getElementById('hiddenPoints').value       = document.getElementById('propPoints').value;
+    var piEl = document.getElementById('propPieceIndex');
+    var hPi = document.getElementById('hiddenPieceIndex');
+    if (piEl && hPi) {
+        hPi.value = piEl.value;
+    }
     applyQuestionTypeUI(document.getElementById('propQuestionType').value);
 }
 
@@ -378,6 +400,21 @@ function resetToNewMode() {
     if (preferredQuestionType && document.getElementById('propQuestionType')) {
         document.getElementById('propQuestionType').value = preferredQuestionType;
     }
+    if (document.getElementById('propPieceIndex')) {
+        var nextPiece = 1;
+        if (EQ.questions && EQ.questions.length > 0) {
+            var used = EQ.questions.map(function(item) { return parseInt(item.piece_index, 10) || 0; });
+            for (var p = 1; p <= (EQ.totalPieces || 9); p++) {
+                if (used.indexOf(p) === -1) { nextPiece = p; break; }
+            }
+            if (nextPiece === 1 && used.indexOf(1) !== -1) {
+                nextPiece = Math.min(EQ.questions.length + 1, EQ.totalPieces || 9);
+            }
+        }
+        document.getElementById('propPieceIndex').value = nextPiece;
+        var hPi = document.getElementById('hiddenPieceIndex');
+        if (hPi) hPi.value = nextPiece;
+    }
     syncPropsToForm();
 }
 
@@ -413,6 +450,12 @@ window.loadQuestionForEdit = function (questionId) {
     document.getElementById('propQuestionType').value = qType;
     document.getElementById('propTimeLimit').value    = q.time_limit  || '20';
     document.getElementById('propPoints').value       = q.points      || '1000';
+    if (document.getElementById('propPieceIndex')) {
+        var piVal = q.piece_index || 1;
+        document.getElementById('propPieceIndex').value = piVal;
+        var hPi = document.getElementById('hiddenPieceIndex');
+        if (hPi) hPi.value = piVal;
+    }
     syncPropsToForm();
 
     setQMediaFromUrl(q.image || null, q.media_type || null);
