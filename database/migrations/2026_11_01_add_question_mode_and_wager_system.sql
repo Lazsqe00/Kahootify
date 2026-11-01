@@ -3,6 +3,9 @@
 
 USE `kahoot_btn`;
 
+ALTER TABLE `quiz`
+  ADD COLUMN IF NOT EXISTS `mode` VARCHAR(50) NOT NULL DEFAULT 'normal';
+
 ALTER TABLE `questions`
   ADD COLUMN IF NOT EXISTS `mode` VARCHAR(50) NOT NULL DEFAULT 'normal',
   ADD COLUMN IF NOT EXISTS `mode_config` TEXT NULL;
