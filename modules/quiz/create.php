@@ -9,8 +9,18 @@ $creatorId = intval($_SESSION['id_creator']);
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     $name = trim($_POST['name'] ?? '');
     $description = trim($_POST['description'] ?? '');
-    $mode = trim($_POST['mode'] ?? 'normal');
-    $gameType = ($_POST['game_type'] ?? 'classic') === 'obstacle' ? 'obstacle' : 'classic';
+    $gameFormat = trim($_POST['game_format'] ?? 'classic');
+
+    if ($gameFormat === 'puzzle' || ($_POST['game_type'] ?? '') === 'obstacle') {
+        $gameType = 'obstacle';
+        $mode = 'normal';
+    } elseif ($gameFormat === 'wager' || ($_POST['mode'] ?? '') === 'wager') {
+        $gameType = 'classic';
+        $mode = 'wager';
+    } else {
+        $gameType = 'classic';
+        $mode = 'normal';
+    }
 
     if (!QuestionModeRegistry::has($mode)) {
         $mode = 'normal';
@@ -28,7 +38,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     if ($gameType === 'obstacle') {
         $obstacleAnswer = trim($_POST['obstacle_answer'] ?? '');
         $totalPieces = intval($_POST['total_pieces'] ?? 4);
-        if (!in_array($totalPieces, [4, 6, 8, 9])) {
+        if (!in_array($totalPieces, [4, 6, 8, 9], true)) {
             $totalPieces = 4;
         }
 
@@ -40,7 +50,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
         if (isset($_FILES['obstacle_image']) && $_FILES['obstacle_image']['error'] === UPLOAD_ERR_OK) {
             $fileInfo = $_FILES['obstacle_image'];
             $allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-            if (!in_array($fileInfo['type'], $allowedMimes)) {
+            if (!in_array($fileInfo['type'], $allowedMimes, true)) {
                 set_flash_message('danger', 'Obstacle image must be JPG, PNG, WEBP, or GIF!');
                 redirect('modules/quiz/create.php');
             }
@@ -61,7 +71,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
                 redirect('modules/quiz/create.php');
             }
         } else {
-            set_flash_message('danger', 'Please upload a secret image for the Obstacle Puzzle mode!');
+            set_flash_message('danger', 'Please upload a secret image for Puzzle mode!');
             redirect('modules/quiz/create.php');
         }
     }
@@ -93,281 +103,352 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     }
 }
 
-$pageTitle = "Create New Quiz | Kahoot!";
+$pageTitle = "Create Quiz | Kahoot!";
 require_once __DIR__ . '/../../includes/header.php';
 require_once __DIR__ . '/../../includes/navbar.php';
 ?>
 
 <style>
-.game-type-card {
-    border: 2px solid #e9ecef;
-    border-radius: 14px;
-    padding: 16px 18px;
-    cursor: pointer;
-    transition: all 0.2s ease;
+body {
+    background-color: #f8fafc;
+}
+
+.create-wrapper {
+    max-width: 680px;
+    margin: 36px auto 60px;
+    padding: 0 16px;
+}
+
+.create-header {
+    margin-bottom: 20px;
+}
+
+.create-title {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0;
+}
+
+.create-card {
     background: #ffffff;
-    height: 100%;
-    position: relative;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 28px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
-.game-type-card:hover {
-    border-color: var(--kahoot-purple);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(70, 23, 143, 0.12);
+
+.field-label {
+    display: block;
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 8px;
 }
-.game-type-card.selected {
-    border-color: var(--kahoot-purple);
-    background: #fbf9ff;
-    box-shadow: 0 4px 14px rgba(70, 23, 143, 0.18);
-}
-.game-type-card.selected::after {
-    content: "✓";
-    position: absolute;
-    top: 10px;
-    right: 12px;
-    width: 22px;
-    height: 22px;
-    background: var(--kahoot-purple);
-    color: #ffffff;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 12px;
-    font-weight: bold;
-}
-.piece-options-grid {
+
+.format-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 8px;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 22px;
 }
-.piece-option-btn {
-    border: 1px solid #ced4da;
-    border-radius: 8px;
-    padding: 8px 6px;
-    text-align: center;
+
+@media (max-width: 600px) {
+    .format-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.format-card {
+    border: 1.5px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 12px 14px;
     cursor: pointer;
     background: #ffffff;
     transition: all 0.15s ease;
-    margin: 0;
+    user-select: none;
 }
-.piece-option-btn input {
+
+.format-card:hover {
+    border-color: #cbd5e1;
+    background: #f8fafc;
+}
+
+.format-card.is-active {
+    border-color: #46178f;
+    background: #faf7ff;
+    box-shadow: 0 0 0 1px #46178f;
+}
+
+.format-title {
+    font-weight: 700;
+    font-size: 0.92rem;
+    color: #0f172a;
+    margin-bottom: 3px;
+}
+
+.format-card.is-active .format-title {
+    color: #46178f;
+}
+
+.format-desc {
+    font-size: 0.78rem;
+    color: #64748b;
+    line-height: 1.35;
+}
+
+.puzzle-box {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin-bottom: 22px;
+}
+
+.puzzle-box-title {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 12px;
+}
+
+.tile-pills {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.tile-pill-label {
+    margin: 0;
+    cursor: pointer;
+}
+
+.tile-pill-label input {
     display: none;
 }
-.piece-option-btn:hover {
-    border-color: #f39c12;
+
+.tile-pill-text {
+    display: inline-block;
+    padding: 6px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 7px;
+    background: #ffffff;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #334155;
+    transition: all 0.15s ease;
 }
-.piece-option-btn:has(input:checked) {
-    border-color: #f39c12;
-    background: #fff8e7;
-    font-weight: bold;
-    color: #d35400;
+
+.tile-pill-label input:checked + .tile-pill-text {
+    border-color: #46178f;
+    background: #46178f;
+    color: #ffffff;
+}
+
+.custom-input {
+    width: 100%;
+    padding: 9px 12px;
+    font-size: 0.92rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #0f172a;
+    outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.custom-input:focus {
+    border-color: #46178f;
+    box-shadow: 0 0 0 3px rgba(70, 23, 143, 0.1);
+}
+
+.custom-textarea {
+    width: 100%;
+    padding: 9px 12px;
+    font-size: 0.9rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #0f172a;
+    outline: none;
+    resize: vertical;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.custom-textarea:focus {
+    border-color: #46178f;
+    box-shadow: 0 0 0 3px rgba(70, 23, 143, 0.1);
+}
+
+.btn-submit {
+    display: inline-block;
+    padding: 10px 22px;
+    background: #46178f;
+    color: #ffffff;
+    font-size: 0.92rem;
+    font-weight: 700;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.btn-submit:hover {
+    background: #361170;
+}
+
+.btn-cancel {
+    display: inline-block;
+    padding: 9px 18px;
+    background: transparent;
+    color: #64748b;
+    font-size: 0.9rem;
+    font-weight: 600;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    text-decoration: none;
+    transition: all 0.15s ease;
+}
+
+.btn-cancel:hover {
+    color: #0f172a;
+    border-color: #94a3b8;
+    text-decoration: none;
 }
 </style>
 
-<div class="container my-5">
-    <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="card border-0 shadow" style="border-radius: 16px;">
-                <div class="card-header text-white py-3" style="background-color: var(--kahoot-purple); border-top-left-radius: 16px; border-top-right-radius: 16px;">
-                    <h5 class="font-weight-bold mb-0">
-                        <i class="fas fa-plus-circle mr-2"></i>Create New Kahoot! Quiz
-                    </h5>
+<div class="create-wrapper">
+
+    <div class="create-header">
+        <h2 class="create-title">New Quiz</h2>
+    </div>
+
+    <div class="create-card">
+        <form action="" method="POST" enctype="multipart/form-data">
+            <input type="hidden" name="game_format" id="inputGameFormat" value="classic">
+
+            <!-- MODE SELECTOR -->
+            <label class="field-label">Game Mode</label>
+            <div class="format-grid">
+                <div class="format-card is-active" id="card-classic" onclick="setFormat('classic')">
+                    <div class="format-title">Classic</div>
+                    <div class="format-desc">Standard live quiz with timed multiple-choice questions</div>
                 </div>
-                <div class="card-body p-4">
-                    <form action="" method="POST" enctype="multipart/form-data">
-                        
-                        <!-- GAME FORMAT SELECTION -->
-                        <div class="form-group mb-4">
-                            <label class="font-weight-bold d-block mb-2 text-dark" style="font-size: 1.05rem;">
-                                Select Game Format <span class="text-danger">*</span>
-                            </label>
-                            <input type="hidden" name="game_type" id="inputGameType" value="classic">
-
-                            <div class="row" style="gap: 12px 0;">
-                                <div class="col-md-6">
-                                    <div class="game-type-card selected" id="cardClassic" onclick="selectGameType('classic')">
-                                        <div class="d-flex align-items-center mb-2">
-                                            <span style="font-size: 1.8rem;" class="mr-2">🎯</span>
-                                            <div>
-                                                <h6 class="font-weight-bold mb-0 text-dark">Classic Kahoot</h6>
-                                                <small class="text-muted">Standard live quiz</small>
-                                            </div>
-                                        </div>
-                                        <p class="text-muted small mb-0">
-                                            Players race to answer live questions shown on the host screen.
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <div class="col-md-6">
-                                    <div class="game-type-card" id="cardObstacle" onclick="selectGameType('obstacle')">
-                                        <div class="d-flex align-items-center mb-2">
-                                            <span style="font-size: 1.8rem;" class="mr-2">🧩</span>
-                                            <div>
-                                                <h6 class="font-weight-bold mb-0 text-dark">Obstacle Puzzle</h6>
-                                                <small class="text-warning font-weight-bold">Secret Image</small>
-                                            </div>
-                                        </div>
-                                        <p class="text-muted small mb-0">
-                                            Players answer questions to flip puzzle tiles and buzz in to guess the secret image!
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- OBSTACLE SETTINGS (Collapsible) -->
-                        <div id="obstacleSettings" style="display: none;" class="p-3 mb-4 rounded border" style="background: #fffcf4; border-color: #ffe082 !important;">
-                            <h6 class="font-weight-bold text-dark mb-3">
-                                <i class="fas fa-puzzle-piece text-warning mr-1"></i> Obstacle Puzzle Setup
-                            </h6>
-
-                            <div class="form-group mb-3">
-                                <label class="font-weight-bold text-dark">
-                                    Secret Image <span class="text-danger">*</span>
-                                </label>
-                                <div class="custom-file">
-                                    <input type="file" name="obstacle_image" class="custom-file-input" id="obstacleImageInput" accept="image/*" onchange="previewObstacleImage(this)">
-                                    <label class="custom-file-label text-truncate" for="obstacleImageInput" id="obstacleImageLabel">Choose image (JPG, PNG, WEBP)...</label>
-                                </div>
-                                <div class="mt-2 text-center">
-                                    <img id="obstacleImgPreview" src="" alt="Preview" style="max-height: 180px; max-width: 100%; border-radius: 8px; display: none; margin: 0 auto; box-shadow: 0 2px 8px rgba(0,0,0,0.15);">
-                                </div>
-                            </div>
-
-                            <div class="form-group mb-3">
-                                <label class="font-weight-bold text-dark">
-                                    Answer Keyword / Title <span class="text-danger">*</span>
-                                </label>
-                                <input type="text" name="obstacle_answer" id="obstacleAnswerInput" class="form-control" placeholder="e.g. Mona Lisa, Eiffel Tower, Ha Long Bay...">
-                                <small class="text-muted">Keywords are matched case-insensitively.</small>
-                            </div>
-
-                            <div class="form-group mb-2">
-                                <label class="font-weight-bold text-dark d-block mb-1">
-                                    Number of Puzzle Tiles:
-                                </label>
-                                <div class="piece-options-grid">
-                                    <label class="piece-option-btn">
-                                        <input type="radio" id="pieces4" name="total_pieces" value="4" checked>
-                                        <span class="piece-option-label">4 tiles <small>(2×2)</small></span>
-                                    </label>
-                                    <label class="piece-option-btn">
-                                        <input type="radio" id="pieces6" name="total_pieces" value="6">
-                                        <span class="piece-option-label">6 tiles <small>(2×3)</small></span>
-                                    </label>
-                                    <label class="piece-option-btn">
-                                        <input type="radio" id="pieces8" name="total_pieces" value="8">
-                                        <span class="piece-option-label">8 tiles <small>(2×4)</small></span>
-                                    </label>
-                                    <label class="piece-option-btn">
-                                        <input type="radio" id="pieces9" name="total_pieces" value="9">
-                                        <span class="piece-option-label">9 tiles <small>(3×3)</small></span>
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="form-group mb-3">
-                            <label class="font-weight-bold">Quiz Title <span class="text-danger">*</span></label>
-                            <input type="text" name="name" class="form-control form-control-lg" placeholder="e.g. Science Trivia, English Vocab..." required autofocus>
-                        </div>
-
-                        <div class="form-group mb-3">
-                            <label class="font-weight-bold">Short Description</label>
-                            <textarea name="description" class="form-control" rows="3" placeholder="Brief summary of what this quiz is about..."></textarea>
-                        </div>
-
-                        <!-- DEFAULT QUESTION MODE -->
-                        <div class="form-group mb-4">
-                            <label class="font-weight-bold d-block mb-1 text-dark" style="font-size: 1rem;">
-                                <i class="fas fa-gamepad text-primary mr-1"></i> Default Question Mode <span class="text-danger">*</span>
-                            </label>
-                            <select name="mode" id="quizModeSelect" class="form-control form-control-lg font-weight-bold text-dark" style="border-radius: 10px; height: 50px; font-size: 1.05rem; cursor: pointer;">
-                                <?php 
-                                $allModes = QuestionModeRegistry::getAll();
-                                foreach ($allModes as $m): 
-                                    $isDefault = ($m->getId() === 'normal');
-                                ?>
-                                <option value="<?= htmlspecialchars($m->getId()) ?>" 
-                                        data-desc="<?= htmlspecialchars($m->getDescription()) ?>"
-                                        <?= $isDefault ? 'selected' : '' ?>>
-                                    <?= $m->getIcon() ?> <?= htmlspecialchars($m->getLabel()) ?>
-                                </option>
-                                <?php endforeach; ?>
-                            </select>
-                            <div id="modeDescriptionBox" class="mt-2 p-2 px-3 rounded bg-light border text-muted small" style="line-height: 1.45;"></div>
-                        </div>
-
-                        <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
-                            <a href="<?= BASE_URL ?>modules/quiz/list.php" class="btn btn-secondary font-weight-bold px-3">
-                                <i class="fas fa-arrow-left mr-1"></i> Back
-                            </a>
-                            <button type="submit" class="btn btn-kahoot btn-kahoot-green px-4 py-2 font-weight-bold" style="font-size: 1.1rem; border-radius: 10px;">
-                                <i class="fas fa-check mr-1"></i> Continue: Add Questions &raquo;
-                            </button>
-                        </div>
-                    </form>
+                <div class="format-card" id="card-wager" onclick="setFormat('wager')">
+                    <div class="format-title">Wager</div>
+                    <div class="format-desc">Players bet a portion of their points on each answer</div>
+                </div>
+                <div class="format-card" id="card-puzzle" onclick="setFormat('puzzle')">
+                    <div class="format-title">Puzzle</div>
+                    <div class="format-desc">Answers reveal hidden tiles of a secret picture</div>
                 </div>
             </div>
-        </div>
+
+            <!-- PUZZLE SETUP (Only visible when Puzzle is selected) -->
+            <div id="puzzleSection" class="puzzle-box" style="display: none;">
+                <div class="puzzle-box-title">Puzzle Settings</div>
+
+                <div class="form-group mb-3">
+                    <label class="field-label" style="font-size: 0.82rem;">Secret Picture <span class="text-danger">*</span></label>
+                    <input type="file" name="obstacle_image" id="obstacleImageInput" class="form-control-file" accept="image/*" onchange="previewSecretImage(this)">
+                    <div id="imgPreviewWrapper" class="mt-2" style="display: none;">
+                        <img id="imgPreview" src="" alt="Secret picture preview" style="max-height: 150px; border-radius: 8px; border: 1px solid #cbd5e1; object-fit: contain;">
+                    </div>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label class="field-label" style="font-size: 0.82rem;">Answer Keyword <span class="text-danger">*</span></label>
+                    <input type="text" name="obstacle_answer" id="obstacleAnswerInput" class="custom-input" placeholder="e.g. Eiffel Tower, Mona Lisa">
+                    <small class="text-muted d-block mt-1">Matched case-insensitively when players buzz in.</small>
+                </div>
+
+                <div class="form-group mb-0">
+                    <label class="field-label" style="font-size: 0.82rem;">Number of Tiles</label>
+                    <div class="tile-pills">
+                        <label class="tile-pill-label">
+                            <input type="radio" name="total_pieces" value="4" checked>
+                            <span class="tile-pill-text">4 tiles (2×2)</span>
+                        </label>
+                        <label class="tile-pill-label">
+                            <input type="radio" name="total_pieces" value="6">
+                            <span class="tile-pill-text">6 tiles (2×3)</span>
+                        </label>
+                        <label class="tile-pill-label">
+                            <input type="radio" name="total_pieces" value="8">
+                            <span class="tile-pill-text">8 tiles (2×4)</span>
+                        </label>
+                        <label class="tile-pill-label">
+                            <input type="radio" name="total_pieces" value="9">
+                            <span class="tile-pill-text">9 tiles (3×3)</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TITLE & DESCRIPTION -->
+            <div class="form-group mb-3">
+                <label class="field-label">Title <span class="text-danger">*</span></label>
+                <input type="text" name="name" class="custom-input" placeholder="e.g. Science Trivia, World Geography" required autofocus>
+            </div>
+
+            <div class="form-group mb-4">
+                <label class="field-label">Description <span class="text-muted font-weight-normal">(optional)</span></label>
+                <textarea name="description" class="custom-textarea" rows="3" placeholder="Brief summary of what this quiz covers..."></textarea>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center pt-3 border-top">
+                <a href="<?= BASE_URL ?>modules/quiz/list.php" class="btn-cancel">
+                    Cancel
+                </a>
+                <button type="submit" class="btn-submit">
+                    Continue to Questions &rarr;
+                </button>
+            </div>
+
+        </form>
     </div>
+
 </div>
 
 <script>
-function selectGameType(type) {
-    document.getElementById('inputGameType').value = type;
-    const cardClassic = document.getElementById('cardClassic');
-    const cardObstacle = document.getElementById('cardObstacle');
-    const obsSettings = document.getElementById('obstacleSettings');
-    const fileInput = document.getElementById('obstacleImageInput');
+function setFormat(format) {
+    document.getElementById('inputGameFormat').value = format;
+
+    document.querySelectorAll('.format-card').forEach(function(el) {
+        el.classList.remove('is-active');
+    });
+    const card = document.getElementById('card-' + format);
+    if (card) card.classList.add('is-active');
+
+    const puzzleSection = document.getElementById('puzzleSection');
+    const imgInput = document.getElementById('obstacleImageInput');
     const ansInput = document.getElementById('obstacleAnswerInput');
 
-    if (type === 'obstacle') {
-        cardClassic.classList.remove('selected');
-        cardObstacle.classList.add('selected');
-        obsSettings.style.display = 'block';
-        fileInput.setAttribute('required', 'required');
+    if (format === 'puzzle') {
+        puzzleSection.style.display = 'block';
+        imgInput.setAttribute('required', 'required');
         ansInput.setAttribute('required', 'required');
     } else {
-        cardObstacle.classList.remove('selected');
-        cardClassic.classList.add('selected');
-        obsSettings.style.display = 'none';
-        fileInput.removeAttribute('required');
+        puzzleSection.style.display = 'none';
+        imgInput.removeAttribute('required');
         ansInput.removeAttribute('required');
     }
 }
 
-function previewObstacleImage(input) {
-    const preview = document.getElementById('obstacleImgPreview');
-    const label = document.getElementById('obstacleImageLabel');
+function previewSecretImage(input) {
+    const preview = document.getElementById('imgPreview');
+    const wrapper = document.getElementById('imgPreviewWrapper');
     if (input.files && input.files[0]) {
-        const file = input.files[0];
-        label.textContent = file.name;
         const reader = new FileReader();
         reader.onload = function(e) {
             preview.src = e.target.result;
-            preview.style.display = 'block';
+            wrapper.style.display = 'block';
         };
-        reader.readAsDataURL(file);
+        reader.readAsDataURL(input.files[0]);
     } else {
-        preview.style.display = 'none';
-        label.textContent = 'Choose image (JPG, PNG, WEBP)...';
+        wrapper.style.display = 'none';
     }
 }
-
-document.addEventListener('DOMContentLoaded', function() {
-    var modeSelect = document.getElementById('quizModeSelect');
-    var descBox = document.getElementById('modeDescriptionBox');
-    if (modeSelect && descBox) {
-        function updateDesc() {
-            var opt = modeSelect.options[modeSelect.selectedIndex];
-            descBox.textContent = opt ? opt.getAttribute('data-desc') : '';
-        }
-        modeSelect.addEventListener('change', updateDesc);
-        updateDesc();
-    }
-});
 </script>
 
 <?php require_once __DIR__ . '/../../includes/footer.php'; ?>
