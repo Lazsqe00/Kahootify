@@ -54,7 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['avatar'] = 'default.png';
 
         set_flash_message('success', 'Account created successfully! Start creating your quizzes now.');
-        redirect('modules/auth/dashboard.php');
+        redirect('modules/quiz/list.php');
 
     } catch (Exception $e) {
         set_flash_message('danger', 'Registration error: ' . $e->getMessage());

@@ -11,7 +11,7 @@ $room = db_fetch_one("SELECT r.*, q.name as quiz_name FROM room r JOIN quiz q ON
 
 if (!$room || $room['status'] === 'finished') {
     set_flash_message('danger', 'Game room does not exist or has already finished!');
-    redirect('modules/auth/dashboard.php');
+    redirect('modules/quiz/list.php');
 }
 
 if ($room['status'] !== 'waiting') {
@@ -85,8 +85,8 @@ if (isset($_GET['start_game'])) {
         $_SESSION['question_index'] = 0;
         redirect('modules/host/play.php');
     } else {
-        set_flash_message('danger', 'Bài trắc nghiệm này chưa có câu hỏi nào!');
-        redirect('modules/auth/dashboard.php');
+        set_flash_message('danger', 'This quiz does not have any questions yet!');
+        redirect('modules/quiz/list.php');
     }
 }
 
@@ -94,7 +94,7 @@ if (isset($_GET['cancel_game'])) {
     db_execute("UPDATE room SET status = 'finished' WHERE id_room = :r", [':r' => $roomId]);
     unset($_SESSION['id_room'], $_SESSION['pin'], $_SESSION['id_quiz']);
     set_flash_message('info', 'Game room has been cancelled!');
-    redirect('modules/auth/dashboard.php');
+    redirect('modules/quiz/list.php');
 }
 
 $players = filter_room_players($roomId, db_fetch_all("SELECT * FROM players WHERE id_room = :r ORDER BY id_player ASC", [':r' => $roomId]));
@@ -116,29 +116,111 @@ require_once __DIR__ . '/../../includes/header.php';
     <source src="<?= BASE_URL ?>assets/audio/lobby.ogg" type="audio/ogg">
 </audio>
 
-<nav class="navbar navbar-dark bg-dark px-4 py-2 d-flex justify-content-between align-items-center">
+<nav class="lobby-topbar d-flex justify-content-between align-items-center">
     <div class="d-flex align-items-center">
-        <img src="<?= BASE_URL ?>assets/img/logo.png" alt="Logo" style="max-height: 32px; filter: brightness(100);" class="mr-3">
-        <span class="text-white font-weight-bold" style="font-size: 1.1rem;"><?= htmlspecialchars($room['quiz_name']) ?></span>
+        <a href="<?= BASE_URL ?>modules/quiz/list.php" class="d-inline-flex align-items-center" title="Kahoot!">
+            <img src="<?= BASE_URL ?>assets/img/logo.png" alt="Kahoot!" style="max-height: 34px; filter: brightness(0) invert(1);">
+        </a>
     </div>
-    <div class="d-flex align-items-center" style="gap: 12px;">
-
-        <button type="button" class="btn btn-sm btn-outline-light font-weight-bold shadow-sm rounded-pill px-3" data-toggle="modal" data-target="#gameSettingsModal" title="Cài đặt phòng chơi">
-            <i class="fas fa-cog mr-1"></i> Cài đặt
+    <div class="lobby-nav-actions">
+        <button type="button" class="lobby-nav-btn" data-toggle="modal" data-target="#gameSettingsModal" title="Game Settings">
+            <i class="fas fa-sliders-h"></i>
+            <span>Settings</span>
         </button>
 
-        <button type="button" id="audioToggleBtn" class="btn btn-sm btn-light font-weight-bold shadow-sm rounded-pill px-3" onclick="toggleAudio()" title="Toggle lobby music">
-            <i class="fas fa-volume-up text-success mr-1" id="audioIcon"></i>
+        <button type="button" id="audioToggleBtn" class="lobby-nav-btn is-active" onclick="toggleAudio()" title="Toggle lobby music">
+            <i class="fas fa-volume-up text-success" id="audioIcon"></i>
             <span id="audioLabel">Music: ON</span>
         </button>
 
-        <a href="lobby.php?cancel_game=true" class="btn btn-sm btn-outline-danger font-weight-bold" onclick="return confirm('Are you sure you want to cancel this game room?');">
-            <i class="fas fa-times mr-1"></i> Cancel Game
+        <a href="lobby.php?cancel_game=true" class="lobby-nav-btn lobby-nav-btn-danger" onclick="return confirm('Are you sure you want to cancel this game room?');" title="Cancel game session">
+            <i class="fas fa-times"></i>
+            <span>Cancel</span>
         </a>
     </div>
 </nav>
 
 <style>
+
+.lobby-topbar {
+    background: rgba(22, 11, 40, 0.78);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    padding: 12px 32px;
+}
+
+.lobby-nav-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.lobby-nav-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 38px;
+    padding: 0 16px;
+    border-radius: 20px;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    cursor: pointer;
+    text-decoration: none !important;
+    transition: all 0.2s cubic-bezier(0.2, 0.8, 0.4, 1);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+    outline: none;
+}
+
+.lobby-nav-btn:hover {
+    background: rgba(255, 255, 255, 0.22);
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.35);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.lobby-nav-btn:active {
+    transform: translateY(0);
+}
+
+.lobby-nav-btn.is-active {
+    background: #ffffff;
+    color: #1a1a2e;
+    border-color: #ffffff;
+}
+
+.lobby-nav-btn.is-active:hover {
+    background: #f4f4f7;
+    color: #1a1a2e;
+}
+
+.lobby-nav-btn.is-muted {
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.65);
+    border-color: rgba(255, 255, 255, 0.12);
+}
+
+.lobby-nav-btn.is-muted:hover {
+    background: rgba(255, 255, 255, 0.16);
+    color: #ffffff;
+}
+
+.lobby-nav-btn-danger {
+    background: rgba(226, 27, 60, 0.14);
+    color: #ff6b81;
+    border-color: rgba(226, 27, 60, 0.32);
+}
+
+.lobby-nav-btn-danger:hover {
+    background: #e21b3c;
+    color: #ffffff;
+    border-color: #e21b3c;
+}
 
 .lobby-pin-card {
     background: #ffffff;
@@ -264,58 +346,7 @@ require_once __DIR__ . '/../../includes/header.php';
         <p class="font-weight-bold mt-2 mb-0">Game PIN: <?= htmlspecialchars($room['pin']) ?></p>
     </dialog>
 
-    <div class="lobby-settings-bar mx-auto mb-3" style="max-width: 540px; width: 90%;">
-        <div class="d-flex justify-content-end align-items-center">
-            <div class="lobby-device-toggle-pill shadow d-inline-flex align-items-center" style="background: #ffffff; border-radius: 50px; padding: 10px 22px; border: 2px solid #ffffff;">
-                <label for="toggleShowQuestions" class="mb-0 mr-3 text-dark font-weight-bold" style="font-family: 'Montserrat', sans-serif; font-size: 0.98rem; font-weight: 800; color: #111111; cursor: pointer; user-select: none;">
-                    Show questions &amp; answers on player devices:
-                </label>
-                <span id="settingStatusLabel" class="badge <?= $showOnPlayers ? 'badge-success' : 'badge-secondary' ?> font-weight-bold mr-3 px-2 py-1" style="font-size: 0.85rem; letter-spacing: 0.5px; cursor: pointer;" onclick="$('#toggleShowQuestions').click()" title="Click to toggle">
-                    <?= $showOnPlayers ? 'ON' : 'OFF' ?>
-                </span>
-                <div class="custom-control custom-switch" style="transform: scale(1.3); transform-origin: center center;">
-                    <input type="checkbox" class="custom-control-input" id="toggleShowQuestions" <?= $showOnPlayers ? 'checked' : '' ?> onchange="updateShowQuestions(this.checked)">
-                    <label class="custom-control-label" for="toggleShowQuestions" style="cursor: pointer;"></label>
-                </div>
-            </div>
-        </div>
-    </div>
 
-    <div class="lobby-settings-bar mx-auto mb-4" style="max-width: 540px; width: 90%;">
-        <div class="lobby-device-toggle-pill shadow d-flex flex-column text-dark" style="background: #ffffff; border-radius: 18px; padding: 14px 22px; border: 2px solid #ffffff;">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <span class="font-weight-bold" style="font-family: 'Montserrat', sans-serif; font-size: 0.98rem; font-weight: 800; color: #111111;">
-                    <i class="fas fa-random text-primary mr-1"></i> Questions per game:
-                </span>
-                <span id="lobbyModeStatusBadge" class="badge badge-primary font-weight-bold px-2 py-1" style="font-size: 0.85rem;">
-                    All (<?= $totalQuizQuestions ?> questions)
-                </span>
-            </div>
-
-            <div class="d-flex flex-column text-left" style="gap: 8px;">
-                <div class="custom-control custom-radio">
-                    <input type="radio" id="lobbyModeAll" name="lobby_question_mode" class="custom-control-input" value="all" checked onchange="syncQuestionSettings('lobby')">
-                    <label class="custom-control-label font-weight-bold text-dark" for="lobbyModeAll" style="cursor: pointer; font-size: 0.92rem;">
-                        Play all questions (<span class="text-primary font-weight-bold"><?= $totalQuizQuestions ?> questions</span>)
-                    </label>
-                </div>
-                <div class="custom-control custom-radio d-flex align-items-center flex-wrap">
-                    <input type="radio" id="lobbyModeRandom" name="lobby_question_mode" class="custom-control-input" value="random" onchange="syncQuestionSettings('lobby')">
-                    <label class="custom-control-label font-weight-bold text-dark mr-2 mb-0" for="lobbyModeRandom" style="cursor: pointer; font-size: 0.92rem;">
-                        Random selection
-                    </label>
-                    <div class="d-inline-flex align-items-center" style="gap: 6px;">
-                        <input type="number" id="lobbyQuestionLimit" class="form-control form-control-sm text-center font-weight-bold text-dark" 
-                               style="width: 75px; height: 32px; border-radius: 8px; border: 2px solid #ced4da;" 
-                               min="1" max="<?= $totalQuizQuestions ?>" 
-                               value="<?= min(5, $totalQuizQuestions) ?>" 
-                               onchange="onLobbyLimitInput()" oninput="onLobbyLimitInput()" onclick="$('#lobbyModeRandom').prop('checked', true); syncQuestionSettings('lobby');">
-                        <span class="font-weight-bold text-muted small">/ <?= $totalQuizQuestions ?> questions in pool</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <div class="d-flex justify-content-center align-items-center my-4" style="gap: 20px;">
         <div class="bg-dark px-4 py-2 rounded-pill shadow">
@@ -461,13 +492,13 @@ function updateAudioUI(isPlaying) {
     const btn = document.getElementById('audioToggleBtn');
     if (!icon || !label || !btn) return;
     if (isPlaying) {
-        icon.className = 'fas fa-volume-up text-success mr-1';
+        icon.className = 'fas fa-volume-up text-success';
         label.textContent = 'Music: ON';
-        btn.className = 'btn btn-sm btn-light font-weight-bold shadow-sm rounded-pill px-3';
+        btn.className = 'lobby-nav-btn is-active';
     } else {
-        icon.className = 'fas fa-volume-mute text-danger mr-1';
+        icon.className = 'fas fa-volume-mute text-muted';
         label.textContent = 'Music: OFF';
-        btn.className = 'btn btn-sm btn-outline-light font-weight-bold shadow-sm rounded-pill px-3';
+        btn.className = 'lobby-nav-btn is-muted';
     }
 }
 
@@ -513,8 +544,8 @@ function updateShowQuestions(checked) {
 }
 
 function getSelectedQuestionConfig() {
-    const isRandom = $('#lobbyModeRandom').is(':checked') || $('#modalModeRandom').is(':checked');
-    let limit = parseInt($('#lobbyQuestionLimit').val()) || totalQuizQuestions;
+    const isRandom = $('#modalModeRandom').is(':checked');
+    let limit = parseInt($('#modalQuestionLimit').val()) || totalQuizQuestions;
     if (limit <= 0) limit = 1;
     if (limit > totalQuizQuestions) limit = totalQuizQuestions;
     return {
@@ -524,45 +555,20 @@ function getSelectedQuestionConfig() {
 }
 
 function syncQuestionSettings(source) {
-    let mode, limit;
-    if (source === 'modal') {
-        mode = $('input[name="modal_question_mode"]:checked').val() || 'all';
-        limit = parseInt($('#modalQuestionLimit').val()) || totalQuizQuestions;
-        if (limit <= 0) limit = 1;
-        if (limit > totalQuizQuestions) limit = totalQuizQuestions;
-
-        $('#lobbyModeAll').prop('checked', mode === 'all');
-        $('#lobbyModeRandom').prop('checked', mode === 'random');
-        $('#lobbyQuestionLimit').val(limit);
-    } else {
-        mode = $('input[name="lobby_question_mode"]:checked').val() || 'all';
-        limit = parseInt($('#lobbyQuestionLimit').val()) || totalQuizQuestions;
-        if (limit <= 0) limit = 1;
-        if (limit > totalQuizQuestions) limit = totalQuizQuestions;
-
-        $('#modalModeAll').prop('checked', mode === 'all');
-        $('#modalModeRandom').prop('checked', mode === 'random');
-        $('#modalQuestionLimit').val(limit);
-    }
+    const mode = $('input[name="modal_question_mode"]:checked').val() || 'all';
+    let limit = parseInt($('#modalQuestionLimit').val()) || totalQuizQuestions;
+    if (limit <= 0) limit = 1;
+    if (limit > totalQuizQuestions) limit = totalQuizQuestions;
 
     if (mode === 'random') {
-        $('#lobbyModeStatusBadge').text('Bốc ' + limit + ' / ' + totalQuizQuestions + ' câu')
-                                  .removeClass('badge-primary').addClass('badge-warning text-dark');
-        $('#modalModeStatusBadge').text('Bốc ' + limit + ' / ' + totalQuizQuestions + ' câu')
+        $('#modalModeStatusBadge').text('Random ' + limit + ' / ' + totalQuizQuestions + ' questions')
                                   .removeClass('badge-primary').addClass('badge-warning text-dark');
     } else {
-        $('#lobbyModeStatusBadge').text('Tất cả (' + totalQuizQuestions + ' câu)')
-                                  .removeClass('badge-warning text-dark').addClass('badge-primary');
-        $('#modalModeStatusBadge').text('Tất cả (' + totalQuizQuestions + ' câu)')
+        $('#modalModeStatusBadge').text('All (' + totalQuizQuestions + ' questions)')
                                   .removeClass('badge-warning text-dark').addClass('badge-primary');
     }
 
     updateStartGameHref();
-}
-
-function onLobbyLimitInput() {
-    $('#lobbyModeRandom').prop('checked', true);
-    syncQuestionSettings('lobby');
 }
 
 function onModalLimitChange() {

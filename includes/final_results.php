@@ -318,7 +318,7 @@ require __DIR__ . '/header.php';
                 <p class="results-tie-note">Equal scores are ordered by joining time.</p>
             </section>
         <?php endif; ?>
-        <footer class="results-footer"><a class="results-button" href="<?= BASE_URL ?><?= $isHostResults ? 'modules/auth/dashboard.php' : 'modules/player/join.php' ?>"><?= $isHostResults ? 'Back to dashboard' : 'Join another game' ?></a><p>Every answer is a step forward. Thanks for playing!</p></footer>
+        <footer class="results-footer"><a class="results-button" href="<?= BASE_URL ?><?= $isHostResults ? 'modules/quiz/list.php' : 'modules/player/join.php' ?>"><?= $isHostResults ? 'Back to My Kahoots' : 'Join another game' ?></a><p>Every answer is a step forward. Thanks for playing!</p></footer>
         </div>
     </main>
     <?php if ($isHostResults && $participantCount > 0): ?>

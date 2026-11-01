@@ -15,8 +15,4 @@ if ($quizId > 0) {
 }
 
 $ref = $_GET['ref'] ?? '';
-if ($ref === 'dashboard') {
-    redirect('modules/auth/dashboard.php');
-} else {
-    redirect('modules/quiz/list.php');
-}
+redirect('modules/quiz/list.php');

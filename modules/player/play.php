@@ -436,7 +436,7 @@ require_once __DIR__ . '/../../includes/header.php';
 
                 <div class="text-right">
                     <span class="badge badge-light px-4 py-2 font-weight-bold text-dark shadow-sm" style="font-size: 1.1rem; border-radius: 50px;">
-                        <i class="fas fa-hand-pointer text-primary mr-1"></i> Chọn 1 đáp án
+                        <i class="fas fa-hand-pointer text-primary mr-1"></i> Choose an answer
                     </span>
                 </div>
             </div>

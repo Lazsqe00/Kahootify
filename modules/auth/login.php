@@ -42,7 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['avatar'] = !empty($user['avatar']) ? $user['avatar'] : 'default.png';
 
         set_flash_message('success', 'Welcome ' . htmlspecialchars($user['name']) . '! You have logged in successfully.');
-        redirect('modules/auth/dashboard.php');
+        redirect('modules/quiz/list.php');
 
     } catch (Exception $e) {
         set_flash_message('danger', 'System error: ' . $e->getMessage());

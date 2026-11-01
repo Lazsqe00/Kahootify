@@ -27,16 +27,18 @@ $flash = get_flash_message();
         </div>
     <?php endif; ?>
 
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
         <div>
-            <h2 class="font-weight-bold" style="color: var(--kahoot-purple);">
+            <h2 class="font-weight-bold mb-1" style="color: var(--kahoot-purple);">
                 <i class="fas fa-th-large mr-2"></i>My Kahoots
             </h2>
-            <p class="text-muted">View, edit questions, or host a live game session.</p>
+            <p class="text-muted mb-0">View, edit questions, or host a live game session.</p>
         </div>
-        <a href="<?= BASE_URL ?>modules/quiz/create.php" class="btn btn-kahoot btn-kahoot-green">
-            <i class="fas fa-plus mr-1"></i> Create New Quiz
-        </a>
+        <div>
+            <a href="<?= BASE_URL ?>modules/quiz/create.php" class="btn btn-kahoot btn-kahoot-green shadow-sm">
+                <i class="fas fa-plus-circle mr-1"></i> Create New Kahoot
+            </a>
+        </div>
     </div>
 
     <div class="row">

@@ -5,18 +5,16 @@ require_once __DIR__ . '/../../config/database.php';
 
 $creatorId = intval($_SESSION['id_creator']);
 
-// Lấy danh sách tất cả câu hỏi đã lưu của người dùng hiện tại
 $savedQuestions = db_fetch_all(
     "SELECT sq.id_saved, sq.saved_at, q.*, qz.name as quiz_name, qz.id_quiz
      FROM saved_review_questions sq
      JOIN questions q ON sq.id_question = q.id_question
      JOIN quiz qz ON q.id_quiz = qz.id_quiz
      WHERE sq.id_creator = :c
-     ORDER BY sq.saved_at DESC",
+     ORDER BY sq.id_saved DESC",
     [':c' => $creatorId]
 );
 
-// Lấy danh sách câu trả lời cho từng câu hỏi
 foreach ($savedQuestions as &$sq) {
     $sq['answers'] = db_fetch_all(
         "SELECT * FROM answers WHERE id_question = :qid ORDER BY id_answer ASC",
@@ -27,7 +25,7 @@ unset($sq);
 
 $totalSaved = count($savedQuestions);
 
-$pageTitle = "Câu hỏi ôn tập đã lưu | Saved Questions - Kahoot!";
+$pageTitle = "Questions Review | Kahoot!";
 require_once __DIR__ . '/../../includes/header.php';
 require_once __DIR__ . '/../../includes/navbar.php';
 
@@ -43,153 +41,333 @@ $reviewMediaUrl = static function (?string $path): string {
 };
 ?>
 
-<div class="container my-4" style="max-width: 1050px;">
+<style>
+body {
+    background-color: #f8fafc;
+}
 
-    <!-- Thanh tiêu đề và nút quay lại -->
-    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 pb-3 border-bottom">
-        <div>
-            <div class="d-flex align-items-center mb-1">
-                <a href="<?= BASE_URL ?>modules/auth/dashboard.php" class="btn btn-outline-secondary btn-sm mr-3 font-weight-bold" style="border-radius: 8px;">
-                    <i class="fas fa-arrow-left mr-1"></i> Dashboard
-                </a>
-                <h2 class="font-weight-bold mb-0" style="color: var(--kahoot-purple);">
-                    <i class="fas fa-bookmark text-warning mr-2"></i>Câu hỏi đã lưu
-                </h2>
-                <span id="savedCountBadge" class="badge badge-warning text-dark font-weight-bold ml-3 px-3 py-2" style="font-size: 1rem; border-radius: 20px;">
-                    <?= $totalSaved ?> câu hỏi
-                </span>
-            </div>
-            <p class="text-muted mb-0">Các câu hỏi bạn đã đánh dấu lưu từ các ván đấu để ôn tập lại kiến thức.</p>
-        </div>
-        <div class="mt-2 mt-md-0">
-            <a href="<?= BASE_URL ?>modules/player/join.php" class="btn btn-success font-weight-bold shadow-sm" style="border-radius: 8px;">
-                <i class="fas fa-gamepad mr-1"></i> Vào phòng thi đấu
-            </a>
-        </div>
-    </div>
+.review-container {
+    max-width: 920px;
+    margin: 28px auto 60px;
+    padding: 0 16px;
+}
 
-    <?php if ($totalSaved > 0): ?>
-        <!-- Thanh tìm kiếm nhanh -->
-        <div class="card border-0 shadow-sm mb-4" style="border-radius: 12px; background: #faf7fe;">
-            <div class="card-body p-3">
-                <div class="input-group">
-                    <div class="input-group-prepend">
-                        <span class="input-group-text bg-white border-right-0"><i class="fas fa-search text-muted"></i></span>
-                    </div>
-                    <input type="text" id="searchInput" class="form-control border-left-0" placeholder="Tìm kiếm theo nội dung câu hỏi hoặc tên bài Kahoot..." autofocus>
+.review-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.review-nav-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.back-link {
+    color: #64748b;
+    font-size: 0.92rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: color 0.15s ease;
+}
+
+.back-link:hover {
+    color: #0f172a;
+    text-decoration: none;
+}
+
+.toolbar-divider {
+    color: #cbd5e1;
+    font-size: 0.9rem;
+}
+
+.toolbar-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0;
+}
+
+.count-pill {
+    display: inline-block;
+    padding: 2px 8px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #475569;
+    background: #e2e8f0;
+    border-radius: 12px;
+}
+
+.search-box {
+    position: relative;
+    min-width: 240px;
+}
+
+.search-input {
+    width: 100%;
+    padding: 8px 14px;
+    font-size: 0.88rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #0f172a;
+    outline: none;
+    transition: all 0.2s ease;
+}
+
+.search-input:focus {
+    border-color: #46178f;
+    box-shadow: 0 0 0 3px rgba(70, 23, 143, 0.12);
+}
+
+.q-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    margin-bottom: 16px;
+    overflow: hidden;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.q-card:hover {
+    border-color: #cbd5e1;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+.q-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    background: #f8fafc;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 0.82rem;
+    color: #64748b;
+}
+
+.q-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.q-quiz-name {
+    font-weight: 600;
+    color: #334155;
+}
+
+.meta-dot {
+    color: #cbd5e1;
+}
+
+.btn-remove-clean {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: all 0.15s ease;
+}
+
+.btn-remove-clean:hover {
+    color: #e11d48;
+    background: #fff1f2;
+}
+
+.q-body {
+    padding: 20px;
+}
+
+.q-text {
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: #0f172a;
+    line-height: 1.5;
+    margin-bottom: 16px;
+}
+
+.answers-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 10px;
+}
+
+.ans-item {
+    padding: 12px 16px;
+    border-radius: 8px;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.95rem;
+    font-weight: 600;
+}
+
+.ans-item.is-correct {
+    outline: 2px solid #16a34a;
+    outline-offset: 1px;
+}
+
+.ans-shape {
+    font-size: 1.1rem;
+    margin-right: 12px;
+    opacity: 0.9;
+    display: inline-block;
+    width: 18px;
+    text-align: center;
+}
+
+.ans-correct-badge {
+    background: rgba(255, 255, 255, 0.95);
+    color: #15803d;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 6px;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    margin-left: 10px;
+    white-space: nowrap;
+}
+
+.empty-review {
+    text-align: center;
+    padding: 60px 20px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+}
+
+.empty-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #1e293b;
+    margin-bottom: 6px;
+}
+
+.empty-sub {
+    font-size: 0.9rem;
+    color: #64748b;
+    margin-bottom: 20px;
+}
+
+.empty-btn {
+    display: inline-block;
+    padding: 8px 18px;
+    background: #0f172a;
+    color: #ffffff;
+    font-size: 0.88rem;
+    font-weight: 600;
+    border-radius: 8px;
+    text-decoration: none;
+    transition: background 0.15s ease;
+}
+
+.empty-btn:hover {
+    background: #334155;
+    color: #ffffff;
+    text-decoration: none;
+}
+</style>
+
+<div class="review-container">
+
+    <div class="review-toolbar">
+        <div class="review-nav-left">
+            <span class="toolbar-title">Questions</span>
+            <span id="savedCountBadge" class="count-pill"><?= $totalSaved ?></span>
+        </div>
+        <div class="toolbar-right">
+            <?php if ($totalSaved > 0): ?>
+                <div class="search-box">
+                    <input type="text" id="searchInput" class="search-input" placeholder="Search questions or quiz..." autocomplete="off">
                 </div>
-            </div>
-        </div>
-    <?php endif; ?>
-
-    <!-- Khung thông báo khi không có câu hỏi nào -->
-    <div id="emptyState" class="text-center py-5 <?= $totalSaved > 0 ? 'd-none' : '' ?>">
-        <div class="card border-0 shadow-sm p-5 mx-auto" style="max-width: 600px; border-radius: 16px; background: #ffffff;">
-            <div class="mb-3 text-warning">
-                <i class="fas fa-bookmark fa-4x" style="opacity: 0.6;"></i>
-            </div>
-            <h4 class="font-weight-bold text-dark mb-2">Chưa có câu hỏi nào được lưu</h4>
-            <p class="text-muted mb-4">
-                Khi tham gia các ván đấu Kahoot, ở màn hình <b>Kết quả cuối cùng (Review your answers)</b>, bạn có thể nhấn nút <span class="badge badge-light border text-primary"><i class="far fa-bookmark mr-1"></i>Save for review</span> để lưu câu hỏi về trang này và xem lại bất cứ lúc nào!
-            </p>
-            <div>
-                <a href="<?= BASE_URL ?>modules/player/join.php" class="btn btn-kahoot btn-kahoot-green font-weight-bold mr-2">
-                    <i class="fas fa-play mr-1"></i> Chơi Kahoot ngay
-                </a>
-                <a href="<?= BASE_URL ?>modules/auth/dashboard.php" class="btn btn-outline-secondary font-weight-bold">
-                    <i class="fas fa-home mr-1"></i> Về Dashboard
-                </a>
-            </div>
+            <?php endif; ?>
         </div>
     </div>
 
-    <!-- Danh sách câu hỏi đã lưu -->
-    <div id="questionsContainer" class="row">
+    <div id="emptyState" class="empty-review <?= $totalSaved > 0 ? 'd-none' : '' ?>">
+        <div class="empty-title">No questions found</div>
+        <p class="empty-sub">Questions bookmarked after games will appear here.</p>
+        <a href="<?= BASE_URL ?>modules/quiz/list.php" class="empty-btn">
+            Back to Kahoots
+        </a>
+    </div>
+
+    <div id="questionsContainer">
         <?php foreach ($savedQuestions as $index => $q):
             $mediaUrl = $reviewMediaUrl($q['image'] ?? null);
             $ext = strtolower(pathinfo(parse_url($mediaUrl, PHP_URL_PATH) ?? '', PATHINFO_EXTENSION));
             $isVideo = in_array($ext, ['mp4', 'webm'], true) || ($q['media_type'] ?? '') === 'video';
-            $savedDateFormatted = date('d/m/Y H:i', strtotime($q['saved_at']));
+            $savedDateFormatted = date('M d, Y', strtotime($q['saved_at']));
         ?>
-            <div class="col-12 mb-4 question-item" id="saved-card-<?= (int)$q['id_question'] ?>" data-text="<?= htmlspecialchars(mb_strtolower($q['text'] . ' ' . $q['quiz_name'])) ?>">
-                <div class="card border-0 shadow-sm" style="border-radius: 14px; overflow: hidden; border-left: 5px solid var(--kahoot-purple) !important;">
-                    
-                    <!-- Header của câu hỏi -->
-                    <div class="card-header bg-white py-3 px-4 d-flex flex-wrap justify-content-between align-items-center border-bottom">
-                        <div class="d-flex align-items-center flex-wrap" style="gap: 8px;">
-                            <span class="badge badge-dark px-3 py-1 font-weight-bold" style="font-size: 0.95rem; border-radius: 6px;">
-                                Câu #<?= $totalSaved - $index ?>
-                            </span>
-                            <span class="badge badge-primary px-3 py-1 font-weight-bold" style="font-size: 0.85rem; border-radius: 6px;" title="Bộ câu hỏi gốc">
-                                <i class="fas fa-layer-group mr-1"></i><?= htmlspecialchars($q['quiz_name']) ?>
-                            </span>
-                            <span class="badge badge-light border text-muted px-2 py-1" style="font-size: 0.8rem; border-radius: 6px;">
-                                <i class="far fa-clock mr-1"></i>Lưu: <?= $savedDateFormatted ?>
-                            </span>
-                            <span class="badge badge-light border text-muted px-2 py-1" style="font-size: 0.8rem; border-radius: 6px;">
-                                <i class="fas fa-stopwatch mr-1"></i><?= intval($q['time_limit']) ?>s
-                            </span>
-                            <span class="badge badge-light border text-muted px-2 py-1" style="font-size: 0.8rem; border-radius: 6px;">
-                                <i class="fas fa-star mr-1 text-warning"></i><?= intval($q['points']) ?> pts
-                            </span>
-                        </div>
-                        <div class="mt-2 mt-sm-0">
-                            <button type="button" class="btn btn-outline-danger btn-sm font-weight-bold btn-unsave"
-                                    data-question-id="<?= (int)$q['id_question'] ?>"
-                                    data-card-id="saved-card-<?= (int)$q['id_question'] ?>"
-                                    style="border-radius: 6px;">
-                                <i class="fas fa-trash-alt mr-1"></i> Bỏ lưu
-                            </button>
-                        </div>
+            <div class="q-card question-item" id="saved-card-<?= (int)$q['id_question'] ?>" data-text="<?= htmlspecialchars(mb_strtolower($q['text'] . ' ' . $q['quiz_name'])) ?>">
+                
+                <div class="q-header">
+                    <div class="q-meta">
+                        <span class="q-quiz-name"><?= htmlspecialchars($q['quiz_name']) ?></span>
+                        <span class="meta-dot">&bull;</span>
+                        <span><?= intval($q['time_limit']) ?>s</span>
+                        <span class="meta-dot">&bull;</span>
+                        <span><?= intval($q['points']) ?> pts</span>
+                        <span class="meta-dot">&bull;</span>
+                        <span><?= $savedDateFormatted ?></span>
+                    </div>
+                    <div>
+                        <button type="button" class="btn-remove-clean btn-unsave"
+                                data-question-id="<?= (int)$q['id_question'] ?>"
+                                data-card-id="saved-card-<?= (int)$q['id_question'] ?>">
+                            Remove
+                        </button>
+                    </div>
+                </div>
+
+                <div class="q-body">
+                    <div class="q-text">
+                        <?= htmlspecialchars($q['text'] ?? '') ?>
                     </div>
 
-                    <div class="card-body p-4">
-                        <!-- Nội dung câu hỏi -->
-                        <h4 class="font-weight-bold text-dark mb-3" style="line-height: 1.4;">
-                            <?= htmlspecialchars($q['text'] ?? '') ?>
-                        </h4>
+                    <?php if ($mediaUrl): ?>
+                        <div class="text-center my-3 p-2 bg-light rounded" style="max-height: 260px;">
+                            <?php if ($isVideo): ?>
+                                <video src="<?= htmlspecialchars($mediaUrl, ENT_QUOTES, 'UTF-8') ?>" controls style="max-height: 240px; max-width: 100%; border-radius: 8px;"></video>
+                            <?php else: ?>
+                                <img src="<?= htmlspecialchars($mediaUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Media" class="img-fluid rounded" style="max-height: 240px; object-fit: contain;">
+                            <?php endif; ?>
+                        </div>
+                    <?php endif; ?>
 
-                        <!-- Hình ảnh / Video đính kèm nếu có -->
-                        <?php if ($mediaUrl): ?>
-                            <div class="text-center my-3 p-2 bg-light rounded" style="max-height: 260px;">
-                                <?php if ($isVideo): ?>
-                                    <video src="<?= htmlspecialchars($mediaUrl, ENT_QUOTES, 'UTF-8') ?>" controls style="max-height: 240px; max-width: 100%; border-radius: 8px;"></video>
-                                <?php else: ?>
-                                    <img src="<?= htmlspecialchars($mediaUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Media" class="img-fluid rounded" style="max-height: 240px; object-fit: contain;">
+                    <div class="answers-grid">
+                        <?php foreach ($q['answers'] as $aIdx => $a):
+                            $cIdx = $aIdx % 4;
+                            $isCorrect = ((int)$a['is_correct'] === 1);
+                            $aImg = $reviewMediaUrl($a['image_path'] ?? null);
+                        ?>
+                            <div class="ans-item <?= $isCorrect ? 'is-correct' : '' ?>" style="background-color: <?= $colors[$cIdx] ?>;">
+                                <div class="d-flex align-items-center flex-grow-1 mr-2">
+                                    <span class="ans-shape"><?= $icons[$cIdx] ?></span>
+                                    <?php if ($aImg): ?>
+                                        <img src="<?= htmlspecialchars($aImg, ENT_QUOTES, 'UTF-8') ?>" alt="Answer" class="rounded mr-2 bg-white p-1" style="max-height: 36px; max-width: 50px; object-fit: contain;">
+                                    <?php endif; ?>
+                                    <span><?= htmlspecialchars($a['text'] ?? '') ?></span>
+                                </div>
+                                <?php if ($isCorrect): ?>
+                                    <span class="ans-correct-badge">Correct</span>
                                 <?php endif; ?>
                             </div>
-                        <?php endif; ?>
-
-                        <!-- Danh sách đáp án -->
-                        <div class="row mt-3">
-                            <?php foreach ($q['answers'] as $aIdx => $a):
-                                $cIdx = $aIdx % 4;
-                                $isCorrect = ((int)$a['is_correct'] === 1);
-                                $aImg = $reviewMediaUrl($a['image_path'] ?? null);
-                            ?>
-                                <div class="col-md-6 mb-2">
-                                    <div class="p-3 rounded d-flex align-items-center justify-content-between shadow-sm"
-                                         style="background-color: <?= $colors[$cIdx] ?>; color: #fff; border: <?= $isCorrect ? '3px solid #28a745' : '1px solid rgba(0,0,0,0.1)' ?>; position: relative;">
-                                        
-                                        <div class="d-flex align-items-center flex-grow-1 mr-2">
-                                            <span class="mr-3" style="font-size: 1.4rem; line-height: 1;"><?= $icons[$cIdx] ?></span>
-                                            <?php if ($aImg): ?>
-                                                <img src="<?= htmlspecialchars($aImg, ENT_QUOTES, 'UTF-8') ?>" alt="Answer" class="rounded mr-2 bg-white p-1" style="max-height: 40px; max-width: 60px; object-fit: contain;">
-                                            <?php endif; ?>
-                                            <span class="font-weight-bold" style="font-size: 1.1rem;"><?= htmlspecialchars($a['text'] ?? '') ?></span>
-                                        </div>
-
-                                        <?php if ($isCorrect): ?>
-                                            <span class="badge badge-light text-success font-weight-bold px-2 py-1 shadow-sm" style="font-size: 0.9rem; border-radius: 6px; white-space: nowrap;">
-                                                <i class="fas fa-check-circle mr-1"></i> ĐÁP ÁN ĐÚNG
-                                            </span>
-                                        <?php endif; ?>
-                                    </div>
-                                </div>
-                            <?php endforeach; ?>
-                        </div>
-
+                        <?php endforeach; ?>
                     </div>
+
                 </div>
             </div>
         <?php endforeach; ?>
@@ -200,7 +378,6 @@ $reviewMediaUrl = static function (?string $path): string {
 <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
 <script>
 $(document).ready(function() {
-    // 1. Tìm kiếm nhanh theo nội dung
     $('#searchInput').on('keyup', function() {
         const query = $(this).val().toLowerCase().trim();
         let matchCount = 0;
@@ -215,17 +392,16 @@ $(document).ready(function() {
         });
     });
 
-    // 2. Xử lý nút "Bỏ lưu"
     $('.btn-unsave').on('click', async function() {
         const btn = $(this);
         const questionId = btn.data('question-id');
         const cardId = btn.data('card-id');
 
-        if (!confirm('Bạn có chắc muốn bỏ lưu câu hỏi này không?')) {
+        if (!confirm('Remove this question?')) {
             return;
         }
 
-        btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin mr-1"></i> Đang xóa...');
+        btn.prop('disabled', true).text('Removing...');
 
         try {
             const response = await fetch('<?= BASE_URL ?>modules/api/toggle_saved_review_question.php', {
@@ -239,23 +415,23 @@ $(document).ready(function() {
 
             const res = await response.json();
             if (response.ok && res.success) {
-                $('#' + cardId).fadeOut(350, function() {
+                $('#' + cardId).fadeOut(250, function() {
                     $(this).remove();
                     const remaining = $('.question-item').length;
-                    $('#savedCountBadge').text(remaining + ' câu hỏi');
+                    $('#savedCountBadge').text(remaining);
 
                     if (remaining === 0) {
-                        $('#searchInput').closest('.card').remove();
-                        $('#emptyState').removeClass('d-none').hide().fadeIn(300);
+                        $('#searchInput').closest('.search-box').remove();
+                        $('#emptyState').removeClass('d-none').hide().fadeIn(250);
                     }
                 });
             } else {
-                alert(res.message || 'Không thể bỏ lưu câu hỏi. Vui lòng thử lại.');
-                btn.prop('disabled', false).html('<i class="fas fa-trash-alt mr-1"></i> Bỏ lưu');
+                alert(res.message || 'Unable to remove question.');
+                btn.prop('disabled', false).text('Remove');
             }
         } catch (err) {
-            alert('Lỗi kết nối máy chủ. Vui lòng thử lại.');
-            btn.prop('disabled', false).html('<i class="fas fa-trash-alt mr-1"></i> Bỏ lưu');
+            alert('Server error. Please try again.');
+            btn.prop('disabled', false).text('Remove');
         }
     });
 });

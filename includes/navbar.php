@@ -33,16 +33,7 @@ $creatorAvatar = $_SESSION['avatar'] ?? 'default.png';
                             <i class="fas fa-th-list mr-1"></i> My Kahoots
                         </a>
                     </li>
-                    <li class="nav-item mr-2">
-                        <a href="<?= BASE_URL ?>modules/reports/list.php" class="nav-link text-light font-weight-bold">
-                            <i class="fas fa-chart-bar mr-1"></i> Reports
-                        </a>
-                    </li>
-                    <li class="nav-item mr-3">
-                        <a href="<?= BASE_URL ?>modules/quiz/create.php" class="btn btn-sm btn-success font-weight-bold">
-                            <i class="fas fa-plus-circle mr-1"></i> Create New Quiz
-                        </a>
-                    </li>
+
 
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle d-flex align-items-center text-white" href="#" id="userDropdown" role="button" data-toggle="dropdown">
@@ -50,11 +41,11 @@ $creatorAvatar = $_SESSION['avatar'] ?? 'default.png';
                             <span class="font-weight-bold"><?= htmlspecialchars($creatorName) ?></span>
                         </a>
                         <div class="dropdown-menu dropdown-menu-right shadow" aria-labelledby="userDropdown">
-                            <a class="dropdown-item" href="<?= BASE_URL ?>modules/auth/dashboard.php">
-                                <i class="fas fa-tachometer-alt mr-2 text-primary"></i> Dashboard
+                            <a class="dropdown-item" href="<?= BASE_URL ?>modules/quiz/list.php">
+                                <i class="fas fa-th-list mr-2 text-primary"></i> My Kahoots
                             </a>
                             <a class="dropdown-item" href="<?= BASE_URL ?>modules/quiz/saved_questions.php">
-                                <i class="fas fa-bookmark mr-2 text-warning"></i> Câu hỏi đã lưu
+                                <i class="fas fa-bookmark mr-2 text-warning"></i> Saved Questions
                             </a>
                             <a class="dropdown-item" href="<?= BASE_URL ?>modules/reports/list.php">
                                 <i class="fas fa-chart-bar mr-2 text-success"></i> Reports & Analytics

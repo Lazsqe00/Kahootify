@@ -9,7 +9,7 @@ $roomId = intval($_SESSION['id_room'] ?? 0);
 $room = db_fetch_one("SELECT * FROM room WHERE id_room = :r AND id_creator = :c", [':r' => $roomId, ':c' => (int)$_SESSION['id_creator']]);
 
 if (!$room) {
-    redirect('modules/auth/dashboard.php');
+    redirect('modules/quiz/list.php');
 }
 
 $isFinal = ($room['status'] === 'finished') || (isset($_GET['final']) && $_GET['final'] === 'true');

@@ -21,7 +21,7 @@ $room = db_fetch_one("
 
 if (!$room) {
     set_flash_message('danger', 'Game report not found or you do not have permission to view it!');
-    redirect('modules/auth/dashboard.php');
+    redirect('modules/quiz/list.php');
 }
 
 // 2. Fetch questions played in this session (respecting randomized order if saved)
