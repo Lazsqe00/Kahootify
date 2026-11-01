@@ -703,8 +703,17 @@
     box-shadow: 0 4px 16px rgba(70,23,143,0.18);
 }
 
-.editor-flash {
-    max-width: 1120px;
-    margin: 10px auto 0;
-    padding: 0 20px;
+.editor-topbar-toast {
+    animation: fadeInToast 0.25s ease-out forwards;
+}
+
+@keyframes fadeInToast {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
 }

@@ -5,6 +5,7 @@ require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../includes/room_access.php';
 require_once __DIR__ . '/../../includes/player_characters.php';
+require_once __DIR__ . '/../../includes/modes/GameStateManager.php';
 
 $rawInput = file_get_contents('php://input');
 $jsonData = json_decode($rawInput, true);
@@ -17,9 +18,10 @@ if ($roomId <= 0) {
     exit;
 }
 
-if (isset($_GET['pid'])) {
-    $playerId = (int)$_GET['pid'];
-    $token = $_GET['token'] ?? '';
+$playerId = 0;
+if (isset($_GET['pid']) || isset($jsonData['pid'])) {
+    $playerId = (int)($_GET['pid'] ?? $jsonData['pid']);
+    $token = $_GET['token'] ?? ($jsonData['token'] ?? '');
     if ($playerId <= 0 || !player_request_is_valid($playerId, $roomId, $token)) {
         echo json_encode(['success' => false, 'message' => 'Invalid player session']);
         exit;
@@ -29,6 +31,9 @@ if (isset($_GET['pid'])) {
         echo json_encode(['success' => false, 'kicked' => true]);
         exit;
     }
+
+    // Touch last_seen_at for connection tracking
+    db_execute("UPDATE players SET last_seen_at = UNIX_TIMESTAMP() WHERE id_player = :p", [':p' => $playerId]);
 }
 
 if ($action === 'update_settings') {
@@ -65,15 +70,39 @@ if ($action === 'update_settings') {
 }
 
 if ($action === 'get_room_status') {
-    $room = db_fetch_one("SELECT id_room, pin, status, question_start_time, show_questions_on_players FROM room WHERE id_room = :r", [':r' => $roomId]);
+    $room = db_fetch_one("SELECT * FROM room WHERE id_room = :r", [':r' => $roomId]);
     if ($room) {
-        echo json_encode([
-            'success' => true,
-            'status'  => $room['status'],
-            'is_locked' => room_is_locked($room),
-            'start_time' => $room['question_start_time'],
-            'show_questions_on_players' => intval($room['show_questions_on_players'] ?? 0)
-        ]);
+        $parsed = GameStateManager::parseRoomStatus($room['status'] ?? '');
+        $response = [
+            'success'                   => true,
+            'status'                    => $room['status'],
+            'current_phase'             => $parsed['phase'],
+            'current_qid'               => $parsed['qid'],
+            'is_locked'                 => room_is_locked($room),
+            'start_time'                => $room['question_start_time'],
+            'show_questions_on_players' => intval($room['show_questions_on_players'] ?? 0),
+        ];
+
+        if ($playerId > 0) {
+            $p = db_fetch_one("SELECT id_player, nickname, score, status, eliminated_at_question, elimination_order FROM players WHERE id_player = :p", [':p' => $playerId]);
+            if ($p) {
+                $response['player_status'] = $p['status'] ?? 'ACTIVE';
+                $response['player_score']  = intval($p['score'] ?? 0);
+
+                if ($parsed['qid'] > 0) {
+                    $log = db_fetch_one(
+                        "SELECT * FROM player_question_logs WHERE id_room = :r AND id_question = :q AND id_player = :p",
+                        [':r' => $roomId, ':q' => $parsed['qid'], ':p' => $playerId]
+                    );
+                    $response['has_wagered']     = ($log && !empty($log['wager_tier']));
+                    $response['wager_tier']      = $log['wager_tier'] ?? null;
+                    $response['wager_amount']    = intval($log['wager_amount'] ?? 0);
+                    $response['is_sitting_out']  = !empty($log['is_sitting_out']);
+                }
+            }
+        }
+
+        echo json_encode($response);
     } else {
         echo json_encode(['success' => false, 'message' => 'Room does not exist']);
     }
@@ -86,17 +115,17 @@ if ($action === 'get_players') {
         echo json_encode(['success' => false, 'message' => 'Room does not exist']);
         exit;
     }
-    $players = filter_room_players($roomId, db_fetch_all("SELECT id_player, nickname, score FROM players WHERE id_room = :r ORDER BY id_player ASC", [':r' => $roomId]));
+    $players = filter_room_players($roomId, db_fetch_all("SELECT id_player, nickname, score, status FROM players WHERE id_room = :r ORDER BY id_player ASC", [':r' => $roomId]));
     foreach ($players as &$lobbyPlayer) {
         $appearance = get_player_appearance($room, (int) $lobbyPlayer['id_player']);
         $lobbyPlayer['character_svg'] = player_appearance_image($appearance, 'lobby-character');
     }
     unset($lobbyPlayer);
     echo json_encode([
-        'success' => true,
-        'players' => $players,
+        'success'   => true,
+        'players'   => $players,
         'is_locked' => room_is_locked($room),
-        'count'   => count($players)
+        'count'     => count($players)
     ]);
     exit;
 }
@@ -115,6 +144,20 @@ if ($action === 'get_question_status') {
         'total_players' => $counts['total_players'],
         'voted_count'   => $counts['voted_count']
     ]);
+    exit;
+}
+
+if ($action === 'get_wager_status') {
+    $qId = intval($_GET['id_question'] ?? 0);
+    $status = GameStateManager::getWagerPhaseStatus($roomId, $qId);
+    echo json_encode($status);
+    exit;
+}
+
+if ($action === 'lock_wager') {
+    $qId = intval($_GET['id_question'] ?? ($_POST['id_question'] ?? ($jsonData['id_question'] ?? 0)));
+    $result = GameStateManager::lockWagerPhaseAndAdvance($roomId, $qId);
+    echo json_encode($result);
     exit;
 }
 

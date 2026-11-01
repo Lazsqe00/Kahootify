@@ -19,11 +19,12 @@ if ($quizId > 0) {
         }
 
         $newQuizId = db_insert(
-            "INSERT INTO quiz (id_creator, name, description) VALUES (:c, :n, :d)",
+            "INSERT INTO quiz (id_creator, name, description, mode) VALUES (:c, :n, :d, :m)",
             [
                 ':c' => $creatorId,
                 ':n' => $newName,
-                ':d' => $srcQuiz['description']
+                ':d' => $srcQuiz['description'],
+                ':m' => $srcQuiz['mode'] ?? 'normal'
             ]
         );
 
@@ -35,7 +36,7 @@ if ($quizId > 0) {
 
             foreach ($questions as $q) {
                 $newQId = db_insert(
-                    "INSERT INTO questions (id_quiz, text, points, time_limit, image, question_type, media_type, sort_order) VALUES (:qz, :t, :p, :tl, :img, :qt, :mt, :so)",
+                    "INSERT INTO questions (id_quiz, text, points, time_limit, image, question_type, media_type, sort_order, mode, mode_config) VALUES (:qz, :t, :p, :tl, :img, :qt, :mt, :so, :m, :mc)",
                     [
                         ':qz'  => $newQuizId,
                         ':t'   => $q['text'],
@@ -44,7 +45,9 @@ if ($quizId > 0) {
                         ':img' => $q['image'],
                         ':qt'  => $q['question_type'] ?? 'multiple_choice',
                         ':mt'  => $q['media_type'] ?? null,
-                        ':so'  => $q['sort_order'] ?? 0
+                        ':so'  => $q['sort_order'] ?? 0,
+                        ':m'   => $q['mode'] ?? 'normal',
+                        ':mc'  => $q['mode_config'] ?? null,
                     ]
                 );
 

@@ -69,19 +69,91 @@ function initPropertiesPanel() {
             try {
                 localStorage.setItem('kahoot_qtype_' + EQ.quizId, this.value);
             } catch (e) {}
+
+            // Check if current mode supports this new question type
+            var modeEl = document.getElementById('propQuestionMode');
+            var curModeId = modeEl ? modeEl.value : (EQ.defaultMode || 'normal');
+            if (curModeId !== 'normal') {
+                var curMode = (EQ.modes || []).find(function (m) { return m.id === curModeId; });
+                if (curMode && curMode.supportedQuestionTypes && !curMode.supportedQuestionTypes.includes(qTypeEl.value)) {
+                    alert("Chế độ '" + curMode.label + "' không hỗ trợ loại câu hỏi này. Tự động chuyển về Multiple Choice.");
+                    qTypeEl.value = 'multiple_choice';
+                    syncPropsToForm();
+                }
+            }
         });
     }
-    ['propQuestionType', 'propTimeLimit', 'propPoints'].forEach(function (id) {
+
+    var modeEl = document.getElementById('propQuestionMode');
+    if (modeEl) {
+        if (EQ.defaultMode && (!EQ.questions || EQ.questions.length === 0)) {
+            modeEl.value = EQ.defaultMode;
+        }
+        modeEl.addEventListener('change', function () {
+            var selectedMode = this.value;
+            EQ.defaultMode = selectedMode;
+            var curType = document.getElementById('propQuestionType') ? document.getElementById('propQuestionType').value : 'multiple_choice';
+            var modeMeta = (EQ.modes || []).find(function (m) { return m.id === selectedMode; });
+
+            if (modeMeta && modeMeta.supportedQuestionTypes && !modeMeta.supportedQuestionTypes.includes(curType)) {
+                alert("Chế độ '" + modeMeta.label + "' không hỗ trợ loại câu hỏi hiện tại (" + curType + "). Vui lòng chọn loại câu hỏi khác trước.");
+                this.value = 'normal';
+                EQ.defaultMode = 'normal';
+            }
+            syncPropsToForm();
+        });
+    }
+
+    ['propQuestionType', 'propTimeLimit', 'propPoints', 'propQuestionMode', 'propWagerTimeSec', 'propWagerSpeedBonus'].forEach(function (id) {
         var el = document.getElementById(id);
         if (el) el.addEventListener('change', syncPropsToForm);
     });
+
+    syncPropsToForm();
 }
 
 function syncPropsToForm() {
-    document.getElementById('hiddenQuestionType').value = document.getElementById('propQuestionType').value;
-    document.getElementById('hiddenTimeLimit').value    = document.getElementById('propTimeLimit').value;
-    document.getElementById('hiddenPoints').value       = document.getElementById('propPoints').value;
-    applyQuestionTypeUI(document.getElementById('propQuestionType').value);
+    var qTypeEl = document.getElementById('propQuestionType');
+    var timeLimitEl = document.getElementById('propTimeLimit');
+    var pointsEl = document.getElementById('propPoints');
+    var modeEl = document.getElementById('propQuestionMode');
+    var wagerTimeEl = document.getElementById('propWagerTimeSec');
+    var wagerSpeedEl = document.getElementById('propWagerSpeedBonus');
+    var modeSettingsPanel = document.getElementById('modeSettingsPanel');
+    var descText = document.getElementById('modeDescriptionText');
+
+    if (qTypeEl && document.getElementById('hiddenQuestionType')) {
+        document.getElementById('hiddenQuestionType').value = qTypeEl.value;
+        applyQuestionTypeUI(qTypeEl.value);
+    }
+    if (timeLimitEl && document.getElementById('hiddenTimeLimit')) {
+        document.getElementById('hiddenTimeLimit').value = timeLimitEl.value;
+    }
+    if (pointsEl && document.getElementById('hiddenPoints')) {
+        document.getElementById('hiddenPoints').value = pointsEl.value;
+    }
+    var modeVal = EQ.defaultMode || 'normal';
+    if (modeEl) {
+        modeVal = modeEl.value || modeVal;
+    }
+    if (document.getElementById('hiddenQuestionMode')) {
+        document.getElementById('hiddenQuestionMode').value = modeVal;
+    }
+
+    if (modeSettingsPanel) {
+        modeSettingsPanel.style.display = (modeVal === 'wager') ? 'block' : 'none';
+    }
+
+    if (descText && EQ.modes) {
+        var meta = EQ.modes.find(function (m) { return m.id === modeVal; });
+        descText.textContent = meta ? meta.description : '';
+    }
+    if (wagerTimeEl && document.getElementById('hiddenWagerTimeSec')) {
+        document.getElementById('hiddenWagerTimeSec').value = wagerTimeEl.value;
+    }
+    if (wagerSpeedEl && document.getElementById('hiddenWagerSpeedBonus')) {
+        document.getElementById('hiddenWagerSpeedBonus').value = wagerSpeedEl.checked ? '1' : '0';
+    }
 }
 
 function applyQuestionTypeUI(type) {
@@ -378,6 +450,14 @@ function resetToNewMode() {
     if (preferredQuestionType && document.getElementById('propQuestionType')) {
         document.getElementById('propQuestionType').value = preferredQuestionType;
     }
+
+    var modeEl = document.getElementById('propQuestionMode');
+    if (modeEl) modeEl.value = EQ.defaultMode || 'normal';
+    var wagerTimeEl = document.getElementById('propWagerTimeSec');
+    if (wagerTimeEl) wagerTimeEl.value = '10';
+    var wagerSpeedEl = document.getElementById('propWagerSpeedBonus');
+    if (wagerSpeedEl) wagerSpeedEl.checked = false;
+
     syncPropsToForm();
 }
 
@@ -413,6 +493,25 @@ window.loadQuestionForEdit = function (questionId) {
     document.getElementById('propQuestionType').value = qType;
     document.getElementById('propTimeLimit').value    = q.time_limit  || '20';
     document.getElementById('propPoints').value       = q.points      || '1000';
+
+    var modeEl = document.getElementById('propQuestionMode');
+    var qMode = q.mode || EQ.defaultMode || 'normal';
+    if (modeEl) modeEl.value = qMode;
+    if (document.getElementById('hiddenQuestionMode')) {
+        document.getElementById('hiddenQuestionMode').value = qMode;
+    }
+
+    var wagerTimeEl = document.getElementById('propWagerTimeSec');
+    var wagerSpeedEl = document.getElementById('propWagerSpeedBonus');
+    var cfg = {};
+    if (q.mode_config) {
+        try {
+            cfg = (typeof q.mode_config === 'string') ? JSON.parse(q.mode_config) : q.mode_config;
+        } catch(e) {}
+    }
+    if (wagerTimeEl) wagerTimeEl.value = cfg.wagerTimeSec || 10;
+    if (wagerSpeedEl) wagerSpeedEl.checked = !!cfg.speedBonusEnabled;
+
     syncPropsToForm();
 
     setQMediaFromUrl(q.image || null, q.media_type || null);

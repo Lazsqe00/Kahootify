@@ -4,6 +4,9 @@ require_once __DIR__ . '/../../includes/auth_check.php';
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../includes/room_access.php';
 require_once __DIR__ . '/../../includes/player_characters.php';
+require_once __DIR__ . '/../../includes/modes/GameStateManager.php';
+require_once __DIR__ . '/../../includes/modes/QuestionModeRegistry.php';
+require_once __DIR__ . '/../../includes/modes/WagerCalculator.php';
 
 $roomId = intval($_SESSION['id_room'] ?? 0);
 $room = db_fetch_one("SELECT * FROM room WHERE id_room = :r AND id_creator = :c", [':r' => $roomId, ':c' => (int)$_SESSION['id_creator']]);
@@ -20,8 +23,13 @@ if ($isFinal && $room['status'] !== 'finished') {
 
 $currentQId = intval($_GET['qid'] ?? 0);
 if ($currentQId <= 0 && !$isFinal) {
-    $currentQId = intval(str_replace('res_', '', $room['status']));
+    $parsed = GameStateManager::parseStatus($room['status']);
+    $currentQId = $parsed['question_id'];
 }
+
+$currentQuestion = db_fetch_one("SELECT * FROM questions WHERE id_question = :qid", [':qid' => $currentQId]);
+$questionMode = $currentQuestion['mode'] ?? 'normal';
+$isWagerQuestion = ($questionMode === 'wager');
 
 $selectedQIds = !empty($room['question_order']) ? json_decode($room['question_order'], true) : null;
 if (!is_array($selectedQIds) || empty($selectedQIds)) {
@@ -40,23 +48,37 @@ $questionNumber = ($currentIdx !== false) ? ($currentIdx + 1) : 1;
 
 if (!$isFinal && $currentQId > 0) {
     $sql = "SELECT p.*,
-                   COALESCE(v.points_earned + v.streak_bonus, 0) as points_gained,
+                   COALESCE(l.points_change, l.delta_score, COALESCE(v.points_earned + v.streak_bonus, 0)) as points_gained,
                    COALESCE(a.is_correct, 0) as is_round_correct,
                    (SELECT COUNT(*) FROM votes v2 JOIN answers a2 ON v2.id_answer = a2.id_answer WHERE v2.id_player = p.id_player AND a2.is_correct = 1) as correct_count
             FROM players p
-            LEFT JOIN votes v ON v.id_player = p.id_player AND v.id_answer IN (SELECT id_answer FROM answers WHERE id_question = :qid)
+            LEFT JOIN player_question_logs l ON l.id_player = p.id_player AND l.id_question = :qid AND l.id_room = :r
+            LEFT JOIN votes v ON v.id_player = p.id_player AND v.id_answer IN (SELECT id_answer FROM answers WHERE id_question = :qid2)
             LEFT JOIN answers a ON v.id_answer = a.id_answer
             WHERE p.id_room = :id_room
             ORDER BY p.score DESC, p.playeradd ASC, p.id_player ASC";
-    $leaderboard = filter_room_players($roomId, db_fetch_all($sql, [':id_room' => $roomId, ':qid' => $currentQId]));
+    $leaderboard = filter_room_players($roomId, db_fetch_all($sql, [':id_room' => $roomId, ':qid' => $currentQId, ':r' => $roomId, ':qid2' => $currentQId]));
 } else {
     $leaderboard = get_room_leaderboard($roomId);
+    $leaderboard = WagerCalculator::calculateFinalRanking($leaderboard);
 }
 
 if ($isFinal) {
     $resultsPlayerId = 0;
     require __DIR__ . '/../../includes/final_results.php';
     exit;
+}
+
+// Stats for wager mode round summary
+$allInCount = 0;
+$wagerWinnersCount = 0;
+$justEliminatedCount = 0;
+$activeRemainingCount = 0;
+if ($isWagerQuestion) {
+    $allInCount = db_count('player_question_logs', "id_room = :r AND id_question = :q AND (wager_tier = '100%' OR wager_tier = 'tier_100')", [':r' => $roomId, ':q' => $currentQId]);
+    $wagerWinnersCount = db_count('player_question_logs', "id_room = :r AND id_question = :q AND (points_change > 0 OR delta_score > 0)", [':r' => $roomId, ':q' => $currentQId]);
+    $justEliminatedCount = db_count('players', "id_room = :r AND status = 'ELIMINATED' AND eliminated_at_question = :q", [':r' => $roomId, ':q' => $currentQId]);
+    $activeRemainingCount = db_count('players', "id_room = :r AND (status = 'ACTIVE' OR status IS NULL) AND is_kicked = 0", [':r' => $roomId]);
 }
 
 $quiz = db_fetch_one("SELECT name FROM quiz WHERE id_quiz = :q", [':q' => $room['id_quiz']]);
@@ -212,7 +234,10 @@ require_once __DIR__ . '/../../includes/header.php';
         <img src="<?= BASE_URL ?>assets/img/logo.png" alt="Logo" style="max-height: 32px; filter: brightness(100);" class="mr-3">
         <span class="badge badge-light font-weight-bold mr-2">PIN: <?= htmlspecialchars($room['pin']) ?></span>
         <span class="text-white font-weight-bold mr-2">LEADERBOARD</span>
-        <span class="badge badge-primary font-weight-bold">Question <?= $questionNumber ?> / <?= $totalQuestions ?></span>
+        <span class="badge badge-primary font-weight-bold mr-2">Question <?= $questionNumber ?> / <?= $totalQuestions ?></span>
+        <?php if ($isWagerQuestion): ?>
+            <span class="badge badge-warning text-dark font-weight-bold"><i class="fas fa-dice mr-1"></i> CƯỢC ĐIỂM</span>
+        <?php endif; ?>
     </div>
 </nav>
 
@@ -226,6 +251,36 @@ require_once __DIR__ . '/../../includes/header.php';
             <?= htmlspecialchars($quizName) ?> &bull; Question <?= $questionNumber ?> of <?= $totalQuestions ?>
         </p>
     </div>
+
+    <?php if ($isWagerQuestion): ?>
+        <!-- WAGER ROUND SUMMARY BAR (HOST VIEW) -->
+        <div class="row mb-4">
+            <div class="col-md-3 col-6 mb-2">
+                <div class="bg-white rounded p-3 text-center shadow-sm" style="border-radius: 14px;">
+                    <div class="text-danger font-weight-bold" style="font-size: 1.8rem;">🔥 <?= $allInCount ?></div>
+                    <div class="text-muted small font-weight-bold text-uppercase">Cược ALL-IN</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6 mb-2">
+                <div class="bg-white rounded p-3 text-center shadow-sm" style="border-radius: 14px;">
+                    <div class="text-success font-weight-bold" style="font-size: 1.8rem;">🏆 <?= $wagerWinnersCount ?></div>
+                    <div class="text-muted small font-weight-bold text-uppercase">Thắng cược</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6 mb-2">
+                <div class="bg-white rounded p-3 text-center shadow-sm" style="border-radius: 14px;">
+                    <div class="text-dark font-weight-bold" style="font-size: 1.8rem;">💀 <?= $justEliminatedCount ?></div>
+                    <div class="text-muted small font-weight-bold text-uppercase">Vừa bị loại</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6 mb-2">
+                <div class="bg-white rounded p-3 text-center shadow-sm" style="border-radius: 14px;">
+                    <div class="text-primary font-weight-bold" style="font-size: 1.8rem;">🛡️ <?= $activeRemainingCount ?></div>
+                    <div class="text-muted small font-weight-bold text-uppercase">Còn sống sót</div>
+                </div>
+            </div>
+        </div>
+    <?php endif; ?>
 
     <!-- Player Standings List (Bảng điểm hiện tại) -->
     <div class="card border-0 leaderboard-card p-3 p-md-4 mb-4">
@@ -244,6 +299,7 @@ require_once __DIR__ . '/../../includes/header.php';
                     $prevScore = max(0, $currScore - $gained);
                     $streak = intval($p['current_streak'] ?? 0);
                     $appearance = get_player_appearance($room, (int)$p['id_player']);
+                    $pStatus = strtoupper((string)($p['status'] ?? 'ACTIVE'));
 
                     $rankIcon = '';
                     if ($rank === 1) {
@@ -278,19 +334,34 @@ require_once __DIR__ . '/../../includes/header.php';
                                     <?= htmlspecialchars($p['nickname']) ?>
                                 </span>
 
+                                <?php if ($pStatus === 'ELIMINATED'): ?>
+                                    <span class="badge badge-dark text-white font-weight-bold mr-2 shadow-sm" style="font-size: 0.8rem;">
+                                        <i class="fas fa-skull mr-1"></i> Bị loại
+                                    </span>
+                                <?php elseif ($pStatus === 'SPECTATOR'): ?>
+                                    <span class="badge badge-secondary font-weight-bold mr-2 shadow-sm" style="font-size: 0.8rem;">
+                                        <i class="fas fa-eye mr-1"></i> Khán giả
+                                    </span>
+                                <?php endif; ?>
+
                                 <!-- Streak Badge -->
-                                <?php if ($streak >= 2): ?>
+                                <?php if ($streak >= 2 && $pStatus === 'ACTIVE'): ?>
                                     <span class="badge badge-danger font-weight-bold mr-2 shadow-sm streak-badge"
                                           title="<?= $streak ?> consecutive correct answers!">
                                         <i class="fas fa-fire streak-fire-anim mr-1"></i><?= $streak ?>
                                     </span>
                                 <?php endif; ?>
 
-                                <!-- Points Gained Pill (+X) -->
+                                <!-- Points Gained / Lost Pill -->
                                 <?php if ($gained > 0): ?>
                                     <span class="badge badge-success font-weight-bold gained-badge shadow-sm"
                                           data-gained="<?= $gained ?>">
                                         +<?= number_format($gained) ?>
+                                    </span>
+                                <?php elseif ($gained < 0): ?>
+                                    <span class="badge badge-danger font-weight-bold gained-badge revealed shadow-sm"
+                                          data-gained="<?= $gained ?>">
+                                        <?= number_format($gained) ?>
                                     </span>
                                 <?php endif; ?>
                             </div>
@@ -303,7 +374,7 @@ require_once __DIR__ . '/../../includes/header.php';
                                       data-start="<?= $prevScore ?>"
                                       data-target="<?= $currScore ?>"
                                       data-gained="<?= $gained ?>">
-                                    <?= number_format($prevScore) ?>
+                                    <?= number_format($currScore) ?>
                                 </span>
                                 <span class="score-unit text-muted font-weight-bold ml-1">pts</span>
                             </div>

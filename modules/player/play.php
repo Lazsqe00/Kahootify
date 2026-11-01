@@ -2,6 +2,10 @@
 
 require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../includes/room_access.php';
+require_once __DIR__ . '/../../includes/modes/GameStateManager.php';
+require_once __DIR__ . '/../../includes/modes/QuestionModeRegistry.php';
+require_once __DIR__ . '/../../includes/modes/WagerCalculator.php';
 
 $playerId = intval($_GET['pid'] ?? ($_SESSION['id_player'] ?? 0));
 $token    = trim($_GET['token'] ?? '');
@@ -36,17 +40,37 @@ if ($status === 'waiting') {
 
 if ($status === 'finished') {
     $leaderboard = get_room_leaderboard($roomId);
+    $leaderboard = WagerCalculator::calculateFinalRanking($leaderboard);
     $resultsPlayerId = $playerId;
     require __DIR__ . '/../../includes/final_results.php';
     exit;
 }
 
-$isResultPhase = (strpos($status, 'res_') === 0);
-$qId = $isResultPhase ? intval(str_replace('res_', '', $status)) : intval($status);
+$parsed = GameStateManager::parseStatus($status);
+$phase = $parsed['phase'];
+$qId = $parsed['question_id'];
+$isResultPhase = ($phase === 'result');
 
-$answers = db_fetch_all("SELECT * FROM answers WHERE id_question = :qid ORDER BY id_answer ASC", [':qid' => $qId]);
+$playerStatus = strtoupper((string)($player['status'] ?? 'ACTIVE'));
+$isEliminated = ($playerStatus === 'ELIMINATED');
+$isSpectator = ($playerStatus === 'SPECTATOR');
+$currentScore = intval($player['score'] ?? 0);
 
 $currentQuestion = db_fetch_one("SELECT * FROM questions WHERE id_question = :qid", [':qid' => $qId]);
+$questionMode = $currentQuestion['mode'] ?? 'normal';
+$modeConfig = !empty($currentQuestion['mode_config']) ? json_decode($currentQuestion['mode_config'], true) : [];
+
+$playerLog = db_fetch_one("SELECT * FROM player_question_logs WHERE id_room = :r AND id_question = :q AND id_player = :p", [
+    ':r' => $roomId,
+    ':q' => $qId,
+    ':p' => $playerId
+]);
+$isSittingOut = !empty($playerLog['is_sitting_out']);
+$myWagerTier = $playerLog['wager_tier'] ?? null;
+$myWagerTierLabel = $myWagerTier ? WagerCalculator::getTierLabel($myWagerTier) : null;
+$myWagerAmount = intval($playerLog['wager_amount'] ?? 0);
+
+$answers = db_fetch_all("SELECT * FROM answers WHERE id_question = :qid ORDER BY id_answer ASC", [':qid' => $qId]);
 $timeLimit = intval($currentQuestion['time_limit'] ?? 20);
 if ($timeLimit <= 0) {
     $timeLimit = 20;
@@ -91,23 +115,25 @@ $myRank = 1;
 if ($isResultPhase) {
     $leaderboardSql = "
         SELECT p.*,
-               COALESCE(v.points_earned + v.streak_bonus, 0) as points_gained,
+               COALESCE(l.points_change, l.delta_score, COALESCE(v.points_earned + v.streak_bonus, 0)) as points_gained,
                COALESCE(a.is_correct, 0) as is_round_correct
         FROM players p
+        LEFT JOIN player_question_logs l ON l.id_player = p.id_player AND l.id_question = :qid AND l.id_room = :r
         LEFT JOIN votes v ON v.id_player = p.id_player
-             AND v.id_answer IN (SELECT id_answer FROM answers WHERE id_question = :qid)
+             AND v.id_answer IN (SELECT id_answer FROM answers WHERE id_question = :qid2)
         LEFT JOIN answers a ON v.id_answer = a.id_answer
-        WHERE p.id_room = :r
+        WHERE p.id_room = :r2
         ORDER BY p.score DESC, p.playeradd ASC, p.id_player ASC
     ";
-    $leaderboard = db_fetch_all($leaderboardSql, [':r' => $roomId, ':qid' => $qId]);
+    $leaderboard = db_fetch_all($leaderboardSql, [':r' => $roomId, ':qid' => $qId, ':qid2' => $qId, ':r2' => $roomId]);
     if (empty($leaderboard)) {
         $leaderboard = db_fetch_all("SELECT * FROM players WHERE id_room = :r ORDER BY score DESC, playeradd ASC, id_player ASC", [':r' => $roomId]);
     }
     $leaderboard = filter_room_players($roomId, $leaderboard);
-    foreach ($leaderboard as $idx => $p) {
+    $rankedBoard = WagerCalculator::calculateFinalRanking($leaderboard);
+    foreach ($rankedBoard as $p) {
         if ($p['id_player'] == $playerId) {
-            $myRank = $idx + 1;
+            $myRank = $p['rank'] ?? '-';
             break;
         }
     }
@@ -119,7 +145,7 @@ if (!is_array($selectedQIds) || empty($selectedQIds)) {
     $selectedQIds = array_column($fallbackQuestions, 'id_question');
 }
 $totalQuestions = count($selectedQIds);
-$currentQNum = array_search($qId, $selectedQIds);
+$currentQNum = array_search((int)$qId, $selectedQIds);
 $questionNumber = ($currentQNum !== false) ? ($currentQNum + 1) : 1;
 
 $pageTitle = "Question " . $questionNumber . "/" . $totalQuestions . " - Kahoot! | " . htmlspecialchars($nickname);
@@ -129,12 +155,26 @@ require_once __DIR__ . '/../../includes/header.php';
 
 <audio id="submitSfx" preload="auto" src="<?= BASE_URL ?>assets/audio/<?= rawurlencode('submit_answer_tension_002.mp3') ?>"></audio>
 
-<div class="d-flex justify-content-between align-items-center px-3 py-2 text-white shadow-sm" style="background-color: var(--kahoot-purple-dark);">
+<div class="d-flex justify-content-between align-items-center px-3 py-2 text-white shadow-sm flex-wrap" style="background-color: var(--kahoot-purple-dark); gap: 10px;">
     <div class="font-weight-bold d-flex align-items-center">
         <i class="fas fa-user mr-1 text-warning"></i> <?= htmlspecialchars($nickname) ?>
         <span class="badge badge-light text-dark font-weight-bold ml-2 px-2 py-1 shadow-sm" style="font-size: 0.85rem;">
             Question <?= $questionNumber ?> / <?= $totalQuestions ?>
         </span>
+        <?php if ($questionMode === 'wager'): ?>
+            <span class="badge badge-warning text-dark font-weight-bold ml-1 px-2 py-1 shadow-sm" style="font-size: 0.85rem;">
+                <i class="fas fa-dice mr-1"></i> CƯỢC
+            </span>
+        <?php endif; ?>
+        <?php if ($isEliminated): ?>
+            <span class="badge badge-danger ml-1 px-2 py-1 font-weight-bold shadow-sm" style="font-size: 0.85rem;">
+                <i class="fas fa-skull mr-1"></i> ĐÃ BỊ LOẠI
+            </span>
+        <?php elseif ($isSpectator): ?>
+            <span class="badge badge-secondary ml-1 px-2 py-1 font-weight-bold shadow-sm" style="font-size: 0.85rem;">
+                <i class="fas fa-eye mr-1"></i> KHÁN GIẢ
+            </span>
+        <?php endif; ?>
     </div>
     <div class="d-flex align-items-center" style="gap: 10px;">
         <div class="font-weight-bold badge badge-light text-dark px-3 py-2" style="font-size: 0.95rem;">
@@ -146,44 +186,30 @@ require_once __DIR__ . '/../../includes/header.php';
     </div>
 </div>
 
-<?php if ($isResultPhase): ?>
+<?php
+// =========================================================================
+// VIEW A: RESULT PHASE
+// =========================================================================
+if ($isResultPhase):
+    $isWagerQuestion = ($questionMode === 'wager');
+    $wagerPointsChange = $playerLog ? intval($playerLog['points_change'] ?? ($playerLog['delta_score'] ?? 0)) : 0;
+    $justEliminated = ($isEliminated && intval($player['eliminated_at_question'] ?? 0) === $qId);
 
-    <?php
     $isCorrect = ($myVote && $myVote['is_correct'] == 1);
     $pointsEarned = $myVote ? intval($myVote['points_earned']) : 0;
     $streakBonus = $myVote ? intval($myVote['streak_bonus'] ?? 0) : 0;
-    $totalRoundPoints = $pointsEarned + $streakBonus;
     $currentStreak = intval($player['current_streak'] ?? 0);
 
-    // Audio công bố kết quả câu hỏi (SFX)
+    // Audio SFX
     $correctAudios = ['correct_01.mp3', 'correct_02.mp3', 'correct_03.mp3', 'correct_04.mp3', 'correct_high.mp3'];
     $incorrectAudios = ['incorrect_01.mp3', 'incorrect_02.mp3', 'incorrect_03.mp3', 'incorrect_04.mp3', 'incorrect_low.mp3'];
-    $resultAudioFile = $isCorrect
-        ? $correctAudios[array_rand($correctAudios)]
-        : $incorrectAudios[array_rand($incorrectAudios)];
 
-    // Kiểm tra mất chuỗi (Streak Lost): Nếu câu này sai và trước đó có chuỗi >= 2
-    $streakLost = false;
-    if (!$isCorrect && $myVote) {
-        $prevVotes = db_fetch_all(
-            "SELECT a.is_correct
-             FROM votes v
-             JOIN answers a ON v.id_answer = a.id_answer
-             WHERE v.id_player = :pid AND a.id_question != :qid
-             ORDER BY v.id_vote DESC",
-            [':pid' => $playerId, ':qid' => $qId]
-        );
-        $prevStreak = 0;
-        foreach ($prevVotes as $pv) {
-            if ($pv['is_correct'] == 1) {
-                $prevStreak++;
-            } else {
-                break;
-            }
-        }
-        if ($prevStreak >= 2) {
-            $streakLost = true;
-        }
+    if ($isWagerQuestion) {
+        $resultAudioFile = ($wagerPointsChange > 0) ? 'correct_high.mp3' : 'incorrect_low.mp3';
+    } else {
+        $resultAudioFile = $isCorrect
+            ? $correctAudios[array_rand($correctAudios)]
+            : $incorrectAudios[array_rand($incorrectAudios)];
     }
     ?>
     <audio id="resultSfx" preload="auto" src="<?= BASE_URL ?>assets/audio/<?= rawurlencode($resultAudioFile) ?>"></audio>
@@ -191,50 +217,114 @@ require_once __DIR__ . '/../../includes/header.php';
 
     <div class="container py-3" style="max-width: 650px;">
 
-        <div class="card border-0 shadow text-white text-center mb-3"
-             style="background: <?= $isCorrect ? 'linear-gradient(135deg, #26890c, #1a6207)' : 'linear-gradient(135deg, #e21b3c, #9c1228)' ?>; border-radius: 16px;">
-            <div class="card-body py-3 px-4">
-                <div class="d-flex align-items-center justify-content-center" style="gap: 15px;">
-                    <div style="font-size: 3rem; line-height: 1;">
-                        <?= $isCorrect ? '🎉' : '❌' ?>
-                    </div>
-                    <div class="text-left">
-                        <h3 class="font-weight-bold mb-0">
-                            <?= $isCorrect ? 'Correct!' : 'Incorrect!' ?>
-                        </h3>
-                        <?php if ($isCorrect): ?>
-                            <?php if ($streakBonus > 0): ?>
-                                <p class="mb-0 font-weight-bold" style="font-size: 1.25rem; color: #fff;">
-                                    +<?= number_format($pointsEarned) ?> + <?= number_format($streakBonus) ?> Streak Bonus
-                                </p>
-                            <?php else: ?>
-                                <p class="mb-0 font-weight-bold" style="font-size: 1.15rem; color: #fff;">
-                                    +<?= number_format($pointsEarned) ?> pts
-                                </p>
-                            <?php endif; ?>
-                        <?php else: ?>
-                            <p class="mb-0 font-weight-bold" style="font-size: 1.15rem; color: #fff;">
-                                +0 pts
-                            </p>
-                            <?php if ($streakLost): ?>
-                                <div class="text-danger font-weight-bold small mt-1 bg-white px-2 py-1 rounded d-inline-block shadow-sm">
-                                    <i class="fas fa-heart-broken mr-1"></i> Answer streak lost!
-                                </div>
-                            <?php endif; ?>
-                        <?php endif; ?>
-                    </div>
+        <?php if ($justEliminated): ?>
+            <div class="card border-0 shadow text-white text-center mb-3"
+                 style="background: linear-gradient(135deg, #1f1f1f, #8b0000); border-radius: 16px;">
+                <div class="card-body py-4 px-4">
+                    <div style="font-size: 4rem; line-height: 1;" class="mb-2">💀</div>
+                    <h2 class="font-weight-bold mb-1">YOU HAVE BEEN ELIMINATED!</h2>
+                    <p class="font-weight-bold mb-2 text-warning" style="font-size: 1.25rem;">
+                        <?= number_format($wagerPointsChange) ?> pts
+                    </p>
+                    <p class="mb-0" style="font-size: 1rem; opacity: 0.9;">
+                        Điểm số của bạn đã về 0 sau khi thua cược. Bạn sẽ theo dõi các câu hỏi còn lại với tư cách khán giả.
+                    </p>
                 </div>
+            </div>
 
-                <?php if ($isCorrect && $currentStreak >= 2): ?>
-                    <div class="mt-3">
-                        <div class="badge badge-warning text-dark font-weight-bold px-3 py-2 shadow-sm" style="font-size: 0.95rem;">
-                            <i class="fas fa-fire text-danger mr-1 streak-fire-anim"></i> Answer Streak: <?= $currentStreak ?> 🔥
+        <?php elseif ($isWagerQuestion && $isSittingOut): ?>
+            <div class="card border-0 shadow text-white text-center mb-3"
+                 style="background: linear-gradient(135deg, #495057, #343a40); border-radius: 16px;">
+                <div class="card-body py-3 px-4">
+                    <div class="d-flex align-items-center justify-content-center" style="gap: 15px;">
+                        <div style="font-size: 3rem; line-height: 1;">⏸️</div>
+                        <div class="text-left">
+                            <h3 class="font-weight-bold mb-0">Bỏ qua câu này</h3>
+                            <p class="mb-0 font-weight-bold" style="font-size: 1.15rem; color: #fff;">
+                                +0 pts (Không đặt cược - Điểm số giữ nguyên)
+                            </p>
                         </div>
                     </div>
-                <?php endif; ?>
+                </div>
             </div>
-        </div>
 
+        <?php elseif ($isWagerQuestion): ?>
+            <?php $wagerWon = ($wagerPointsChange > 0); ?>
+            <div class="card border-0 shadow text-white text-center mb-3"
+                 style="background: <?= $wagerWon ? 'linear-gradient(135deg, #26890c, #1a6207)' : 'linear-gradient(135deg, #e21b3c, #9c1228)' ?>; border-radius: 16px;">
+                <div class="card-body py-3 px-4">
+                    <div class="d-flex align-items-center justify-content-center" style="gap: 15px;">
+                        <div style="font-size: 3rem; line-height: 1;">
+                            <?= $wagerWon ? '🎉' : '❌' ?>
+                        </div>
+                        <div class="text-left">
+                            <h3 class="font-weight-bold mb-0">
+                                <?= $wagerWon ? 'Thắng Cược!' : 'Thua Cược!' ?>
+                            </h3>
+                            <p class="mb-0 font-weight-bold" style="font-size: 1.25rem; color: #fff;">
+                                <?= $wagerWon ? '+' : '' ?><?= number_format($wagerPointsChange) ?> pts
+                            </p>
+                            <small style="opacity: 0.9;" class="font-weight-bold">
+                                Mức cược: <?= htmlspecialchars($myWagerTierLabel ?? ($myWagerTier ?? '')) ?> (<?= number_format($myWagerAmount) ?> pts)
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        <?php elseif ($isEliminated || $isSpectator): ?>
+            <div class="card border-0 shadow text-white text-center mb-3"
+                 style="background: linear-gradient(135deg, #495057, #343a40); border-radius: 16px;">
+                <div class="card-body py-3 px-4">
+                    <div style="font-size: 2.5rem;" class="mb-1">👀</div>
+                    <h4 class="font-weight-bold mb-0">Chế độ khán giả</h4>
+                    <small>Bạn đang theo dõi kết quả của các người chơi khác.</small>
+                </div>
+            </div>
+
+        <?php else: ?>
+            <!-- NORMAL QUESTION RESULT -->
+            <div class="card border-0 shadow text-white text-center mb-3"
+                 style="background: <?= $isCorrect ? 'linear-gradient(135deg, #26890c, #1a6207)' : 'linear-gradient(135deg, #e21b3c, #9c1228)' ?>; border-radius: 16px;">
+                <div class="card-body py-3 px-4">
+                    <div class="d-flex align-items-center justify-content-center" style="gap: 15px;">
+                        <div style="font-size: 3rem; line-height: 1;">
+                            <?= $isCorrect ? '🎉' : '❌' ?>
+                        </div>
+                        <div class="text-left">
+                            <h3 class="font-weight-bold mb-0">
+                                <?= $isCorrect ? 'Correct!' : 'Incorrect!' ?>
+                            </h3>
+                            <?php if ($isCorrect): ?>
+                                <?php if ($streakBonus > 0): ?>
+                                    <p class="mb-0 font-weight-bold" style="font-size: 1.25rem; color: #fff;">
+                                        +<?= number_format($pointsEarned) ?> + <?= number_format($streakBonus) ?> Streak Bonus
+                                    </p>
+                                <?php else: ?>
+                                    <p class="mb-0 font-weight-bold" style="font-size: 1.15rem; color: #fff;">
+                                        +<?= number_format($pointsEarned) ?> pts
+                                    </p>
+                                <?php endif; ?>
+                            <?php else: ?>
+                                <p class="mb-0 font-weight-bold" style="font-size: 1.15rem; color: #fff;">
+                                    +0 pts
+                                </p>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+
+                    <?php if ($isCorrect && $currentStreak >= 2): ?>
+                        <div class="mt-3">
+                            <div class="badge badge-warning text-dark font-weight-bold px-3 py-2 shadow-sm" style="font-size: 0.95rem;">
+                                <i class="fas fa-fire text-danger mr-1 streak-fire-anim"></i> Answer Streak: <?= $currentStreak ?> 🔥
+                            </div>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        <?php endif; ?>
+
+        <!-- Rank Card -->
         <div class="card border-0 shadow-sm mb-3 text-center" style="border-radius: 14px; background: #ffffff;">
             <div class="card-body py-2 px-3">
                 <div class="d-flex justify-content-around align-items-center">
@@ -255,6 +345,7 @@ require_once __DIR__ . '/../../includes/header.php';
             </div>
         </div>
 
+        <!-- Room Leaderboard -->
         <div class="card border-0 shadow-sm mb-3" style="border-radius: 16px; background: #ffffff;">
             <div class="card-header bg-white py-2 px-3 border-bottom d-flex align-items-center justify-content-between">
                 <h6 class="font-weight-bold mb-0 text-dark">
@@ -270,6 +361,7 @@ require_once __DIR__ . '/../../includes/header.php';
                     $isMe = ($p['id_player'] == $playerId);
                     $gained = intval($p['points_gained'] ?? 0);
                     $startScore = max(0, intval($p['score']) - $gained);
+                    $pStatus = strtoupper((string)($p['status'] ?? 'ACTIVE'));
                 ?>
                     <div class="d-flex align-items-center justify-content-between p-2 mb-2 rounded"
                          style="border: <?= $isMe ? '2px solid #f59f00' : '1px solid #e9ecef' ?>; background-color: <?= $isMe ? '#fff9db' : '#f8f9fa' ?>;">
@@ -292,8 +384,13 @@ require_once __DIR__ . '/../../includes/header.php';
                                 <?php if ($isMe): ?>
                                     <span class="badge badge-warning text-dark font-weight-bold ml-1 px-2" style="font-size: 0.75rem;">YOU</span>
                                 <?php endif; ?>
-                                <?php if (intval($p['current_streak'] ?? 0) >= 2): ?>
-                                    <span class="badge badge-danger ml-1 font-weight-bold" style="font-size: 0.75rem;" title="<?= intval($p['current_streak']) ?> câu đúng liên tiếp!">
+                                <?php if ($pStatus === 'ELIMINATED'): ?>
+                                    <span class="badge badge-dark ml-1 font-weight-bold" style="font-size: 0.72rem;">Eliminated</span>
+                                <?php elseif ($pStatus === 'SPECTATOR'): ?>
+                                    <span class="badge badge-secondary ml-1 font-weight-bold" style="font-size: 0.72rem;">Spectator</span>
+                                <?php endif; ?>
+                                <?php if (intval($p['current_streak'] ?? 0) >= 2 && $pStatus === 'ACTIVE'): ?>
+                                    <span class="badge badge-danger ml-1 font-weight-bold" style="font-size: 0.75rem;">
                                         <i class="fas fa-fire streak-fire-anim"></i> <?= intval($p['current_streak']) ?>
                                     </span>
                                 <?php endif; ?>
@@ -310,6 +407,10 @@ require_once __DIR__ . '/../../includes/header.php';
                             <?php if ($gained > 0): ?>
                                 <span class="badge badge-success px-1 ml-1" style="font-size: 0.75rem;">
                                     +<?= $gained ?>
+                                </span>
+                            <?php elseif ($gained < 0): ?>
+                                <span class="badge badge-danger px-1 ml-1" style="font-size: 0.75rem;">
+                                    <?= $gained ?>
                                 </span>
                             <?php endif; ?>
                         </div>
@@ -337,149 +438,337 @@ require_once __DIR__ . '/../../includes/header.php';
                 });
             });
         }
-
-        setTimeout(function() {
-            let pointsAudioPlayed = false;
-            document.querySelectorAll('.score-jump').forEach(function(el) {
-                const startVal = parseInt(el.getAttribute('data-start')) || 0;
-                const targetVal = parseInt(el.getAttribute('data-target')) || 0;
-                const gainedVal = parseInt(el.getAttribute('data-gained')) || 0;
-
-                if (gainedVal > 0 && targetVal > startVal) {
-                    if (!pointsAudioPlayed) {
-                        pointsAudioPlayed = true;
-                        const pointsAudio = document.getElementById('pointsSfx');
-                        if (pointsAudio) {
-                            pointsAudio.volume = 0.7;
-                            pointsAudio.currentTime = 0;
-                            pointsAudio.play().catch(function() {});
-                        }
-                    }
-                    el.classList.add('text-success');
-                    let startTime = null;
-                    const duration = 1200;
-
-                    function step(timestamp) {
-                        if (!startTime) startTime = timestamp;
-                        const progress = Math.min((timestamp - startTime) / duration, 1);
-                        const ease = 1 - Math.pow(1 - progress, 3);
-                        const currentVal = Math.round(startVal + (targetVal - startVal) * ease);
-                        el.textContent = currentVal.toLocaleString('en-US');
-
-                        if (progress < 1) {
-                            window.requestAnimationFrame(step);
-                        } else {
-                            el.textContent = targetVal.toLocaleString('en-US');
-                        }
-                    }
-                    window.requestAnimationFrame(step);
-                }
-            });
-        }, 300);
     });
     </script>
 
-<?php elseif ($myVote): ?>
+<?php
+// =========================================================================
+// VIEW B: WAGER PHASE (Active players select wager tier, Spectators/Eliminated wait)
+// =========================================================================
+elseif ($phase === 'wager'):
+    $wagerTimeLimit = intval($modeConfig['wager_time_sec'] ?? 10);
+    if ($wagerTimeLimit <= 0) $wagerTimeLimit = 10;
+    $remainingWager = max(0, $wagerTimeLimit - $elapsed);
 
-    <div class="d-flex align-items-center justify-content-center text-center text-white backgroundColorChanges" style="min-height: calc(100vh - 55px);">
-        <div class="p-4">
-            <div style="font-size: 4rem;" class="mb-3">⏳</div>
-            <h2 class="font-weight-bold mb-2">Answer Submitted!</h2>
-            <p class="lead font-weight-bold mb-4">Look up at the host screen for results when time is up!</p>
-            <div class="spinner-grow text-light" role="status"></div>
-        </div>
-    </div>
+    $tier10 = WagerCalculator::calculateWagerAmount($currentScore, 0.10, $modeConfig);
+    $tier25 = WagerCalculator::calculateWagerAmount($currentScore, 0.25, $modeConfig);
+    $tier50 = WagerCalculator::calculateWagerAmount($currentScore, 0.50, $modeConfig);
+    $tier100 = WagerCalculator::calculateWagerAmount($currentScore, 1.00, $modeConfig);
+    ?>
 
-<?php else: ?>
-
-    <?php if (!$showOnDevice): ?>
-        <div class="player-buttons-grid">
-            <div class="player-btn red" onclick="submitAnswer(<?= $answers[0]['id_answer'] ?? 0 ?>)">
-                <span class="text-white">🔺</span>
+    <div class="container my-3" style="max-width: 650px;">
+        <?php if ($isEliminated): ?>
+            <div class="card border-0 shadow text-white text-center py-4 px-3 mb-3" style="background: linear-gradient(135deg, #1f1f1f, #434343); border-radius: 16px;">
+                <div style="font-size: 3.5rem;">💀</div>
+                <h3 class="font-weight-bold mt-2">YOU HAVE BEEN ELIMINATED</h3>
+                <p class="mb-0 text-muted">You have been eliminated. Watch other players finish the match!</p>
             </div>
-
-            <div class="player-btn blue" onclick="submitAnswer(<?= $answers[1]['id_answer'] ?? 0 ?>)">
-                <span class="text-white">🔷</span>
+        <?php elseif ($isSpectator): ?>
+            <div class="card border-0 shadow text-white text-center py-4 px-3 mb-3" style="background: linear-gradient(135deg, #2c3e50, #3498db); border-radius: 16px;">
+                <div style="font-size: 3.5rem;">👀</div>
+                <h3 class="font-weight-bold mt-2">YOU ARE A SPECTATOR</h3>
+                <p class="mb-0">You joined late after the match had already started.</p>
             </div>
+        <?php else: ?>
+            <!-- ACTIVE PLAYER WAGER UI -->
+            <div class="card border-0 shadow text-center p-3 mb-3" style="border-radius: 16px; background: #ffffff;">
+                <div class="d-flex justify-content-between align-items-center mb-2 px-2">
+                    <span class="badge badge-warning text-dark font-weight-bold px-3 py-2" style="font-size: 0.95rem;">
+                        <i class="fas fa-dice mr-1"></i> WAGER POINTS
+                    </span>
+                    <div id="wagerTimerBadge" class="badge badge-dark px-3 py-2 font-weight-bold <?= $remainingWager <= 3 ? 'bg-danger' : '' ?>" style="font-size: 1.1rem; border-radius: 20px;">
+                        ⏱️ <span id="wagerTimer"><?= $remainingWager ?></span>s
+                    </div>
+                </div>
 
-            <div class="player-btn yellow" onclick="submitAnswer(<?= $answers[2]['id_answer'] ?? 0 ?>)">
-                <span class="text-white">🟡</span>
-            </div>
+                <h3 class="font-weight-bold text-dark mb-1">CHOOSE WAGER AMOUNT</h3>
+                <p class="text-muted small mb-2">
+                    The question will appear after wagering time ends. You must wager at least 10% of your score. An incorrect answer deducts your wagered points!
+                </p>
 
-            <div class="player-btn green" onclick="submitAnswer(<?= $answers[3]['id_answer'] ?? 0 ?>)">
-                <span class="text-white">🟩</span>
-            </div>
-        </div>
-    <?php else: ?>
-        <div class="container my-3" style="max-width: 1050px;">
-            <div class="question-card-banner">
-                <h2 class="font-weight-bold text-dark mb-0">
-                    <?= htmlspecialchars($currentQuestion['text'] ?? '') ?>
-                </h2>
-                <?php if ($hasQuestionImage): ?>
-                    <div class="text-center mt-3">
-                        <?php if ($questionMediaType === 'video'): ?>
-                            <video src="<?= htmlspecialchars($questionImageUrl) ?>" controls autoplay muted loop class="img-fluid rounded player-thumb-img shadow-sm" style="max-height: 280px; max-width: 100%; border-radius: 12px;"></video>
-                        <?php else: ?>
-                            <img src="<?= htmlspecialchars($questionImageUrl) ?>" alt="Question Illustration" class="img-fluid rounded player-thumb-img shadow-sm" style="max-height: 280px; object-fit: contain; border-radius: 12px;">
-                        <?php endif; ?>
+                <?php if ($myWagerTier !== null): ?>
+                    <div class="alert alert-success py-2 font-weight-bold mb-3 shadow-sm" id="wagerStatusAlert">
+                        <i class="fas fa-check-circle mr-1"></i> Selected: <strong id="selectedTierLabel"><?= htmlspecialchars($myWagerTierLabel ?? $myWagerTier) ?></strong> (<?= number_format($myWagerAmount) ?> pts)
+                        <div class="small font-weight-normal text-muted mt-1">You can choose a different amount before time runs out.</div>
+                    </div>
+                <?php else: ?>
+                    <div class="alert alert-info py-2 font-weight-bold mb-3 shadow-sm" id="wagerStatusAlert">
+                        <i class="fas fa-info-circle mr-1"></i> Please choose a wager amount before time runs out!
                     </div>
                 <?php endif; ?>
-            </div>
 
-            <div class="d-flex justify-content-between align-items-center my-3 px-2">
-                <div>
-                    <div id="playerTimerBox" class="timer-circle <?= $remainingSeconds <= 5 ? 'warning' : '' ?>">
-                        <span id="playerTimer"><?= $remainingSeconds ?></span>
+                <div class="row" style="gap: 12px 0;">
+                    <!-- 10% -->
+                    <div class="col-6">
+                        <button type="button" class="btn btn-block py-3 font-weight-bold text-white wager-tier-btn <?= in_array($myWagerTier, ['tier_10', '10%'], true) ? 'active-tier' : '' ?>"
+                                data-tier="tier_10" onclick="submitWagerTier('tier_10')"
+                                style="background: #1368ce; border-radius: 14px; font-size: 1.15rem; box-shadow: 0 4px 10px rgba(19, 104, 206, 0.3);">
+                            <div>10%</div>
+                            <div class="small font-weight-normal"><?= number_format($tier10) ?> pts</div>
+                        </button>
+                    </div>
+
+
+                    <!-- 25% -->
+                    <div class="col-6">
+                        <button type="button" class="btn btn-block py-3 font-weight-bold text-white wager-tier-btn <?= in_array($myWagerTier, ['tier_25', '25%'], true) ? 'active-tier' : '' ?>"
+                                data-tier="tier_25" onclick="submitWagerTier('tier_25')"
+                                style="background: #26890c; border-radius: 14px; font-size: 1.15rem; box-shadow: 0 4px 10px rgba(38, 137, 12, 0.3);">
+                            <div>25%</div>
+                            <div class="small font-weight-normal"><?= number_format($tier25) ?> pts</div>
+                        </button>
+                    </div>
+
+                    <!-- 50% -->
+                    <div class="col-6">
+                        <button type="button" class="btn btn-block py-3 font-weight-bold text-dark wager-tier-btn <?= in_array($myWagerTier, ['tier_50', '50%'], true) ? 'active-tier' : '' ?>"
+                                data-tier="tier_50" onclick="submitWagerTier('tier_50')"
+                                style="background: #ffa602; border-radius: 14px; font-size: 1.15rem; box-shadow: 0 4px 10px rgba(255, 166, 2, 0.3);">
+                            <div>50%</div>
+                            <div class="small font-weight-normal"><?= number_format($tier50) ?> pts</div>
+                        </button>
+                    </div>
+
+                    <!-- ALL-IN (100%) -->
+                    <div class="col-6">
+                        <button type="button" class="btn btn-block py-3 font-weight-bold text-white wager-tier-btn <?= in_array($myWagerTier, ['tier_100', '100%', 'ALL-IN'], true) ? 'active-tier' : '' ?>"
+                                data-tier="tier_100" onclick="submitWagerTier('tier_100')"
+                                style="background: linear-gradient(135deg, #e21b3c, #ff3366); border-radius: 14px; font-size: 1.15rem; box-shadow: 0 4px 14px rgba(226, 27, 60, 0.45);">
+                            <div>🔥 ALL-IN</div>
+                            <div class="small font-weight-normal"><?= number_format($tier100) ?> pts</div>
+                        </button>
                     </div>
                 </div>
-
-                <div class="text-right">
-                    <span class="badge badge-light px-4 py-2 font-weight-bold text-dark shadow-sm" style="font-size: 1.1rem; border-radius: 50px;">
-                        <i class="fas fa-hand-pointer text-primary mr-1"></i> Choose an answer
-                    </span>
-                </div>
             </div>
 
-            <div class="row">
-                <?php
-                $colors = [KAHOOT_COLOR_RED, KAHOOT_COLOR_BLUE, KAHOOT_COLOR_YELLOW, KAHOOT_COLOR_GREEN];
-                $icons  = [KAHOOT_ICON_RED, KAHOOT_ICON_BLUE, KAHOOT_ICON_YELLOW, KAHOOT_ICON_GREEN];
-                $colorClasses = ['red', 'blue', 'yellow', 'green'];
+            <style>
+            .wager-tier-btn {
+                transition: transform 0.15s ease, box-shadow 0.15s ease;
+                border: 3px solid transparent;
+            }
+            .wager-tier-btn:hover {
+                transform: translateY(-2px);
+            }
+            .wager-tier-btn.active-tier {
+                border-color: #ffd700 !important;
+                box-shadow: 0 0 16px rgba(255, 215, 0, 0.8) !important;
+                transform: scale(1.02);
+            }
+            </style>
+        <?php endif; ?>
+    </div>
 
-                foreach ($answers as $idx => $a):
-                    $cIdx = $idx % 4;
-                    $ansId = intval($a['id_answer'] ?? 0);
-                    $ansImgUrl = '';
-                    if (!empty($a['image_path'])) {
-                        if (preg_match('#^https?://#i', $a['image_path'])) {
-                            $ansImgUrl = $a['image_path'];
-                        } else {
-                            $aImgFile = basename($a['image_path']);
-                            $aImgDiskPath = dirname(__DIR__, 2) . '/assets/img/questions/' . $aImgFile;
-                            if (file_exists($aImgDiskPath)) {
-                                $ansImgUrl = BASE_URL . 'assets/img/questions/' . rawurlencode($aImgFile);
-                            }
-                        }
-                    }
-                ?>
-                    <div class="col-md-6 mb-3">
-                        <div class="answer-box shadow-sm d-flex justify-content-between align-items-center <?= $colorClasses[$cIdx] ?>"
-                             onclick="submitAnswer(<?= $ansId ?>)">
-                            <div class="d-flex align-items-center flex-grow-1 mr-2">
-                                <span class="symbol mr-3" style="font-size: 2rem;"><?= $icons[$cIdx] ?></span>
-                                <?php if ($ansImgUrl): ?>
-                                    <img src="<?= htmlspecialchars($ansImgUrl) ?>" alt="Answer" class="img-fluid rounded mr-3 bg-white p-1" style="max-height: 50px; max-width: 75px; object-fit: contain; box-shadow: 0 2px 4px rgba(0,0,0,0.15);">
-                                <?php endif; ?>
-                                <?php if (!empty($a['text'])): ?>
-                                    <span style="font-size: 1.3rem;"><?= htmlspecialchars($a['text'] ?? '') ?></span>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-                    </div>
-                <?php endforeach; ?>
+    <script>
+    let wagerSeconds = <?= intval($remainingWager) ?>;
+    const wagerTimerEl = document.getElementById('wagerTimer');
+    const wagerTimerBadge = document.getElementById('wagerTimerBadge');
+
+    const wagerCountdown = setInterval(function() {
+        wagerSeconds--;
+        if (wagerSeconds <= 0) {
+            wagerSeconds = 0;
+            clearInterval(wagerCountdown);
+            if (wagerTimerEl) wagerTimerEl.textContent = '0';
+            $('.wager-tier-btn').css('pointer-events', 'none').css('opacity', '0.7');
+        } else {
+            if (wagerTimerEl) wagerTimerEl.textContent = wagerSeconds;
+            if (wagerSeconds <= 3 && wagerTimerBadge) {
+                wagerTimerBadge.classList.add('bg-danger');
+            }
+        }
+    }, 1000);
+
+    function submitWagerTier(tierId) {
+        $('.wager-tier-btn').removeClass('active-tier');
+        $('[data-tier="' + tierId + '"]').addClass('active-tier');
+
+        $.ajax({
+            url: '<?= BASE_URL ?>modules/api/submit_wager.php',
+            type: 'POST',
+            dataType: 'json',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                id_player: <?= $playerId ?>,
+                id_room: <?= $roomId ?>,
+                id_question: <?= $qId ?>,
+                tier_id: tierId,
+                token: '<?= htmlspecialchars($token) ?>'
+            }),
+            success: function(res) {
+                if (res && res.success) {
+                    const fallbackMap = {
+                        'tier_10': '10%',
+                        'tier_25': '25%',
+                        'tier_50': '50%',
+                        'tier_100': '100% (ALL-IN)'
+                    };
+                    const tierLabel = res.tier || res.tier_label || fallbackMap[tierId] || tierId;
+                    $('#wagerStatusAlert').removeClass('alert-info').addClass('alert-success')
+                        .html('<i class="fas fa-check-circle mr-1"></i> Selected: <strong>' + tierLabel + '</strong> (' + res.wager_amount.toLocaleString() + ' pts)<div class="small font-weight-normal text-muted mt-1">You can choose a different amount before time runs out.</div>');
+                } else {
+                    alert(res.message || 'Unable to place wager');
+                }
+            },
+            error: function() {
+                alert('Connection error while placing wager.');
+            }
+        });
+    }
+    </script>
+
+<?php
+// =========================================================================
+// VIEW C: QUESTION PHASE
+// =========================================================================
+elseif ($phase === 'question'):
+    if ($isEliminated): ?>
+        <div class="d-flex align-items-center justify-content-center text-center text-white backgroundColorChanges" style="min-height: calc(100vh - 55px);">
+            <div class="p-4">
+                <div style="font-size: 4rem;" class="mb-3">💀</div>
+                <h2 class="font-weight-bold mb-2">You have been eliminated</h2>
+                <p class="lead font-weight-bold mb-4">You are spectating the match.</p>
+                <div class="spinner-grow text-light" role="status"></div>
             </div>
         </div>
+
+    <?php elseif ($isSpectator): ?>
+        <div class="d-flex align-items-center justify-content-center text-center text-white backgroundColorChanges" style="min-height: calc(100vh - 55px);">
+            <div class="p-4">
+                <div style="font-size: 4rem;" class="mb-3">👀</div>
+                <h2 class="font-weight-bold mb-2">You are a spectator</h2>
+                <p class="lead font-weight-bold mb-4">You joined after the match had already started.</p>
+                <div class="spinner-grow text-light" role="status"></div>
+            </div>
+        </div>
+
+    <?php elseif ($questionMode === 'wager' && $isSittingOut): ?>
+        <!-- SITTING OUT: Player missed wager time window -->
+        <div class="d-flex align-items-center justify-content-center text-center text-white backgroundColorChanges" style="min-height: calc(100vh - 55px);">
+            <div class="p-4" style="max-width: 500px;">
+                <div style="font-size: 4rem;" class="mb-3">⏸️</div>
+                <h2 class="font-weight-bold mb-2">You did not place a wager, skipping this question</h2>
+                <p class="lead font-weight-bold mb-4">Your score remains unchanged. Get ready for the next question!</p>
+                <div class="spinner-grow text-light" role="status"></div>
+            </div>
+        </div>
+
+    <?php elseif ($myVote): ?>
+        <!-- ALREADY VOTED -->
+        <div class="d-flex align-items-center justify-content-center text-center text-white backgroundColorChanges" style="min-height: calc(100vh - 55px);">
+            <div class="p-4">
+                <div style="font-size: 4rem;" class="mb-3">⏳</div>
+                <h2 class="font-weight-bold mb-2">Answer Submitted!</h2>
+                <?php if ($questionMode === 'wager'): ?>
+                    <p class="font-weight-bold text-warning mb-2" style="font-size: 1.15rem;">
+                        <i class="fas fa-dice mr-1"></i> Wager: <?= htmlspecialchars($myWagerTierLabel ?? ($myWagerTier ?? '')) ?> (<?= number_format($myWagerAmount) ?> pts)
+                    </p>
+                <?php endif; ?>
+                <p class="lead font-weight-bold mb-4">Look up at the host screen for results when time is up!</p>
+                <div class="spinner-grow text-light" role="status"></div>
+            </div>
+        </div>
+
+    <?php else: ?>
+        <!-- ACTIVE PARTICIPANT ANSWERING VIEW -->
+        <?php if ($questionMode === 'wager'): ?>
+            <div class="container mt-2 mb-0" style="max-width: 1050px;">
+                <div class="alert alert-warning text-center font-weight-bold py-2 mb-2 shadow-sm" style="border-radius: 12px; font-size: 1.05rem;">
+                    <i class="fas fa-dice mr-1"></i> Your wager for this question:
+                    <span class="badge badge-dark ml-1 px-3 py-1"><?= htmlspecialchars($myWagerTierLabel ?? ($myWagerTier ?? '')) ?> (<?= number_format($myWagerAmount) ?> pts)</span>
+                </div>
+            </div>
+        <?php endif; ?>
+
+        <?php if (!$showOnDevice): ?>
+            <div class="player-buttons-grid">
+                <div class="player-btn red" onclick="submitAnswer(<?= $answers[0]['id_answer'] ?? 0 ?>)">
+                    <span class="text-white">🔺</span>
+                </div>
+
+                <div class="player-btn blue" onclick="submitAnswer(<?= $answers[1]['id_answer'] ?? 0 ?>)">
+                    <span class="text-white">🔷</span>
+                </div>
+
+                <div class="player-btn yellow" onclick="submitAnswer(<?= $answers[2]['id_answer'] ?? 0 ?>)">
+                    <span class="text-white">🟡</span>
+                </div>
+
+                <div class="player-btn green" onclick="submitAnswer(<?= $answers[3]['id_answer'] ?? 0 ?>)">
+                    <span class="text-white">🟩</span>
+                </div>
+            </div>
+        <?php else: ?>
+            <div class="container my-3" style="max-width: 1050px;">
+                <div class="question-card-banner">
+                    <h2 class="font-weight-bold text-dark mb-0">
+                        <?= htmlspecialchars($currentQuestion['text'] ?? '') ?>
+                    </h2>
+                    <?php if ($hasQuestionImage): ?>
+                        <div class="text-center mt-3">
+                            <?php if ($questionMediaType === 'video'): ?>
+                                <video src="<?= htmlspecialchars($questionImageUrl) ?>" controls autoplay muted loop class="img-fluid rounded player-thumb-img shadow-sm" style="max-height: 280px; max-width: 100%; border-radius: 12px;"></video>
+                            <?php else: ?>
+                                <img src="<?= htmlspecialchars($questionImageUrl) ?>" alt="Question Illustration" class="img-fluid rounded player-thumb-img shadow-sm" style="max-height: 280px; object-fit: contain; border-radius: 12px;">
+                            <?php endif; ?>
+                        </div>
+                    <?php endif; ?>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center my-3 px-2">
+                    <div>
+                        <div id="playerTimerBox" class="timer-circle <?= $remainingSeconds <= 5 ? 'warning' : '' ?>">
+                            <span id="playerTimer"><?= $remainingSeconds ?></span>
+                        </div>
+                    </div>
+
+                    <div class="text-right">
+                        <span class="badge badge-light px-4 py-2 font-weight-bold text-dark shadow-sm" style="font-size: 1.1rem; border-radius: 50px;">
+                            <i class="fas fa-hand-pointer text-primary mr-1"></i> Choose an answer
+                        </span>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <?php
+                    $colors = [KAHOOT_COLOR_RED, KAHOOT_COLOR_BLUE, KAHOOT_COLOR_YELLOW, KAHOOT_COLOR_GREEN];
+                    $icons  = [KAHOOT_ICON_RED, KAHOOT_ICON_BLUE, KAHOOT_ICON_YELLOW, KAHOOT_ICON_GREEN];
+                    $colorClasses = ['red', 'blue', 'yellow', 'green'];
+
+                    foreach ($answers as $idx => $a):
+                        $cIdx = $idx % 4;
+                        $ansId = intval($a['id_answer'] ?? 0);
+                        $ansImgUrl = '';
+                        if (!empty($a['image_path'])) {
+                            if (preg_match('#^https?://#i', $a['image_path'])) {
+                                $ansImgUrl = $a['image_path'];
+                            } else {
+                                $aImgFile = basename($a['image_path']);
+                                $aImgDiskPath = dirname(__DIR__, 2) . '/assets/img/questions/' . $aImgFile;
+                                if (file_exists($aImgDiskPath)) {
+                                    $ansImgUrl = BASE_URL . 'assets/img/questions/' . rawurlencode($aImgFile);
+                                }
+                            }
+                        }
+                    ?>
+                        <div class="col-md-6 mb-3">
+                            <div class="answer-box shadow-sm d-flex justify-content-between align-items-center <?= $colorClasses[$cIdx] ?>"
+                                 onclick="submitAnswer(<?= $ansId ?>)">
+                                <div class="d-flex align-items-center flex-grow-1 mr-2">
+                                    <span class="symbol mr-3" style="font-size: 2rem;"><?= $icons[$cIdx] ?></span>
+                                    <?php if ($ansImgUrl): ?>
+                                        <img src="<?= htmlspecialchars($ansImgUrl) ?>" alt="Answer" class="img-fluid rounded mr-3 bg-white p-1" style="max-height: 50px; max-width: 75px; object-fit: contain; box-shadow: 0 2px 4px rgba(0,0,0,0.15);">
+                                    <?php endif; ?>
+                                    <?php if (!empty($a['text'])): ?>
+                                        <span style="font-size: 1.3rem;"><?= htmlspecialchars($a['text'] ?? '') ?></span>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        <?php endif; ?>
+
     <?php endif; ?>
 
 <?php endif; ?>
@@ -501,7 +790,6 @@ function refreshPlayerPage() {
 function submitAnswer(answerId) {
     if (!answerId) return;
 
-    // Phát âm thanh submit tension ngay khi chạm/click vào đáp án
     const submitAudio = document.getElementById('submitSfx');
     if (submitAudio) {
         try {
@@ -533,7 +821,7 @@ function submitAnswer(answerId) {
     });
 }
 
-<?php if ($showOnDevice && !$isResultPhase && !$myVote): ?>
+<?php if ($showOnDevice && $phase === 'question' && !$myVote && !$isSittingOut && !$isEliminated && !$isSpectator): ?>
 let playerSeconds = <?= intval($remainingSeconds) ?>;
 const timerEl = document.getElementById('playerTimer');
 const timerBox = document.getElementById('playerTimerBox');

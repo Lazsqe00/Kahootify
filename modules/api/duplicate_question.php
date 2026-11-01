@@ -30,10 +30,12 @@ $maxSo  = db_fetch_one("SELECT COALESCE(MAX(sort_order), 0) AS mo FROM questions
 $newSo  = intval($maxSo['mo']) + 1;
 $qType  = $srcQ['question_type'] ?? 'multiple_choice';
 $mType  = $srcQ['media_type']    ?? null;
+$qMode  = $srcQ['mode']          ?? 'normal';
+$mConf  = $srcQ['mode_config']   ?? null;
 
 $newQId = db_insert(
-    "INSERT INTO questions (id_quiz, text, points, time_limit, image, question_type, media_type, sort_order) VALUES (:qz,:t,:p,:tl,:img,:qt,:mt,:so)",
-    [':qz'=>$quizId,':t'=>$srcQ['text'],':p'=>$srcQ['points'],':tl'=>$srcQ['time_limit'],':img'=>$srcQ['image'],':qt'=>$qType,':mt'=>$mType,':so'=>$newSo]
+    "INSERT INTO questions (id_quiz, text, points, time_limit, image, question_type, media_type, sort_order, mode, mode_config) VALUES (:qz,:t,:p,:tl,:img,:qt,:mt,:so,:m,:mc)",
+    [':qz'=>$quizId,':t'=>$srcQ['text'],':p'=>$srcQ['points'],':tl'=>$srcQ['time_limit'],':img'=>$srcQ['image'],':qt'=>$qType,':mt'=>$mType,':so'=>$newSo,':m'=>$qMode,':mc'=>$mConf]
 );
 
 $srcAnswers = db_fetch_all("SELECT * FROM answers WHERE id_question = :q ORDER BY id_answer ASC", [':q' => $questionId]);
