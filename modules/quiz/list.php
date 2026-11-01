@@ -63,9 +63,16 @@ $flash = get_flash_message();
                             <img src="<?= BASE_URL ?>assets/img/cover.png" alt="Cover" style="max-height: 100%; object-fit: cover; opacity: 0.35; width: 100%;">
                             <div class="position-absolute text-center px-3">
                                 <h5 class="text-white font-weight-bold mb-1"><?= htmlspecialchars($q['name']) ?></h5>
-                                <span class="badge badge-warning text-dark font-weight-bold">
-                                    <i class="fas fa-question-circle mr-1"></i> <?= $q['question_count'] ?> questions
-                                </span>
+                                <div class="d-flex justify-content-center flex-wrap">
+                                    <span class="badge badge-warning text-dark font-weight-bold m-1">
+                                        <i class="fas fa-question-circle mr-1"></i> <?= $q['question_count'] ?> questions
+                                    </span>
+                                    <?php if (($q['game_type'] ?? 'classic') === 'obstacle'): ?>
+                                    <span class="badge badge-info text-white font-weight-bold m-1">
+                                        <i class="fas fa-puzzle-piece mr-1"></i> Chướng ngại vật (<?= intval($q['total_pieces']) ?> mảnh)
+                                    </span>
+                                    <?php endif; ?>
+                                </div>
                             </div>
                         </div>
 

@@ -46,7 +46,46 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
             "UPDATE questions SET mode = :m, mode_config = :mc WHERE id_quiz = :qz AND question_type IN ($inTypes)",
             [':m' => $targetMode, ':mc' => $cfg, ':qz' => $quizId]
         );
-        set_flash_message('success', "Đã áp dụng chế độ '{$modeObj->getLabel()}' cho tất cả các câu hỏi hợp lệ trong bài!");
+        set_flash_message('success', "Applied '{$modeObj->getLabel()}' mode to all eligible questions!");
+        redirect('modules/quiz/edit.php?id=' . $quizId);
+    }
+
+    // Obstacle Puzzle settings update
+    if ($action === 'update_obstacle_settings' && ($quiz['game_type'] ?? 'classic') === 'obstacle') {
+        $newAns = trim($_POST['obstacle_answer'] ?? '');
+        $newTp  = intval($_POST['total_pieces'] ?? 4);
+        if (!in_array($newTp, [4, 6, 8, 9])) $newTp = 4;
+
+        $newObsImg = null;
+        if (isset($_FILES['obstacle_image']) && $_FILES['obstacle_image']['error'] === UPLOAD_ERR_OK) {
+            $f = $_FILES['obstacle_image'];
+            $allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+            if (in_array($f['type'], $allowed)) {
+                $ext = strtolower(pathinfo($f['name'], PATHINFO_EXTENSION));
+                $name = 'obs_' . uniqid() . '_' . time() . '.' . $ext;
+                $dir = __DIR__ . '/../../assets/img/obstacles/';
+                if (!is_dir($dir)) mkdir($dir, 0777, true);
+                if (move_uploaded_file($f['tmp_name'], $dir . $name)) {
+                    $newObsImg = 'assets/img/obstacles/' . $name;
+                }
+            }
+        }
+
+        if ($newObsImg) {
+            db_execute("UPDATE quiz SET obstacle_answer = :ans, total_pieces = :tp, obstacle_image = :img WHERE id_quiz = :q", [
+                ':ans' => $newAns,
+                ':tp'  => $newTp,
+                ':img' => $newObsImg,
+                ':q'   => $quizId
+            ]);
+        } else {
+            db_execute("UPDATE quiz SET obstacle_answer = :ans, total_pieces = :tp WHERE id_quiz = :q", [
+                ':ans' => $newAns,
+                ':tp'  => $newTp,
+                ':q'   => $quizId
+            ]);
+        }
+        set_flash_message('success', 'Obstacle settings updated!');
         redirect('modules/quiz/edit.php?id=' . $quizId);
     }
 
@@ -117,18 +156,28 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
             $mtCol  = $oldMt;
         }
 
+        $pieceIndex = 0;
+        if (($quiz['game_type'] ?? 'classic') === 'obstacle') {
+            $pieceIndex = intval($_POST['piece_index'] ?? 0);
+            if ($pieceIndex <= 0) {
+                $maxPi = db_fetch_one("SELECT COALESCE(MAX(piece_index), 0) AS mo FROM questions WHERE id_quiz = :qz", [':qz' => $quizId]);
+                $pieceIndex = min(intval($maxPi['mo']) + 1, intval($quiz['total_pieces'] ?? 4));
+            }
+        }
+
         if ($action === 'add_question') {
             $maxSo = db_fetch_one("SELECT COALESCE(MAX(sort_order), 0) AS mo FROM questions WHERE id_quiz = :qz", [':qz' => $quizId]);
             $so    = intval($maxSo['mo']) + 1;
             $qId   = db_insert(
-                "INSERT INTO questions (id_quiz, text, points, time_limit, image, question_type, media_type, sort_order, mode, mode_config) VALUES (:qz,:t,:p,:tl,:img,:qt,:mt,:so,:m,:mc)",
-                [':qz'=>$quizId,':t'=>$qText,':p'=>$pts,':tl'=>$tl,':img'=>$imgCol,':qt'=>$qType,':mt'=>$mtCol,':so'=>$so,':m'=>$qMode,':mc'=>$modeConfig]
+                "INSERT INTO questions (id_quiz, text, points, time_limit, image, question_type, media_type, sort_order, mode, mode_config, piece_index) 
+                 VALUES (:qz,:t,:p,:tl,:img,:qt,:mt,:so,:m,:mc,:pi)",
+                [':qz'=>$quizId,':t'=>$qText,':p'=>$pts,':tl'=>$tl,':img'=>$imgCol,':qt'=>$qType,':mt'=>$mtCol,':so'=>$so,':m'=>$qMode,':mc'=>$modeConfig,':pi'=>$pieceIndex]
             );
         } else {
             $qId = $editQId;
             db_execute(
-                "UPDATE questions SET text=:t, points=:p, time_limit=:tl, image=:img, question_type=:qt, media_type=:mt, mode=:m, mode_config=:mc WHERE id_question=:qid AND id_quiz=:qz",
-                [':t'=>$qText,':p'=>$pts,':tl'=>$tl,':img'=>$imgCol,':qt'=>$qType,':mt'=>$mtCol,':m'=>$qMode,':mc'=>$modeConfig,':qid'=>$qId,':qz'=>$quizId]
+                "UPDATE questions SET text=:t, points=:p, time_limit=:tl, image=:img, question_type=:qt, media_type=:mt, mode=:m, mode_config=:mc, piece_index=:pi WHERE id_question=:qid AND id_quiz=:qz",
+                [':t'=>$qText,':p'=>$pts,':tl'=>$tl,':img'=>$imgCol,':qt'=>$qType,':mt'=>$mtCol,':m'=>$qMode,':mc'=>$modeConfig,':pi'=>$pieceIndex,':qid'=>$qId,':qz'=>$quizId]
             );
             db_execute("DELETE FROM answers WHERE id_question = :qid", [':qid' => $qId]);
         }
@@ -215,25 +264,36 @@ require_once __DIR__ . '/../../includes/header.php';
 require_once __DIR__ . '/../../includes/navbar.php';
 
 $flash = get_flash_message();
+$isObstacle = ($quiz['game_type'] ?? 'classic') === 'obstacle';
 ?>
 
 <div class="editor-page-wrapper">
 
     <div class="editor-topbar">
-        <a href="<?= BASE_URL ?>modules/quiz/list.php" class="btn btn-sm btn-outline-secondary font-weight-bold">
-            <i class="fas fa-chevron-left mr-1"></i> My Kahoots
-        </a>
-        <div class="quiz-title-wrapper">
-            <span id="quizTitleDisplay"><?= htmlspecialchars($quiz['name']) ?></span>
-            <input type="text" id="quizTitleInput" value="<?= htmlspecialchars($quiz['name']) ?>" maxlength="100">
-            <i class="fas fa-pencil-alt title-edit-icon" id="editTitleIcon" title="Edit title"></i>
+        <div class="d-flex align-items-center flex-wrap" style="gap: 8px;">
+            <a href="<?= BASE_URL ?>modules/quiz/list.php" class="btn btn-sm btn-outline-secondary font-weight-bold">
+                <i class="fas fa-chevron-left mr-1"></i> My Kahoots
+            </a>
+            <div class="quiz-title-wrapper">
+                <span id="quizTitleDisplay"><?= htmlspecialchars($quiz['name']) ?></span>
+                <input type="text" id="quizTitleInput" value="<?= htmlspecialchars($quiz['name']) ?>" maxlength="100">
+                <i class="fas fa-pencil-alt title-edit-icon" id="editTitleIcon" title="Edit title"></i>
+            </div>
             <?php if ($defaultQMode === 'wager' || $hasWagerInQuiz): ?>
-                <span class="badge badge-warning text-dark font-weight-bold ml-2 px-2 py-1 shadow-sm" style="font-size: 11px;" title="Bài trắc nghiệm này theo chế độ Cược điểm">
-                    🎲 Chế độ: Cược điểm (Wager)
+                <span class="badge badge-warning text-dark font-weight-bold py-1 px-2" style="font-size: 0.85rem;">
+                    🎲 Mode: Wager
                 </span>
             <?php endif; ?>
+            <?php if ($isObstacle): ?>
+                <span class="badge badge-warning text-dark font-weight-bold py-1 px-2" style="font-size: 0.85rem;">
+                    <i class="fas fa-puzzle-piece mr-1"></i> Obstacle (<?= intval($quiz['total_pieces']) ?> tiles)
+                </span>
+                <button type="button" class="btn btn-sm btn-outline-warning font-weight-bold py-1 px-2" data-toggle="modal" data-target="#obstacleSettingsModal" title="Secret image & keyword">
+                    <i class="fas fa-image mr-1"></i> Secret Image
+                </button>
+            <?php endif; ?>
         </div>
-        
+
         <div class="d-flex align-items-center" style="gap: 12px;">
             <?php if ($flash): ?>
             <div class="alert alert-<?= htmlspecialchars($flash['type']) ?> alert-auto-dismiss alert-dismissible fade show mb-0 py-1 px-3 d-flex align-items-center shadow-sm"
@@ -267,10 +327,12 @@ $flash = get_flash_message();
                     <?php foreach ($questions as $idx => $q): 
                         $curMode = $q['mode'] ?? 'normal';
                     ?>
-                    <li class="q-list-item" data-id="<?= $q['id_question'] ?>" data-mode="<?= htmlspecialchars($curMode) ?>">
+                    <li class="q-list-item" data-id="<?= $q['id_question'] ?>" data-mode="<?= htmlspecialchars($curMode) ?>" data-piece="<?= intval($q['piece_index'] ?? 0) ?>">
                         <span class="drag-handle"><i class="fas fa-grip-vertical"></i></span>
                         <div class="q-thumb-content">
-                            <div class="q-thumb-num">Q<?= $idx + 1 ?></div>
+                            <div class="q-thumb-num">
+                                <?= $isObstacle ? ('🧩 Mảnh ' . intval($q['piece_index'] ?: ($idx + 1))) : ('Q' . ($idx + 1)) ?>
+                            </div>
                             <div class="q-thumb-text" title="<?= htmlspecialchars($q['text'] ?? '') ?>">
                                 <?= htmlspecialchars(mb_strimwidth($q['text'] ?? '', 0, 36, '…')) ?>
                             </div>
@@ -328,6 +390,7 @@ $flash = get_flash_message();
                 <input type="hidden" name="time_limit"           id="hiddenTimeLimit"         value="<?= htmlspecialchars($defaultTimeLimit) ?>">
                 <input type="hidden" name="points"               id="hiddenPoints"            value="<?= htmlspecialchars($defaultPoints) ?>">
                 <input type="hidden" name="question_media_remove" id="questionMediaRemoveFlag" value="0">
+                <input type="hidden" name="piece_index"          id="hiddenPieceIndex"        value="1">
 
                 <div class="canvas-body">
 
@@ -417,25 +480,38 @@ $flash = get_flash_message();
         <div class="props-panel">
             <div id="modeSettingsPanel" class="prop-group" style="<?= $defaultQMode === 'wager' ? 'display:block;' : 'display:none;' ?> background: #fff8e1; border: 1px solid #ffe082; border-radius: 8px; padding: 10px;">
                 <div class="prop-label mb-2 text-dark font-weight-bold" style="font-size: 12px;">
-                    <i class="fas fa-sliders-h mr-1 text-warning"></i> Cài đặt Cược điểm
+                    <i class="fas fa-sliders-h mr-1 text-warning"></i> Wager Settings
                 </div>
                 <div class="form-group mb-2">
-                    <label class="small text-muted font-weight-bold mb-1 d-block" style="font-size: 11px;">Thời gian cược</label>
+                    <label class="small text-muted font-weight-bold mb-1 d-block" style="font-size: 11px;">Wager Duration</label>
                     <select class="prop-select" id="propWagerTimeSec" style="height: 32px; font-size: 12px;">
-                        <option value="5">5 giây</option>
-                        <option value="10" selected>10 giây (Mặc định)</option>
-                        <option value="15">15 giây</option>
-                        <option value="20">20 giây</option>
-                        <option value="30">30 giây</option>
+                        <option value="5">5s</option>
+                        <option value="10" selected>10s (Default)</option>
+                        <option value="15">15s</option>
+                        <option value="20">20s</option>
+                        <option value="30">30s</option>
                     </select>
                 </div>
                 <div class="custom-control custom-switch mt-2">
                     <input type="checkbox" class="custom-control-input" id="propWagerSpeedBonus">
                     <label class="custom-control-label small font-weight-bold text-dark" for="propWagerSpeedBonus" style="font-size: 11px;">
-                        Bật điểm tốc độ
+                        Enable Speed Bonus
                     </label>
                 </div>
             </div>
+
+            <?php if ($isObstacle): ?>
+            <div class="prop-group">
+                <div class="prop-label">
+                    <i class="fas fa-puzzle-piece text-warning mr-1"></i> Puzzle Tile #
+                </div>
+                <select class="prop-select" id="propPieceIndex">
+                    <?php for ($p = 1; $p <= intval($quiz['total_pieces'] ?? 4); $p++): ?>
+                        <option value="<?= $p ?>">Tile #<?= $p ?></option>
+                    <?php endfor; ?>
+                </select>
+            </div>
+            <?php endif; ?>
 
             <div class="prop-group">
                 <div class="prop-label">Question Type</div>
@@ -473,13 +549,13 @@ $flash = get_flash_message();
             <form method="POST">
                 <input type="hidden" name="action" value="apply_mode_to_all">
                 <div class="modal-header border-0 pb-0">
-                    <h5 class="modal-title font-weight-bold text-dark"><i class="fas fa-layer-group text-primary mr-2"></i>Áp dụng chế độ hàng loạt</h5>
+                    <h5 class="modal-title font-weight-bold text-dark"><i class="fas fa-layer-group text-primary mr-2"></i>Apply Mode to All Questions</h5>
                     <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
                 </div>
                 <div class="modal-body py-3">
-                    <p class="text-muted small">Chọn chế độ bạn muốn áp dụng cho <strong>tất cả câu hỏi</strong> trong bài trắc nghiệm này:</p>
+                    <p class="text-muted small">Select the question mode to apply to <strong>all questions</strong> in this quiz:</p>
                     <div class="form-group mb-0">
-                        <label class="font-weight-bold small text-dark">Chế độ mục tiêu:</label>
+                        <label class="font-weight-bold small text-dark">Target Mode:</label>
                         <select name="target_mode" class="form-control font-weight-bold">
                             <?php foreach (QuestionModeRegistry::getAll() as $m): ?>
                             <option value="<?= htmlspecialchars($m->getId()) ?>">
@@ -490,19 +566,76 @@ $flash = get_flash_message();
                     </div>
                 </div>
                 <div class="modal-footer border-0 pt-0">
-                    <button type="button" class="btn btn-sm btn-secondary font-weight-bold px-3" data-dismiss="modal">Hủy</button>
-                    <button type="submit" class="btn btn-sm btn-primary font-weight-bold px-4">Áp dụng ngay</button>
+                    <button type="button" class="btn btn-sm btn-secondary font-weight-bold px-3" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-sm btn-primary font-weight-bold px-4">Apply Now</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 
+<?php if ($isObstacle): ?>
+<!-- MODAL OBSTACLE SETTINGS -->
+<div class="modal fade" id="obstacleSettingsModal" tabindex="-1" role="dialog" aria-labelledby="obstacleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header text-white" style="background-color: var(--kahoot-purple);">
+                <h5 class="modal-title font-weight-bold" id="obstacleModalLabel">
+                    <i class="fas fa-puzzle-piece mr-2"></i>Secret Image &amp; Obstacle Settings
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form action="" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="action" value="update_obstacle_settings">
+                <div class="modal-body p-4">
+                    <div class="form-group text-center">
+                        <label class="font-weight-bold d-block text-left">Current Secret Image:</label>
+                        <?php if (!empty($quiz['obstacle_image'])): ?>
+                            <img src="<?= BASE_URL . htmlspecialchars($quiz['obstacle_image']) ?>" class="img-fluid rounded border shadow-sm" style="max-height: 200px; object-fit: contain;" alt="Obstacle Image">
+                        <?php else: ?>
+                            <div class="alert alert-warning">No secret image uploaded yet</div>
+                        <?php endif; ?>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="font-weight-bold">Upload New Image (optional):</label>
+                        <input type="file" name="obstacle_image" class="form-control-file" accept="image/*">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="font-weight-bold">Secret Keyword (Exact Answer):</label>
+                        <input type="text" name="obstacle_answer" class="form-control" value="<?= htmlspecialchars($quiz['obstacle_answer'] ?? '') ?>" required>
+                    </div>
+
+                    <div class="form-group mb-0">
+                        <label class="font-weight-bold">Number of Puzzle Tiles:</label>
+                        <select name="total_pieces" class="form-control">
+                            <option value="4" <?= ($quiz['total_pieces'] ?? 4) == 4 ? 'selected' : '' ?>>4 tiles (2x2 grid)</option>
+                            <option value="6" <?= ($quiz['total_pieces'] ?? 4) == 6 ? 'selected' : '' ?>>6 tiles (2x3 grid)</option>
+                            <option value="8" <?= ($quiz['total_pieces'] ?? 4) == 8 ? 'selected' : '' ?>>8 tiles (2x4 grid)</option>
+                            <option value="9" <?= ($quiz['total_pieces'] ?? 4) == 9 ? 'selected' : '' ?>>9 tiles (3x3 grid)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary font-weight-bold" data-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-kahoot btn-kahoot-green font-weight-bold">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
 <script>
 window.KAHOOT_EDIT = {
     quizId:      <?= intval($quizId) ?>,
     baseUrl:     <?= json_encode(BASE_URL) ?>,
     defaultMode: <?= json_encode($defaultQMode) ?>,
+    gameType:    <?= json_encode($quiz['game_type'] ?? 'classic') ?>,
+    totalPieces: <?= intval($quiz['total_pieces'] ?? 4) ?>,
     questions:   <?= json_encode(array_values($questions), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>,
     modes:     <?= json_encode(array_values(array_map(function($m) {
         return [

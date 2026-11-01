@@ -38,6 +38,11 @@ if ($status === 'waiting') {
     redirect('modules/player/waiting.php?pid=' . $playerId . '&token=' . urlencode($token));
 }
 
+if (($room['game_type'] ?? 'classic') === 'obstacle' && $status === 'board') {
+    require __DIR__ . '/../../includes/player_obstacle_board.php';
+    exit;
+}
+
 if ($status === 'finished') {
     $leaderboard = get_room_leaderboard($roomId);
     $leaderboard = WagerCalculator::calculateFinalRanking($leaderboard);
@@ -55,6 +60,8 @@ $playerStatus = strtoupper((string)($player['status'] ?? 'ACTIVE'));
 $isEliminated = ($playerStatus === 'ELIMINATED');
 $isSpectator = ($playerStatus === 'SPECTATOR');
 $currentScore = intval($player['score'] ?? 0);
+$isObstacleMode = (($room['game_type'] ?? 'classic') === 'obstacle');
+$isDisqualified = ($isObstacleMode && !empty($player['is_disqualified_obstacle']));
 
 $currentQuestion = db_fetch_one("SELECT * FROM questions WHERE id_question = :qid", [':qid' => $qId]);
 $questionMode = $currentQuestion['mode'] ?? 'normal';
@@ -163,16 +170,25 @@ require_once __DIR__ . '/../../includes/header.php';
         </span>
         <?php if ($questionMode === 'wager'): ?>
             <span class="badge badge-warning text-dark font-weight-bold ml-1 px-2 py-1 shadow-sm" style="font-size: 0.85rem;">
-                <i class="fas fa-dice mr-1"></i> CƯỢC
+                <i class="fas fa-dice mr-1"></i> Wager
             </span>
         <?php endif; ?>
-        <?php if ($isEliminated): ?>
+        <?php if ($isObstacleMode && !empty($currentQuestion['piece_index'])): ?>
+            <span class="badge badge-warning text-dark font-weight-bold ml-2 px-2 py-1 shadow-sm" style="font-size: 0.85rem;">
+                <i class="fas fa-puzzle-piece mr-1"></i> Tile <?= intval($currentQuestion['piece_index']) ?>
+            </span>
+        <?php endif; ?>
+        <?php if ($isDisqualified): ?>
+            <span class="badge badge-danger text-white font-weight-bold ml-2 px-2 py-1 shadow-sm" style="font-size: 0.85rem;">
+                <i class="fas fa-ban mr-1"></i> Disqualified
+            </span>
+        <?php elseif ($isEliminated): ?>
             <span class="badge badge-danger ml-1 px-2 py-1 font-weight-bold shadow-sm" style="font-size: 0.85rem;">
-                <i class="fas fa-skull mr-1"></i> ĐÃ BỊ LOẠI
+                <i class="fas fa-skull mr-1"></i> Eliminated
             </span>
         <?php elseif ($isSpectator): ?>
             <span class="badge badge-secondary ml-1 px-2 py-1 font-weight-bold shadow-sm" style="font-size: 0.85rem;">
-                <i class="fas fa-eye mr-1"></i> KHÁN GIẢ
+                <i class="fas fa-eye mr-1"></i> Spectator
             </span>
         <?php endif; ?>
     </div>
@@ -217,7 +233,22 @@ if ($isResultPhase):
 
     <div class="container py-3" style="max-width: 650px;">
 
-        <?php if ($justEliminated): ?>
+        <?php if ($isDisqualified): ?>
+            <div class="card border-0 shadow text-white text-center mb-3"
+                 style="background: linear-gradient(135deg, #495057, #343a40); border-radius: 16px;">
+                <div class="card-body py-3 px-4">
+                    <div class="d-flex align-items-center justify-content-center" style="gap: 15px;">
+                        <div style="font-size: 3rem; line-height: 1;">🚫</div>
+                        <div class="text-left">
+                            <h3 class="font-weight-bold mb-0">Disqualified</h3>
+                            <p class="mb-0 font-weight-bold" style="font-size: 1rem; color: #ced4da;">
+                                You guessed the secret picture incorrectly. You are spectating the rest of the game.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        <?php elseif ($justEliminated): ?>
             <div class="card border-0 shadow text-white text-center mb-3"
                  style="background: linear-gradient(135deg, #1f1f1f, #8b0000); border-radius: 16px;">
                 <div class="card-body py-4 px-4">
@@ -771,6 +802,20 @@ elseif ($phase === 'question'):
 
     <?php endif; ?>
 
+    <?php if ($isObstacleMode): ?>
+        <div class="text-center my-4">
+            <?php if ($isDisqualified): ?>
+                <button type="button" class="btn btn-secondary font-weight-bold shadow-sm rounded-pill px-4 py-2" disabled>
+                    <i class="fas fa-ban mr-1"></i> YOU ARE DISQUALIFIED FROM THIS ROUND
+                </button>
+            <?php else: ?>
+                <button type="button" class="btn btn-danger font-weight-bold shadow rounded-pill px-4 py-3" style="font-size: 1.2rem;" onclick="claimBuzzerFromQuestion()">
+                    <i class="fas fa-bell mr-2"></i> 🔔 GUESS SECRET PICTURE
+                </button>
+            <?php endif; ?>
+        </div>
+    <?php endif; ?>
+
 <?php endif; ?>
 
 <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
@@ -779,6 +824,7 @@ const roomId = <?= $roomId ?>;
 const playerId = <?= $playerId ?>;
 const playerToken = '<?= htmlspecialchars($token) ?>';
 const currentStatus = '<?= $status ?>';
+const isDisqualified = <?= $isDisqualified ? 'true' : 'false' ?>;
 
 sessionStorage.setItem('kahoot_pid', playerId);
 sessionStorage.setItem('kahoot_token', playerToken);
@@ -787,8 +833,46 @@ function refreshPlayerPage() {
     window.location.href = 'play.php?pid=' + playerId + '&token=' + encodeURIComponent(playerToken);
 }
 
+function claimBuzzerFromQuestion() {
+    if (isDisqualified) {
+        alert('You have been disqualified from this round!');
+        return;
+    }
+    $.post('<?= BASE_URL ?>modules/api/obstacle_action.php?action=buzz&id_room=' + roomId, {
+        id_player: playerId,
+        token: playerToken
+    }, function(res) {
+        if (res && res.success && res.your_turn) {
+            var guess = prompt('🔔 YOUR TURN (20 seconds):\nEnter the secret picture keyword:');
+            if (guess && guess.trim()) {
+                $.post('<?= BASE_URL ?>modules/api/obstacle_action.php?action=submit_guess&id_room=' + roomId, {
+                    id_player: playerId,
+                    token: playerToken,
+                    guess: guess.trim()
+                }, function(res2) {
+                    if (res2 && res2.success && res2.correct) {
+                        alert('🏆 CORRECT! You guessed the keyword and won the game!');
+                    } else if (res2 && res2.all_disqualified) {
+                        alert('All players have guessed incorrectly! Moving to Final Podium.');
+                    } else {
+                        alert(res2.message || 'Incorrect answer!');
+                    }
+                    refreshPlayerPage();
+                }, 'json');
+            } else {
+                $.post('<?= BASE_URL ?>modules/api/obstacle_action.php?action=buzzer_timeout&id_room=' + roomId);
+                refreshPlayerPage();
+            }
+        } else {
+            alert(res.message || 'Cannot buzz in at this time');
+        }
+    }, 'json').fail(function() {
+        alert('Server connection error');
+    });
+}
+
 function submitAnswer(answerId) {
-    if (!answerId) return;
+    if (!answerId || isDisqualified) return;
 
     const submitAudio = document.getElementById('submitSfx');
     if (submitAudio) {

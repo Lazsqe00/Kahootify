@@ -32,12 +32,16 @@ if (!$room) {
 }
 
 $playerCheck = db_fetch_one(
-    "SELECT id_player, current_streak, status, score, eliminated_at_question, elimination_order 
+    "SELECT id_player, current_streak, status, score, eliminated_at_question, elimination_order, is_disqualified_obstacle 
      FROM players WHERE id_player = :p AND id_room = :r",
     [':p' => $playerId, ':r' => $roomId]
 );
 if (!$playerCheck) {
     echo json_encode(['success' => false, 'message' => 'Player not found in this room']);
+    exit;
+}
+if (!empty($playerCheck['is_disqualified_obstacle']) && ($room['game_type'] ?? 'classic') === 'obstacle') {
+    echo json_encode(['success' => false, 'disqualified' => true, 'message' => 'Bạn đã bị hủy tư cách thi đấu do đoán sai từ khóa chướng ngại vật!']);
     exit;
 }
 $currentStreak = intval($playerCheck['current_streak'] ?? 0);
@@ -50,7 +54,7 @@ try {
         }
 
         $ans = db_fetch_one(
-            "SELECT a.*, q.points, q.time_limit, q.mode, q.mode_config, r.question_start_time, r.status
+            "SELECT a.*, q.points, q.time_limit, q.mode, q.mode_config, q.piece_index, r.question_start_time, r.status, r.game_type
              FROM answers a
              JOIN questions q ON a.id_question = q.id_question
              JOIN room r ON r.id_room = :r
@@ -219,6 +223,26 @@ try {
                 ]
             );
 
+            // Obstacle puzzle: unlock piece for this player
+            $unlockedPiece = null;
+            if ($isCorrect && (($ans['game_type'] ?? 'classic') === 'obstacle')) {
+                $pieceIdx = intval($ans['piece_index'] ?? 0);
+                if ($pieceIdx > 0) {
+                    $pRow = db_fetch_one("SELECT unlocked_pieces FROM players WHERE id_player = :p", [':p' => $playerId]);
+                    $myUnlocked = !empty($pRow['unlocked_pieces']) ? json_decode($pRow['unlocked_pieces'], true) : [];
+                    if (!is_array($myUnlocked)) $myUnlocked = [];
+                    if (!in_array($pieceIdx, $myUnlocked)) {
+                        $myUnlocked[] = $pieceIdx;
+                        sort($myUnlocked);
+                        db_execute("UPDATE players SET unlocked_pieces = :up WHERE id_player = :p", [
+                            ':up' => json_encode($myUnlocked),
+                            ':p'  => $playerId
+                        ]);
+                    }
+                    $unlockedPiece = $pieceIdx;
+                }
+            }
+
             // Record in player_question_logs for analytics & report
             $existingLog = db_fetch_one(
                 "SELECT id_log FROM player_question_logs WHERE id_room = :r AND id_question = :q AND id_player = :p",
@@ -256,16 +280,17 @@ try {
         }
 
         return [
-            'success'       => true,
-            'is_correct'    => $isCorrect,
-            'points_earned' => $pointsEarned,
-            'streak'        => $newStreak,
-            'streak_bonus'  => $streakBonus,
-            'streak_lost'   => $streakLost,
-            'mode'          => $modeId,
-            'wager_amount'  => $wagerAmount,
-            'score_delta'   => $scoreDelta,
-            'is_eliminated' => !empty($after['eliminated']),
+            'success'        => true,
+            'is_correct'     => $isCorrect,
+            'points_earned'  => $pointsEarned,
+            'streak'         => $newStreak,
+            'streak_bonus'   => $streakBonus,
+            'streak_lost'    => $streakLost,
+            'mode'           => $modeId,
+            'wager_amount'   => $wagerAmount,
+            'score_delta'    => $scoreDelta,
+            'is_eliminated'  => !empty($after['eliminated']),
+            'unlocked_piece' => $unlockedPiece ?? null
         ];
     });
 

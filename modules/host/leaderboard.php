@@ -390,9 +390,15 @@ require_once __DIR__ . '/../../includes/header.php';
 
     <!-- Bottom Action Button: Host manually clicks to advance -->
     <div class="text-center my-4">
-        <a href="<?= BASE_URL ?>modules/host/play.php?action=next_question&qid=<?= $currentQId ?>" class="btn btn-kahoot btn-kahoot-green btn-lg shadow font-weight-bold px-5 py-3" style="font-size: 1.25rem; border-radius: 12px;" onclick="stopAllAudio()">
-            <?= $hasNextQuestion ? 'Next Question &raquo;' : 'Final Results 🏆' ?>
-        </a>
+        <?php if (($room['game_type'] ?? 'classic') === 'obstacle'): ?>
+            <a href="<?= BASE_URL ?>modules/host/play.php?action=return_to_board" class="btn btn-kahoot btn-kahoot-green btn-lg shadow font-weight-bold px-5 py-3" style="font-size: 1.25rem; border-radius: 12px;" onclick="stopAllAudio()">
+                <i class="fas fa-th mr-2"></i> Quay về Bảng Mảnh Ghép &raquo;
+            </a>
+        <?php else: ?>
+            <a href="<?= BASE_URL ?>modules/host/play.php?action=next_question&qid=<?= $currentQId ?>" class="btn btn-kahoot btn-kahoot-green btn-lg shadow font-weight-bold px-5 py-3" style="font-size: 1.25rem; border-radius: 12px;" onclick="stopAllAudio()">
+                <?= $hasNextQuestion ? 'Next Question &raquo;' : 'Final Results 🏆' ?>
+            </a>
+        <?php endif; ?>
     </div>
 
 </div>

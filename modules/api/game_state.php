@@ -76,6 +76,8 @@ if ($action === 'get_room_status') {
         $response = [
             'success'                   => true,
             'status'                    => $room['status'],
+            'game_type'                 => $room['game_type'] ?? 'classic',
+            'buzzer_status'             => $room['buzzer_status'] ?? 'idle',
             'current_phase'             => $parsed['phase'],
             'current_qid'               => $parsed['qid'],
             'is_locked'                 => room_is_locked($room),
@@ -132,7 +134,7 @@ if ($action === 'get_players') {
 
 if ($action === 'get_question_status') {
     $qId = intval($_GET['id_question'] ?? 0);
-    $room = db_fetch_one('SELECT id_room, pin FROM room WHERE id_room = :r', [':r' => $roomId]);
+    $room = db_fetch_one('SELECT id_room, pin, game_type, status FROM room WHERE id_room = :r', [':r' => $roomId]);
     if (!$room) {
         echo json_encode(['success' => false, 'message' => 'Room does not exist']);
         exit;
@@ -141,6 +143,7 @@ if ($action === 'get_question_status') {
 
     echo json_encode([
         'success'       => true,
+        'status'        => $room['status'],
         'total_players' => $counts['total_players'],
         'voted_count'   => $counts['voted_count']
     ]);
