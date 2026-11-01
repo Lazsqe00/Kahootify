@@ -73,15 +73,33 @@ if (isset($_GET['start_game'])) {
         }
 
         $firstQId = $selectedQIds[0];
+        $firstQ = db_fetch_one("SELECT * FROM questions WHERE id_question = :q", [':q' => $firstQId]);
+        require_once __DIR__ . '/../../includes/modes/GameStateManager.php';
+        $initialStatus = GameStateManager::getInitialQuestionStatus($firstQ ?: ['id_question' => $firstQId, 'mode' => 'normal']);
+
+        $hasWagerInQuiz = db_count('questions', "id_quiz = :q AND mode = 'wager'", [':q' => $room['id_quiz']]) > 0;
+        $startingScore = intval($_GET['starting_score'] ?? ($room['starting_score'] ?? 0));
+        if ($hasWagerInQuiz && $startingScore < 1) {
+            $startingScore = 1000;
+        }
+
         db_execute(
-            "UPDATE room SET status = :s, question_start_time = UNIX_TIMESTAMP(), question_limit = :ql, question_order = :qo WHERE id_room = :r",
+            "UPDATE room SET status = :s, question_start_time = UNIX_TIMESTAMP(), question_limit = :ql, question_order = :qo, starting_score = :ss WHERE id_room = :r",
             [
-                ':s'  => (string)$firstQId,
+                ':s'  => $initialStatus,
                 ':ql' => $savedLimit,
                 ':qo' => json_encode(array_values($selectedQIds)),
+                ':ss' => $startingScore,
                 ':r'  => $roomId
             ]
         );
+
+        if ($startingScore > 0) {
+            db_execute("UPDATE players SET score = :ss WHERE id_room = :r AND (score = 0 OR score IS NULL)", [
+                ':ss' => $startingScore,
+                ':r'  => $roomId
+            ]);
+        }
         $_SESSION['question_index'] = 0;
         redirect('modules/host/play.php');
     } else {
@@ -264,6 +282,26 @@ require_once __DIR__ . '/../../includes/header.php';
         <p class="font-weight-bold mt-2 mb-0">Game PIN: <?= htmlspecialchars($room['pin']) ?></p>
     </dialog>
 
+    <?php
+    $hasWagerInQuiz = db_count('questions', "id_quiz = :q AND mode = 'wager'", [':q' => $room['id_quiz']]) > 0;
+    if ($hasWagerInQuiz):
+    ?>
+    <div class="lobby-settings-bar mx-auto mb-3" style="max-width: 540px; width: 90%;">
+        <div class="lobby-device-toggle-pill shadow d-flex justify-content-between align-items-center text-dark" style="background: #ffffff; border-radius: 18px; padding: 12px 22px; border: 2px solid #ffca28;">
+            <div>
+                <span class="font-weight-bold" style="font-family: 'Montserrat', sans-serif; font-size: 0.95rem; font-weight: 800; color: #111111;">
+                    <i class="fas fa-coins text-warning mr-1"></i> Điểm khởi đầu (Starting Score):
+                </span>
+                <small class="text-muted d-block" style="font-size: 11px;">(Áp dụng vì bài có câu Cược điểm - tối thiểu 1 điểm)</small>
+            </div>
+            <div class="d-flex align-items-center" style="gap: 6px;">
+                <input type="number" id="lobbyStartingScore" class="form-control form-control-sm text-center font-weight-bold text-dark" style="width: 90px; height: 32px; border-radius: 8px; border: 2px solid #ffca28;" min="1" max="100000" step="50" value="<?= max(1, intval($room['starting_score'] ?: 1000)) ?>" onchange="updateStartingScore(this.value)">
+                <span class="font-weight-bold text-muted small">pts</span>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <div class="lobby-settings-bar mx-auto mb-3" style="max-width: 540px; width: 90%;">
         <div class="d-flex justify-content-end align-items-center">
             <div class="lobby-device-toggle-pill shadow d-inline-flex align-items-center" style="background: #ffffff; border-radius: 50px; padding: 10px 22px; border: 2px solid #ffffff;">
@@ -407,6 +445,21 @@ require_once __DIR__ . '/../../includes/header.php';
                         </div>
                     </div>
                 </div>
+
+                <?php if ($hasWagerInQuiz): ?>
+                <div class="p-3 mb-3 rounded" style="background-color: #fff8e1; border: 1px solid #ffe082;">
+                    <h6 class="font-weight-bold mb-1 text-dark" style="font-family: 'Montserrat', sans-serif; font-weight: 800;">
+                        <i class="fas fa-coins text-warning mr-1"></i> Điểm khởi đầu (Starting Score)
+                    </h6>
+                    <p class="text-muted small mb-2">
+                        Bài trắc nghiệm có câu hỏi <strong>Cược điểm (Wager)</strong>. Người chơi cần có số điểm khởi đầu (&ge; 1) để có thể cược ngay từ câu đầu tiên.
+                    </p>
+                    <div class="d-flex align-items-center" style="gap: 8px;">
+                        <input type="number" id="modalStartingScore" class="form-control form-control-sm text-center font-weight-bold" style="width: 100px; height: 34px; border-radius: 8px; border: 2px solid #ffca28;" min="1" max="100000" step="50" value="<?= max(1, intval($room['starting_score'] ?: 1000)) ?>" onchange="updateStartingScore(this.value)">
+                        <span class="font-weight-bold text-muted small">điểm ban đầu</span>
+                    </div>
+                </div>
+                <?php endif; ?>
             </div>
             <div class="modal-footer bg-light py-2">
                 <button type="button" class="btn btn-primary font-weight-bold rounded-pill px-4" data-dismiss="modal">Done</button>
@@ -576,7 +629,19 @@ function updateStartGameHref() {
     if (config.mode === 'random') {
         url += '&question_limit=' + config.limit;
     }
+    const startingScoreEl = $('#lobbyStartingScore');
+    if (startingScoreEl.length) {
+        url += '&starting_score=' + (parseInt(startingScoreEl.val()) || 1000);
+    }
     $('#btnStartGame').attr('href', url);
+}
+
+function updateStartingScore(val) {
+    let score = parseInt(val) || 1000;
+    if (score < 1) score = 1;
+    $('#lobbyStartingScore').val(score);
+    $('#modalStartingScore').val(score);
+    updateStartGameHref();
 }
 
 $(document).ready(function() {

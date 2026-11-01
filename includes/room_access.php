@@ -64,16 +64,34 @@ function filter_room_players($roomId, $players, $state = null) {
 
 function room_question_counts($room, $questionId, $state = null) {
     $roomId = is_array($room) ? (int)($room['id_room'] ?? 0) : (int)$room;
-    $players = filter_room_players($roomId, db_fetch_all(
-        'SELECT id_player FROM players WHERE id_room = :r', [':r' => $roomId]
-    ), $state);
+    $q = db_fetch_one('SELECT mode FROM questions WHERE id_question = :q', [':q' => $questionId]);
+    $mode = $q['mode'] ?? 'normal';
+
+    if ($mode === 'wager') {
+        $participants = db_fetch_all(
+            "SELECT l.id_player 
+             FROM player_question_logs l
+             JOIN players p ON p.id_player = l.id_player
+             WHERE l.id_room = :r AND l.id_question = :q AND l.is_sitting_out = 0 AND p.is_kicked = 0 AND p.status = 'ACTIVE'",
+            [':r' => $roomId, ':q' => $questionId]
+        );
+        $playerIds = array_column($participants, 'id_player');
+    } else {
+        $players = filter_room_players($roomId, db_fetch_all(
+            "SELECT id_player FROM players WHERE id_room = :r AND (status = 'ACTIVE' OR status IS NULL)", [':r' => $roomId]
+        ), $state);
+        $playerIds = array_column($players, 'id_player');
+    }
+
     $answered = db_fetch_all(
         'SELECT DISTINCT v.id_player FROM votes v JOIN answers a ON a.id_answer = v.id_answer JOIN players p ON p.id_player = v.id_player WHERE p.id_room = :r AND a.id_question = :q AND p.is_kicked = 0',
         [':r' => $roomId, ':q' => $questionId]
     );
+    $answeredIds = array_column($answered, 'id_player');
+
     return [
-        'total_players' => count($players),
-        'voted_count' => count(array_intersect(array_column($players, 'id_player'), array_column($answered, 'id_player')))
+        'total_players' => count($playerIds),
+        'voted_count' => count(array_intersect($playerIds, $answeredIds))
     ];
 }
 
@@ -170,12 +188,25 @@ function join_room_player($roomId, $pin, $nickname, $characterId = null, $access
         if ($existing) {
             $nickname .= '_' . mt_rand(10, 99);
         }
+
+        $isWaiting = ($currentRoom['status'] === 'waiting');
+        $allowLate = !empty($currentRoom['allow_late_join']);
+        $playerStatus = ($isWaiting || $allowLate) ? 'ACTIVE' : 'SPECTATOR';
+        $initialScore = ($playerStatus === 'ACTIVE') ? intval($currentRoom['starting_score'] ?? 0) : 0;
+
         $playerId = db_insert(
-            'INSERT INTO players (id_room, nickname, score, answers_correct, is_kicked, character_id, accessory_id) VALUES (:r, :nick, 0, 0, 0, :char, :acc)',
-            [':r' => $roomId, ':nick' => $nickname, ':char' => ($characterId ?: '1500'), ':acc' => ($accessoryId ?: '')]
-            );
+            'INSERT INTO players (id_room, nickname, score, answers_correct, is_kicked, character_id, accessory_id, status) VALUES (:r, :nick, :score, 0, 0, :char, :acc, :st)',
+            [
+                ':r'     => $roomId,
+                ':nick'  => $nickname,
+                ':score' => $initialScore,
+                ':char'  => ($characterId ?: '1500'),
+                ':acc'   => ($accessoryId ?: ''),
+                ':st'    => $playerStatus
+            ]
+        );
         $pdo->commit();
-        return ['success' => true, 'id_player' => $playerId, 'nickname' => $nickname];
+        return ['success' => true, 'id_player' => $playerId, 'nickname' => $nickname, 'status' => $playerStatus];
     } catch (Throwable $error) {
         if ($pdo->inTransaction()) {
             $pdo->rollBack();

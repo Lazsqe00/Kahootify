@@ -4,6 +4,8 @@ require_once __DIR__ . '/../../includes/auth_check.php';
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../includes/room_access.php';
 require_once __DIR__ . '/../../includes/player_characters.php';
+require_once __DIR__ . '/../../includes/modes/GameStateManager.php';
+require_once __DIR__ . '/../../includes/modes/QuestionModeRegistry.php';
 
 $roomId = intval($_SESSION['id_room'] ?? 0);
 $room = db_fetch_one("SELECT r.*, q.name as quiz_name FROM room r JOIN quiz q ON r.id_quiz = q.id_quiz WHERE r.id_room = :r AND r.id_creator = :c", [':r' => $roomId, ':c' => (int)$_SESSION['id_creator']]);
@@ -22,6 +24,10 @@ if ($status === 'finished') {
     redirect('modules/host/leaderboard.php?final=true');
 }
 
+$parsed = GameStateManager::parseStatus($status);
+$phase = $parsed['phase'];
+$qId = $parsed['question_id'];
+
 $selectedQIds = !empty($room['question_order']) ? json_decode($room['question_order'], true) : null;
 if (!is_array($selectedQIds) || empty($selectedQIds)) {
     $fallbackQuestions = db_fetch_all("SELECT id_question FROM questions WHERE id_quiz = :q ORDER BY id_question ASC", [':q' => $room['id_quiz']]);
@@ -31,13 +37,34 @@ $selectedQIds = array_values(array_filter(array_map('intval', (array)$selectedQI
 $totalQuestions = count($selectedQIds);
 
 // CRITICAL: Handle actions FIRST before checking $isResultPhase!
+if (isset($_GET['action']) && $_GET['action'] === 'lock_wager') {
+    GameStateManager::lockWagerPhaseAndAdvance($roomId, $qId);
+    redirect('modules/host/play.php');
+}
+
+if (isset($_GET['action']) && $_GET['action'] === 'skip_question') {
+    $currentIdx = array_search((int)$qId, $selectedQIds, true);
+    if ($currentIdx === false) {
+        $currentIdx = array_search((int)$qId, $selectedQIds);
+    }
+    if ($currentIdx !== false && isset($selectedQIds[$currentIdx + 1])) {
+        $nextQId = intval($selectedQIds[$currentIdx + 1]);
+        $_SESSION['question_index'] = $currentIdx + 1;
+        GameStateManager::advanceToQuestion($roomId, $nextQId);
+        redirect('modules/host/play.php');
+    } else {
+        db_execute("UPDATE room SET status = 'finished' WHERE id_room = :r", [':r' => $roomId]);
+        redirect('modules/host/leaderboard.php?final=true');
+    }
+}
+
 if (isset($_GET['action']) && $_GET['action'] === 'next_question') {
     $currentQId = 0;
     if (isset($_GET['qid']) && intval($_GET['qid']) > 0) {
         $currentQId = intval($_GET['qid']);
     }
     if ($currentQId <= 0) {
-        $currentQId = intval(str_replace('res_', '', $status));
+        $currentQId = $qId;
     }
     $currentIdx = array_search((int)$currentQId, $selectedQIds, true);
     if ($currentIdx === false) {
@@ -50,10 +77,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'next_question') {
     if ($currentIdx !== false && isset($selectedQIds[$currentIdx + 1])) {
         $nextQId = intval($selectedQIds[$currentIdx + 1]);
         $_SESSION['question_index'] = $currentIdx + 1;
-        db_execute("UPDATE room SET status = :s, question_start_time = UNIX_TIMESTAMP() WHERE id_room = :r", [
-            ':s' => (string)$nextQId,
-            ':r' => $roomId
-        ]);
+        GameStateManager::advanceToQuestion($roomId, $nextQId);
         redirect('modules/host/play.php');
     } else {
         db_execute("UPDATE room SET status = 'finished' WHERE id_room = :r", [':r' => $roomId]);
@@ -62,30 +86,137 @@ if (isset($_GET['action']) && $_GET['action'] === 'next_question') {
 }
 
 // When show_result is triggered (either all answered or time is up),
-// immediately update status to res_<qid> and go straight to leaderboard
+// immediately update status to res_<qid> via GameStateManager and go straight to leaderboard
 if (isset($_GET['action']) && $_GET['action'] === 'show_result') {
-    if (is_numeric($status)) {
-        db_execute("UPDATE room SET status = :s WHERE id_room = :r", [
-            ':s' => 'res_' . $status,
-            ':r' => $roomId
-        ]);
-        $toQId = intval($status);
-    } else {
-        $toQId = intval(str_replace('res_', '', $status));
-    }
-    redirect('modules/host/leaderboard.php?qid=' . $toQId);
+    GameStateManager::finalizeQuestionPhase($roomId, $qId);
+    redirect('modules/host/leaderboard.php?qid=' . $qId);
 }
 
 // If room is in result phase (and no action requested), directly show leaderboard
-$isResultPhase = (strpos($status, 'res_') === 0);
-if ($isResultPhase) {
-    $toQId = intval(str_replace('res_', '', $status));
-    redirect('modules/host/leaderboard.php?qid=' . $toQId);
+if ($phase === 'result') {
+    redirect('modules/host/leaderboard.php?qid=' . $qId);
 }
 
-$qId = intval($status);
-
 $currentQuestion = db_fetch_one("SELECT * FROM questions WHERE id_question = :qid", [':qid' => $qId]);
+$questionMode = $currentQuestion['mode'] ?? 'normal';
+$modeConfig = !empty($currentQuestion['mode_config']) ? json_decode($currentQuestion['mode_config'], true) : [];
+
+$currentIdx = array_search((int)$qId, $selectedQIds, true);
+$questionNumber = ($currentIdx !== false) ? ($currentIdx + 1) : 1;
+
+// =========================================================================
+// WAGER PHASE HOST VIEW
+// =========================================================================
+if ($phase === 'wager') {
+    $wagerTimeLimit = intval($modeConfig['wager_time_sec'] ?? 10);
+    if ($wagerTimeLimit <= 0) $wagerTimeLimit = 10;
+
+    $startTime = !empty($room['question_start_time']) ? intval($room['question_start_time']) : time();
+    $elapsed = time() - $startTime;
+    $remainingWagerSeconds = max(0, $wagerTimeLimit - $elapsed);
+
+    $activeCount = db_count('players', "id_room = :r AND (status = 'ACTIVE' OR status IS NULL) AND is_kicked = 0", [':r' => $roomId]);
+    $wageredCount = db_count('player_question_logs', "id_room = :r AND id_question = :q AND is_sitting_out = 0", [':r' => $roomId, ':q' => $qId]);
+
+    $pageTitle = "Wager Phase - Question " . $questionNumber . "/" . $totalQuestions . " - Kahoot! Host";
+    $bodyClass = "backgroundColorChanges";
+    require_once __DIR__ . '/../../includes/header.php';
+    ?>
+    <nav class="navbar navbar-dark bg-dark px-4 py-2 d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center">
+            <img src="<?= BASE_URL ?>assets/img/logo.png" alt="Logo" style="max-height: 32px; filter: brightness(100);" class="mr-3">
+            <span class="badge badge-light font-weight-bold mr-2">PIN: <?= htmlspecialchars($room['pin']) ?></span>
+            <span class="text-white font-weight-bold mr-2">Question <?= $questionNumber ?> / <?= $totalQuestions ?></span>
+            <span class="badge badge-warning text-dark font-weight-bold"><i class="fas fa-dice mr-1"></i> CƯỢC ĐIỂM</span>
+        </div>
+        <div class="d-flex align-items-center">
+            <a href="play.php?action=lock_wager" class="btn btn-warning font-weight-bold mr-2 shadow-sm">
+                <i class="fas fa-arrow-right mr-1"></i> Bắt đầu câu hỏi ngay &raquo;
+            </a>
+            <a href="play.php?action=skip_question" class="btn btn-outline-light font-weight-bold" onclick="return confirm('Bỏ qua câu hỏi này? Điểm người chơi sẽ không thay đổi.');">
+                Bỏ qua câu hỏi &raquo;
+            </a>
+        </div>
+    </nav>
+
+    <div class="container my-4" style="max-width: 950px;">
+        <details class="text-white mb-3">
+            <summary class="font-weight-bold">Manage players</summary>
+            <div class="text-center mt-3"><?php $reloadAfterKick = true; require __DIR__ . '/../../includes/host_players.php'; ?></div>
+        </details>
+
+        <div class="question-card-banner text-center py-4 shadow-sm" style="background: rgba(255, 255, 255, 0.96); border-radius: 20px;">
+            <div style="font-size: 3.8rem; line-height: 1;" class="mb-2">🎲</div>
+            <h2 class="font-weight-bold text-dark mb-1">CHẾ ĐỘ CƯỢC ĐIỂM (WAGER)</h2>
+            <p class="text-muted font-weight-bold mb-0" style="font-size: 1.15rem;">
+                Người chơi đang bí mật lựa chọn mức cược (10%, 25%, 50%, ALL-IN). Mức cược của từng người được giữ kín.
+            </p>
+        </div>
+
+        <div class="d-flex justify-content-around align-items-center my-4 px-3 flex-wrap" style="gap: 20px;">
+            <div>
+                <div id="wagerTimerBox" class="timer-circle <?= $remainingWagerSeconds <= 3 ? 'warning' : '' ?>" style="width: 100px; height: 100px; font-size: 2.4rem;">
+                    <span id="wagerTimerSeconds"><?= $remainingWagerSeconds ?></span>
+                </div>
+            </div>
+
+            <div class="text-center">
+                <div class="bg-white rounded-pill px-5 py-3 shadow font-weight-bold text-dark" style="font-size: 1.35rem;">
+                    <i class="fas fa-coins text-warning mr-2"></i>
+                    Đã đặt cược: <span id="wagerCount" class="text-primary font-weight-bold"><?= $wageredCount ?></span> / <span id="activeCount"><?= $activeCount ?></span>
+                </div>
+                <div class="text-white mt-2 small font-weight-bold" style="text-shadow: 1px 1px 2px rgba(0,0,0,0.4);">
+                    Hệ thống sẽ tự động chuyển sang câu hỏi khi tất cả đã cược hoặc hết giờ.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script>
+    let remainingWager = <?= $remainingWagerSeconds ?>;
+    const roomId = <?= $roomId ?>;
+    const qId = <?= $qId ?>;
+
+    const wagerTimerInterval = setInterval(function() {
+        remainingWager--;
+        if (remainingWager <= 0) {
+            clearInterval(wagerTimerInterval);
+            clearInterval(wagerPollInterval);
+            $('#wagerTimerSeconds').text('0');
+            window.location.href = 'play.php?action=lock_wager';
+        } else {
+            $('#wagerTimerSeconds').text(remainingWager);
+            if (remainingWager <= 3) {
+                $('#wagerTimerBox').addClass('warning');
+            }
+        }
+    }, 1000);
+
+    const wagerPollInterval = setInterval(function() {
+        $.getJSON('<?= BASE_URL ?>modules/api/game_state.php?action=get_wager_status&id_room=' + roomId + '&id_question=' + qId, function(data) {
+            if (data && data.success) {
+                $('#wagerCount').text(data.wagered_count);
+                $('#activeCount').text(data.total_active);
+
+                if (data.is_all_wagered) {
+                    clearInterval(wagerPollInterval);
+                    clearInterval(wagerTimerInterval);
+                    window.location.href = 'play.php?action=lock_wager';
+                }
+            }
+        });
+    }, 800);
+    </script>
+    </body>
+    </html>
+    <?php
+    exit;
+}
+
+// =========================================================================
+// QUESTION PHASE HOST VIEW (Normal or Wager)
+// =========================================================================
 $answers = db_fetch_all("SELECT * FROM answers WHERE id_question = :qid ORDER BY id_answer ASC", [':qid' => $qId]);
 
 $questionMediaUrl = '';
@@ -123,9 +254,6 @@ $startTime = !empty($room['question_start_time']) ? intval($room['question_start
 $elapsed = time() - $startTime;
 $remainingSeconds = max(0, $timeLimit - $elapsed);
 
-$currentIdx = array_search((int)$qId, $selectedQIds, true);
-$questionNumber = ($currentIdx !== false) ? ($currentIdx + 1) : 1;
-
 $questionAudioFile = null;
 $audioDir = __DIR__ . '/../../assets/audio';
 if (is_dir($audioDir)) {
@@ -148,6 +276,7 @@ $icons  = [KAHOOT_ICON_RED, KAHOOT_ICON_BLUE, KAHOOT_ICON_YELLOW, KAHOOT_ICON_GR
 
 $pageTitle = "Question " . $questionNumber . "/" . $totalQuestions . " - Kahoot! Host";
 $bodyClass = "backgroundColorChanges";
+
 require_once __DIR__ . '/../../includes/header.php';
 ?>
 
@@ -161,7 +290,10 @@ require_once __DIR__ . '/../../includes/header.php';
     <div class="d-flex align-items-center">
         <img src="<?= BASE_URL ?>assets/img/logo.png" alt="Logo" style="max-height: 32px; filter: brightness(100);" class="mr-3">
         <span class="badge badge-light font-weight-bold mr-2">PIN: <?= htmlspecialchars($room['pin']) ?></span>
-        <span class="text-white font-weight-bold">Question <?= $questionNumber ?> / <?= $totalQuestions ?></span>
+        <span class="text-white font-weight-bold mr-2">Question <?= $questionNumber ?> / <?= $totalQuestions ?></span>
+        <?php if ($questionMode === 'wager'): ?>
+            <span class="badge badge-warning text-dark font-weight-bold"><i class="fas fa-dice mr-1"></i> CƯỢC ĐIỂM</span>
+        <?php endif; ?>
     </div>
     <div class="d-flex align-items-center">
         <?php if ($questionAudioFile): ?>
@@ -171,8 +303,11 @@ require_once __DIR__ . '/../../includes/header.php';
             </button>
         <?php endif; ?>
 
-        <a href="play.php?action=show_result" onclick="stopQuestionAudio()" class="btn btn-outline-light font-weight-bold">
+        <a href="play.php?action=show_result" onclick="stopQuestionAudio()" class="btn btn-outline-light font-weight-bold mr-2">
             Skip to Leaderboard &raquo;
+        </a>
+        <a href="play.php?action=skip_question" onclick="stopQuestionAudio(); return confirm('Bỏ qua câu hỏi này? Điểm người chơi sẽ không thay đổi.');" class="btn btn-sm btn-outline-warning font-weight-bold">
+            Bỏ qua câu hỏi &raquo;
         </a>
     </div>
 </nav>
