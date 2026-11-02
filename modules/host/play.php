@@ -17,6 +17,13 @@ if (!$room) {
 $status = $room['status'];
 
 if (isset($_GET['action']) && $_GET['action'] === 'return_to_board') {
+    $openedPieces = !empty($room['opened_pieces']) ? json_decode($room['opened_pieces'], true) : [];
+    if (!is_array($openedPieces)) $openedPieces = [];
+    $quizDetail = db_fetch_one("SELECT total_pieces FROM quiz WHERE id_quiz = :q", [':q' => $room['id_quiz']]);
+    $totalPieces = intval($quizDetail['total_pieces'] ?? 4);
+    if (count($openedPieces) >= $totalPieces) {
+        db_execute("UPDATE players SET is_disqualified_obstacle = 0 WHERE id_room = :r", [':r' => $roomId]);
+    }
     db_execute("UPDATE room SET status = 'board', buzzer_status = 'idle', buzzer_player_id = NULL, buzzer_time = NULL WHERE id_room = :r", [':r' => $roomId]);
     redirect('modules/host/play.php');
 }
@@ -53,6 +60,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'lock_wager') {
 }
 
 if (isset($_GET['action']) && $_GET['action'] === 'skip_question') {
+    if (($room['game_type'] ?? 'classic') === 'obstacle') {
+        redirect('modules/host/play.php?action=return_to_board');
+    }
     $currentIdx = array_search((int)$qId, $selectedQIds, true);
     if ($currentIdx === false) {
         $currentIdx = array_search((int)$qId, $selectedQIds);

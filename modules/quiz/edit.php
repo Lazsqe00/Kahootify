@@ -54,7 +54,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     if ($action === 'update_obstacle_settings' && ($quiz['game_type'] ?? 'classic') === 'obstacle') {
         $newAns = trim($_POST['obstacle_answer'] ?? '');
         $newTp  = intval($_POST['total_pieces'] ?? 4);
-        if (!in_array($newTp, [4, 6, 8, 9])) $newTp = 4;
+        if (!in_array($newTp, [4, 6, 8, 9, 10, 12, 15, 16, 20, 25])) $newTp = 4;
 
         $newObsImg = null;
         if (isset($_FILES['obstacle_image']) && $_FILES['obstacle_image']['error'] === UPLOAD_ERR_OK) {
@@ -158,10 +158,25 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
 
         $pieceIndex = 0;
         if (($quiz['game_type'] ?? 'classic') === 'obstacle') {
-            $pieceIndex = intval($_POST['piece_index'] ?? 0);
-            if ($pieceIndex <= 0) {
-                $maxPi = db_fetch_one("SELECT COALESCE(MAX(piece_index), 0) AS mo FROM questions WHERE id_quiz = :qz", [':qz' => $quizId]);
-                $pieceIndex = min(intval($maxPi['mo']) + 1, intval($quiz['total_pieces'] ?? 4));
+            $totalAllowed = intval($quiz['total_pieces'] ?? 4);
+            if ($action === 'add_question') {
+                $curCount = db_count('questions', 'id_quiz = :qz', [':qz' => $quizId]);
+                if ($curCount >= $totalAllowed) {
+                    set_flash_message('danger', "This Puzzle quiz only has {$totalAllowed} tiles. You have already created all {$totalAllowed} questions!");
+                    redirect('modules/quiz/edit.php?id=' . $quizId);
+                }
+                $existingPieces = db_fetch_all("SELECT piece_index FROM questions WHERE id_quiz = :qz", [':qz' => $quizId]);
+                $used = array_map(function($row) { return intval($row['piece_index']); }, $existingPieces);
+                $pieceIndex = 1;
+                for ($p = 1; $p <= $totalAllowed; $p++) {
+                    if (!in_array($p, $used, true)) {
+                        $pieceIndex = $p;
+                        break;
+                    }
+                }
+            } else {
+                $pieceIndex = intval($_POST['piece_index'] ?? ($oldQ['piece_index'] ?? 1));
+                if ($pieceIndex <= 0) $pieceIndex = 1;
             }
         }
 
@@ -222,6 +237,16 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
 if (isset($_GET['delete_question'])) {
     $dqId = intval($_GET['delete_question']);
     db_execute("DELETE FROM questions WHERE id_question = :q AND id_quiz = :qz", [':q' => $dqId, ':qz' => $quizId]);
+    if ($isObstacle) {
+        $remaining = db_fetch_all("SELECT id_question FROM questions WHERE id_quiz = :qz ORDER BY sort_order ASC, id_question ASC", [':qz' => $quizId]);
+        foreach ($remaining as $idx => $rq) {
+            db_execute("UPDATE questions SET piece_index = :pi, sort_order = :so WHERE id_question = :qid", [
+                ':pi' => $idx + 1,
+                ':so' => $idx + 1,
+                ':qid' => $rq['id_question']
+            ]);
+        }
+    }
     set_flash_message('info', 'Question deleted.');
     redirect('modules/quiz/edit.php?id=' . $quizId);
 }
@@ -284,10 +309,19 @@ $isObstacle = ($quiz['game_type'] ?? 'classic') === 'obstacle';
                     🎲 Mode: Wager
                 </span>
             <?php endif; ?>
-            <?php if ($isObstacle): ?>
-                <span class="badge badge-warning text-dark font-weight-bold py-1 px-2" style="font-size: 0.85rem;">
-                    <i class="fas fa-puzzle-piece mr-1"></i> Obstacle (<?= intval($quiz['total_pieces']) ?> tiles)
-                </span>
+            <?php if ($isObstacle): 
+                $reqPieces = intval($quiz['total_pieces'] ?? 4);
+                $curQCount = count($questions);
+            ?>
+                <?php if ($curQCount >= $reqPieces): ?>
+                    <span class="badge badge-success text-white font-weight-bold py-1 px-2 vcnv-badge" style="font-size: 0.85rem;">
+                        <i class="fas fa-check-circle mr-1"></i> All <?=$curQCount?>/<?=$reqPieces?> tiles ready
+                    </span>
+                <?php else: ?>
+                    <span class="badge badge-warning text-dark font-weight-bold py-1 px-2 vcnv-badge" style="font-size: 0.85rem;">
+                        <i class="fas fa-exclamation-triangle mr-1"></i> <?=$curQCount?>/<?=$reqPieces?> tiles (Missing <?=$reqPieces - $curQCount?>)
+                    </span>
+                <?php endif; ?>
                 <button type="button" class="btn btn-sm btn-outline-warning font-weight-bold py-1 px-2" data-toggle="modal" data-target="#obstacleSettingsModal" title="Secret image & keyword">
                     <i class="fas fa-image mr-1"></i> Secret Image
                 </button>
@@ -307,9 +341,15 @@ $isObstacle = ($quiz['game_type'] ?? 'classic') === 'obstacle';
             </div>
             <?php endif; ?>
 
-            <a href="<?= BASE_URL ?>modules/host/create_room.php?id_quiz=<?= $quiz['id_quiz'] ?>" class="btn btn-sm font-weight-bold" style="background:#46178f;color:#fff;">
-                <i class="fas fa-play mr-1"></i> Host Game Now
-            </a>
+            <?php if ($isObstacle && count($questions) < intval($quiz['total_pieces'] ?? 4)): ?>
+                <button type="button" class="btn btn-sm font-weight-bold btn-secondary" onclick="alert('This Puzzle quiz requires exactly <?= intval($quiz["total_pieces"] ?? 4) ?> questions for all <?= intval($quiz["total_pieces"] ?? 4) ?> tiles before hosting! Currently has <?= count($questions) ?> questions.')">
+                    <i class="fas fa-play mr-1"></i> Host Game Now
+                </button>
+            <?php else: ?>
+                <a href="<?= BASE_URL ?>modules/host/create_room.php?id_quiz=<?= $quiz['id_quiz'] ?>" class="btn btn-sm font-weight-bold" style="background:#46178f;color:#fff;">
+                    <i class="fas fa-play mr-1"></i> Host Game Now
+                </a>
+            <?php endif; ?>
         </div>
     </div>
 
@@ -327,11 +367,11 @@ $isObstacle = ($quiz['game_type'] ?? 'classic') === 'obstacle';
                     <?php foreach ($questions as $idx => $q): 
                         $curMode = $q['mode'] ?? 'normal';
                     ?>
-                    <li class="q-list-item" data-id="<?= $q['id_question'] ?>" data-mode="<?= htmlspecialchars($curMode) ?>" data-piece="<?= intval($q['piece_index'] ?? 0) ?>">
+                    <li class="q-list-item" data-id="<?= $q['id_question'] ?>" data-mode="<?= htmlspecialchars($curMode) ?>" data-piece="<?= intval($q['piece_index'] ?? ($idx + 1)) ?>">
                         <span class="drag-handle"><i class="fas fa-grip-vertical"></i></span>
                         <div class="q-thumb-content">
                             <div class="q-thumb-num">
-                                <?= $isObstacle ? ('🧩 Mảnh ' . intval($q['piece_index'] ?: ($idx + 1))) : ('Q' . ($idx + 1)) ?>
+                                <?= $isObstacle ? ('🧩 Tile ' . ($idx + 1)) : ('Q' . ($idx + 1)) ?>
                             </div>
                             <div class="q-thumb-text" title="<?= htmlspecialchars($q['text'] ?? '') ?>">
                                 <?= htmlspecialchars(mb_strimwidth($q['text'] ?? '', 0, 36, '…')) ?>
@@ -339,9 +379,9 @@ $isObstacle = ($quiz['game_type'] ?? 'classic') === 'obstacle';
                             <div class="q-thumb-meta">
                                 <?= intval($q['time_limit']) ?>s &bull; <?= number_format(intval($q['points'])) ?> pts
                                 <?php if ($curMode === 'wager'): ?>
-                                    <span class="badge badge-warning text-dark font-weight-bold ml-1" style="font-size:10px;">🎲 Cược</span>
+                                    <span class="badge badge-warning text-dark font-weight-bold ml-1" style="font-size:10px;">🎲 Wager</span>
                                 <?php else: ?>
-                                    <span class="badge badge-light text-secondary font-weight-normal ml-1" style="font-size:10px;">⚡ Thường</span>
+                                    <span class="badge badge-light text-secondary font-weight-normal ml-1" style="font-size:10px;">⚡ Normal</span>
                                 <?php endif; ?>
                             </div>
                         </div>
@@ -364,12 +404,18 @@ $isObstacle = ($quiz['game_type'] ?? 'classic') === 'obstacle';
                 </ul>
             </div>
             <div class="q-list-footer">
-                <button type="button" class="btn-add-question" id="btnAddNewQuestion">
-                    <i class="fas fa-plus"></i> New question
-                </button>
+                <?php if ($isObstacle && count($questions) >= intval($quiz['total_pieces'] ?? 4)): ?>
+                    <button type="button" class="btn-add-question" id="btnAddNewQuestion" disabled style="opacity: 0.7; cursor: not-allowed;" title="All <?= intval($quiz['total_pieces'] ?? 4) ?> questions for <?= intval($quiz['total_pieces'] ?? 4) ?> tiles created">
+                        <i class="fas fa-check-circle mr-1 text-success"></i> All <?= intval($quiz['total_pieces'] ?? 4) ?> tiles ready
+                    </button>
+                <?php else: ?>
+                    <button type="button" class="btn-add-question" id="btnAddNewQuestion">
+                        <i class="fas fa-plus"></i> <?= $isObstacle ? ('Add Question for Tile ' . (count($questions) + 1)) : 'New question' ?>
+                    </button>
+                <?php endif; ?>
                 <?php if (!empty($questions)): ?>
                 <button type="button" class="btn btn-sm btn-outline-light btn-block mt-2 font-weight-bold" data-toggle="modal" data-target="#bulkModeModal" style="border-radius: 8px; font-size: 11px;">
-                    <i class="fas fa-layer-group mr-1"></i> Áp dụng chế độ hàng loạt
+                    <i class="fas fa-layer-group mr-1"></i> Apply Bulk Mode
                 </button>
                 <?php endif; ?>
             </div>
@@ -377,7 +423,7 @@ $isObstacle = ($quiz['game_type'] ?? 'classic') === 'obstacle';
 
         <div class="q-canvas">
             <div class="canvas-header">
-                <span id="canvasModeLabel" class="canvas-mode-label">New Question</span>
+                <span id="canvasModeLabel" class="canvas-mode-label"><?= $isObstacle ? ('Create Question for Tile ' . (count($questions) + 1)) : 'New Question' ?></span>
                 <span style="color:rgba(255,255,255,0.65);font-size:12px;"><?= count($questions) ?> question<?= count($questions) !== 1 ? 's' : '' ?></span>
             </div>
             <form id="questionForm" method="POST" enctype="multipart/form-data">
@@ -390,7 +436,7 @@ $isObstacle = ($quiz['game_type'] ?? 'classic') === 'obstacle';
                 <input type="hidden" name="time_limit"           id="hiddenTimeLimit"         value="<?= htmlspecialchars($defaultTimeLimit) ?>">
                 <input type="hidden" name="points"               id="hiddenPoints"            value="<?= htmlspecialchars($defaultPoints) ?>">
                 <input type="hidden" name="question_media_remove" id="questionMediaRemoveFlag" value="0">
-                <input type="hidden" name="piece_index"          id="hiddenPieceIndex"        value="1">
+                <input type="hidden" name="piece_index"          id="hiddenPieceIndex"        value="<?= $isObstacle ? (count($questions) + 1) : 1 ?>">
 
                 <div class="canvas-body">
 
@@ -500,18 +546,6 @@ $isObstacle = ($quiz['game_type'] ?? 'classic') === 'obstacle';
                 </div>
             </div>
 
-            <?php if ($isObstacle): ?>
-            <div class="prop-group">
-                <div class="prop-label">
-                    <i class="fas fa-puzzle-piece text-warning mr-1"></i> Puzzle Tile #
-                </div>
-                <select class="prop-select" id="propPieceIndex">
-                    <?php for ($p = 1; $p <= intval($quiz['total_pieces'] ?? 4); $p++): ?>
-                        <option value="<?= $p ?>">Tile #<?= $p ?></option>
-                    <?php endfor; ?>
-                </select>
-            </div>
-            <?php endif; ?>
 
             <div class="prop-group">
                 <div class="prop-label">Question Type</div>
@@ -613,9 +647,15 @@ $isObstacle = ($quiz['game_type'] ?? 'classic') === 'obstacle';
                         <label class="font-weight-bold">Number of Puzzle Tiles:</label>
                         <select name="total_pieces" class="form-control">
                             <option value="4" <?= ($quiz['total_pieces'] ?? 4) == 4 ? 'selected' : '' ?>>4 tiles (2x2 grid)</option>
-                            <option value="6" <?= ($quiz['total_pieces'] ?? 4) == 6 ? 'selected' : '' ?>>6 tiles (2x3 grid)</option>
-                            <option value="8" <?= ($quiz['total_pieces'] ?? 4) == 8 ? 'selected' : '' ?>>8 tiles (2x4 grid)</option>
+                            <option value="6" <?= ($quiz['total_pieces'] ?? 4) == 6 ? 'selected' : '' ?>>6 tiles (3x2 grid)</option>
+                            <option value="8" <?= ($quiz['total_pieces'] ?? 4) == 8 ? 'selected' : '' ?>>8 tiles (4x2 grid)</option>
                             <option value="9" <?= ($quiz['total_pieces'] ?? 4) == 9 ? 'selected' : '' ?>>9 tiles (3x3 grid)</option>
+                            <option value="10" <?= ($quiz['total_pieces'] ?? 4) == 10 ? 'selected' : '' ?>>10 tiles (5x2 grid)</option>
+                            <option value="12" <?= ($quiz['total_pieces'] ?? 4) == 12 ? 'selected' : '' ?>>12 tiles (4x3 grid)</option>
+                            <option value="15" <?= ($quiz['total_pieces'] ?? 4) == 15 ? 'selected' : '' ?>>15 tiles (5x3 grid)</option>
+                            <option value="16" <?= ($quiz['total_pieces'] ?? 4) == 16 ? 'selected' : '' ?>>16 tiles (4x4 grid)</option>
+                            <option value="20" <?= ($quiz['total_pieces'] ?? 4) == 20 ? 'selected' : '' ?>>20 tiles (5x4 grid)</option>
+                            <option value="25" <?= ($quiz['total_pieces'] ?? 4) == 25 ? 'selected' : '' ?>>25 tiles (5x5 grid)</option>
                         </select>
                     </div>
                 </div>

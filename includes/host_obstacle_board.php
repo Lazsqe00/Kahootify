@@ -4,10 +4,11 @@
 
 $quiz = db_fetch_one("SELECT * FROM quiz WHERE id_quiz = :q", [':q' => $room['id_quiz']]);
 $totalPieces = intval($quiz['total_pieces'] ?? 4);
-if (!in_array($totalPieces, [4, 6, 8, 9])) $totalPieces = 4;
+if (!in_array($totalPieces, [4, 6, 8, 9, 10, 12, 15, 16, 20, 25])) $totalPieces = 4;
 
 $openedPieces = !empty($room['opened_pieces']) ? json_decode($room['opened_pieces'], true) : [];
 if (!is_array($openedPieces)) $openedPieces = [];
+$allOpened = (count($openedPieces) >= $totalPieces);
 
 $counts = room_question_counts($room, 0);
 $totalPlayers = $counts['total_players'];
@@ -17,6 +18,12 @@ $cols = 2; $rows = 2;
 if ($totalPieces === 6) { $cols = 3; $rows = 2; }
 elseif ($totalPieces === 8) { $cols = 4; $rows = 2; }
 elseif ($totalPieces === 9) { $cols = 3; $rows = 3; }
+elseif ($totalPieces === 10) { $cols = 5; $rows = 2; }
+elseif ($totalPieces === 12) { $cols = 4; $rows = 3; }
+elseif ($totalPieces === 15) { $cols = 5; $rows = 3; }
+elseif ($totalPieces === 16) { $cols = 4; $rows = 4; }
+elseif ($totalPieces === 20) { $cols = 5; $rows = 4; }
+elseif ($totalPieces === 25) { $cols = 5; $rows = 5; }
 
 $pageTitle = "Bảng Vượt Chướng Ngại Vật - Host";
 $bodyClass = "backgroundColorChanges";
@@ -47,9 +54,12 @@ require_once __DIR__ . '/header.php';
 .cols-2 { grid-template-columns: repeat(2, 1fr); }
 .cols-3 { grid-template-columns: repeat(3, 1fr); }
 .cols-4 { grid-template-columns: repeat(4, 1fr); }
+.cols-5 { grid-template-columns: repeat(5, 1fr); }
 
 .rows-2 { grid-template-rows: repeat(2, 1fr); }
 .rows-3 { grid-template-rows: repeat(3, 1fr); }
+.rows-4 { grid-template-rows: repeat(4, 1fr); }
+.rows-5 { grid-template-rows: repeat(5, 1fr); }
 
 .obstacle-tile {
     position: relative;
@@ -157,13 +167,18 @@ require_once __DIR__ . '/header.php';
     margin: 18px 0;
     box-shadow: 0 10px 30px rgba(0,0,0,0.5);
 }
+.vcnv-badge {
+    font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.5px;
+}
 </style>
 
 <nav class="navbar navbar-dark bg-dark px-4 py-2 d-flex justify-content-between align-items-center">
     <div class="d-flex align-items-center">
         <img src="<?= BASE_URL ?>assets/img/logo.png" alt="Logo" style="max-height: 32px; filter: brightness(100);" class="mr-3">
         <span class="badge badge-light font-weight-bold mr-2">PIN: <?= htmlspecialchars($room['pin']) ?></span>
-        <span class="badge badge-warning text-dark font-weight-bold mr-3">
+        <span class="badge badge-warning text-dark font-weight-bold mr-3 vcnv-badge">
             <i class="fas fa-puzzle-piece mr-1"></i> VƯỢT CHƯỚNG NGẠI VẬT
         </span>
         <span class="text-white font-weight-bold d-none d-md-inline"><?= htmlspecialchars($quiz['name']) ?></span>
@@ -187,10 +202,13 @@ require_once __DIR__ . '/header.php';
                     <span id="buzzerDesc" style="opacity: 0.95;">Người chơi đang trả lời từ khóa bức tranh bí mật...</span>
                 </div>
             </div>
-            <div class="text-right">
-                <span class="badge badge-light font-weight-bold py-2 px-3" style="font-size: 1.1rem; color: #b3122c;" id="buzzerTimerBadge">
-                    20s
+            <div class="d-flex align-items-center">
+                <span class="badge badge-light font-weight-bold py-2 px-3 mr-2" style="font-size: 1rem; color: #b3122c;" id="buzzerTimerBadge">
+                    Đang trả lời...
                 </span>
+                <button type="button" class="btn btn-sm btn-outline-light font-weight-bold rounded-pill px-3" onclick="hostCancelBuzz()" title="Hủy lượt chuông nếu người chơi không trả lời">
+                    <i class="fas fa-times mr-1"></i> Hủy chuông
+                </button>
             </div>
         </div>
     </div>
@@ -210,22 +228,40 @@ require_once __DIR__ . '/header.php';
             </div>
         </div>
 
-        <!-- MÀN HÌNH BẢO MẬT: CHỈ HIỂN THỊ CÁC Ô SỐ, TUYỆT ĐỐI KHÔNG CHỨA ẢNH BÍ MẬT -->
-        <div class="obstacle-grid cols-<?= $cols ?> rows-<?= $rows ?>">
-            <?php for ($p = 1; $p <= $totalPieces; $p++): 
-                $isOpened = in_array($p, $openedPieces);
-            ?>
-                <div class="obstacle-tile <?= $isOpened ? 'disabled' : '' ?>" 
-                     id="tile_<?= $p ?>" 
-                     <?= !$isOpened ? 'onclick="activatePiece(' . $p . ')"' : '' ?>
-                     title="<?= $isOpened ? 'Mảnh này đã mở câu hỏi' : 'Nhấn để mở câu hỏi mảnh ' . $p ?>">
-                    <div class="tile-num">🧩 <?= $p ?></div>
-                    <span class="tile-badge <?= $isOpened ? 'badge-opened' : 'badge-unopened' ?>">
-                        <?= $isOpened ? '<i class="fas fa-check-circle mr-1"></i> ĐÃ MỞ CÂU HỎI' : '<i class="fas fa-lock-open mr-1"></i> CHƯA MỞ' ?>
-                    </span>
+        <!-- BẢNG MẢNH GHÉP HOẶC HÌNH ẢNH MỞ KHÓA -->
+        <?php if ($allOpened): ?>
+            <!-- TOÀN BỘ MẢNH GHÉP ĐÃ MỞ: HOST MỞ KHÓA HÌNH LUÔN -->
+            <div class="text-center py-2" id="unlockedImageSection">
+                <div class="alert alert-success font-weight-bold py-2 mb-3 shadow" style="font-size: 1.15rem; border-radius: 12px; background: rgba(40, 167, 69, 0.25); border: 1px solid #28a745; color: #2ecc71;">
+                    <i class="fas fa-unlock-alt mr-2"></i> ĐÃ MỞ HẾT TẤT CẢ CÁC MẢNH GHÉP - BỨC TRANH BÍ MẬT ĐÃ MỞ KHÓA!
                 </div>
-            <?php endfor; ?>
-        </div>
+                <?php if (!empty($quiz['obstacle_image'])): ?>
+                    <img src="<?= BASE_URL . htmlspecialchars($quiz['obstacle_image']) ?>" class="img-fluid rounded shadow border border-warning mb-2" style="max-height: 420px; object-fit: contain; width: 100%; background: #000;" alt="Bức tranh bí mật">
+                <?php endif; ?>
+                <div class="mt-3 p-3 rounded text-center" style="background: rgba(255, 255, 255, 0.08); border: 1px dashed rgba(255, 255, 255, 0.3);">
+                    <h5 class="text-warning font-weight-bold mb-0">
+                        <i class="fas fa-bell mr-2"></i> Chuông đoán từ khóa đã được mở cho TẤT CẢ người chơi!
+                    </h5>
+                </div>
+            </div>
+        <?php else: ?>
+            <!-- LƯỚI Ô SỐ: CHƯA MỞ HẾT CÁC MẢNH -->
+            <div class="obstacle-grid cols-<?= $cols ?> rows-<?= $rows ?>" id="hostTilesGrid">
+                <?php for ($p = 1; $p <= $totalPieces; $p++): 
+                    $isOpened = in_array($p, $openedPieces);
+                ?>
+                    <div class="obstacle-tile <?= $isOpened ? 'disabled' : '' ?>" 
+                         id="tile_<?= $p ?>" 
+                         <?= !$isOpened ? 'onclick="activatePiece(' . $p . ')"' : '' ?>
+                         title="<?= $isOpened ? 'Mảnh này đã mở câu hỏi' : 'Nhấn để mở câu hỏi mảnh ' . $p ?>">
+                        <div class="tile-num">🧩 <?= $p ?></div>
+                        <span class="tile-badge <?= $isOpened ? 'badge-opened' : 'badge-unopened' ?>">
+                            <?= $isOpened ? '<i class="fas fa-check-circle mr-1"></i> ĐÃ MỞ CÂU HỎI' : '<i class="fas fa-lock-open mr-1"></i> CHƯA MỞ' ?>
+                        </span>
+                    </div>
+                <?php endfor; ?>
+            </div>
+        <?php endif; ?>
 
         <div class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top border-secondary">
             <span class="text-muted small">
@@ -234,6 +270,49 @@ require_once __DIR__ . '/header.php';
             <span class="text-warning font-weight-bold small">
                 Đã mở: <?= count($openedPieces) ?> / <?= $totalPieces ?> mảnh
             </span>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL XÁC NHẬN CÂU TRẢ LỜI CHO HOST -->
+<div class="winner-reveal-modal" id="hostReviewModal" style="z-index: 99998;">
+    <div class="winner-modal-content" style="max-width: 600px; border-color: #f59f00;">
+        <div class="mb-2">
+            <span class="badge badge-warning text-dark font-weight-bold px-3 py-1 shadow-sm" style="font-size: 0.95rem;">
+                <i class="fas fa-gavel mr-1"></i> XÁC NHẬN CÂU TRẢ LỜI
+            </span>
+        </div>
+        <h4 class="font-weight-bold text-white mb-3">
+            Người chơi <span class="text-warning" id="reviewPlayerName">...</span> đã đưa ra đáp án:
+        </h4>
+        <div class="p-3 mb-3 rounded" style="background: rgba(255, 255, 255, 0.08); border: 2px dashed #f59f00;">
+            <div class="small text-white-50 text-uppercase font-weight-bold mb-1">Câu trả lời:</div>
+            <div class="font-weight-bold text-white" id="reviewPlayerGuess" style="font-size: 2rem; word-break: break-word; line-height: 1.2;">
+                ...
+            </div>
+        </div>
+        <div class="p-2 mb-3 rounded bg-dark border border-secondary text-left d-flex align-items-center justify-content-between px-3">
+            <span class="text-white-50 small font-weight-bold">
+                <i class="fas fa-key mr-1 text-warning"></i> Đáp án gốc bức tranh:
+            </span>
+            <span class="badge badge-light text-dark font-weight-bold px-2 py-1" style="font-size: 0.95rem;" id="reviewTargetAnswer">
+                <?= htmlspecialchars($quiz['obstacle_answer'] ?? '') ?>
+            </span>
+        </div>
+        <p class="text-white font-weight-bold mb-3" style="font-size: 1.05rem;">
+            Bạn xác nhận câu trả lời này là ĐÚNG hay SAI?
+        </p>
+        <div class="row">
+            <div class="col-6">
+                <button type="button" class="btn btn-success btn-lg btn-block font-weight-bold py-3 shadow" id="btnHostConfirmTrue" onclick="hostSubmitReview(true)" style="border-radius: 12px; font-size: 1.15rem;">
+                    <i class="fas fa-check-circle mr-1"></i> ĐÚNG (True)
+                </button>
+            </div>
+            <div class="col-6">
+                <button type="button" class="btn btn-danger btn-lg btn-block font-weight-bold py-3 shadow" id="btnHostConfirmFalse" onclick="hostSubmitReview(false)" style="border-radius: 12px; font-size: 1.15rem;">
+                    <i class="fas fa-times-circle mr-1"></i> SAI (False)
+                </button>
+            </div>
         </div>
     </div>
 </div>
@@ -311,17 +390,72 @@ function activatePiece(pieceIndex) {
     });
 }
 
+function hostSubmitReview(isCorrect) {
+    if ($('#btnHostConfirmTrue').prop('disabled')) return;
+    $('#btnHostConfirmTrue, #btnHostConfirmFalse').prop('disabled', true);
+
+    $.post('<?= BASE_URL ?>modules/api/obstacle_action.php?action=host_confirm_guess&id_room=' + roomId, {
+        decision: isCorrect ? 'true' : 'false'
+    }, function(res) {
+        $('#btnHostConfirmTrue, #btnHostConfirmFalse').prop('disabled', false);
+        if (res && res.success) {
+            $('#hostReviewModal').hide();
+            if (res.correct) {
+                winnerDeclared = true;
+                clearInterval(pollInterval);
+                $('#winnerNickDisplay').text('Chúc mừng Quán quân: ' + (res.winner_name || '') + '!');
+                $('#winnerAnswerDisplay').text('TỪ KHÓA CHÍNH XÁC: ' + (res.answer || ''));
+                if (res.obstacle_image) {
+                    $('#winnerSecretImg').attr('src', res.obstacle_image);
+                }
+                $('#winnerModal').css('display', 'flex');
+                try {
+                    document.getElementById('fanfareAudio').play();
+                } catch(e) {}
+            } else if (res.all_disqualified) {
+                winnerDeclared = true;
+                clearInterval(pollInterval);
+                alert('Tất cả người chơi đều đã trả lời sai từ khóa bức tranh! Trò chơi kết thúc, người chiến thắng được xếp hạng theo số điểm.');
+                window.location.href = 'leaderboard.php?final=true';
+            } else {
+                $('#buzzerAlert').slideUp(200);
+            }
+        } else {
+            alert(res.message || 'Lỗi khi gửi xác nhận');
+        }
+    }, 'json').fail(function() {
+        $('#btnHostConfirmTrue, #btnHostConfirmFalse').prop('disabled', false);
+        alert('Lỗi kết nối máy chủ');
+    });
+}
+
+function hostCancelBuzz() {
+    if (!confirm('Bạn có chắc muốn hủy lượt bấm chuông này để phòng tiếp tục?')) return;
+    $.post('<?= BASE_URL ?>modules/api/obstacle_action.php?action=host_cancel_buzz&id_room=' + roomId, function() {
+        $('#buzzerAlert').slideUp(200);
+        $('#hostReviewModal').hide();
+    });
+}
+
 // Polling kiểm tra realtime: Chuông bấm và Người thắng cuộc
 const pollInterval = setInterval(function() {
     $.getJSON('<?= BASE_URL ?>modules/api/obstacle_action.php?action=get_obstacle_state&id_room=' + roomId, function(data) {
         if (!data || !data.success) return;
 
-        // 1. Kiểm tra Người chiến thắng chung cuộc hoặc Tất cả bị loại
+        // Nếu tất cả mảnh ghép đã mở mà giao diện chưa chuyển sang ảnh mở khóa: reload
+        if (data.all_pieces_opened && !$('#unlockedImageSection').length) {
+            window.location.reload();
+            return;
+        }
+
+        // 1. Kiểm tra Người chiến thắng chung cuộc hoặc Tất cả trả lời sai
         if (data.status === 'finished' || (data.is_revealed && !winnerDeclared)) {
             winnerDeclared = true;
             clearInterval(pollInterval);
+            $('#hostReviewModal').hide();
+            $('#buzzerAlert').hide();
             if (data.all_disqualified) {
-                alert('Tất cả người chơi đều đã đoán sai từ khóa khi bấm chuông! Trò chơi kết thúc, người chiến thắng là người có điểm số cao nhất.');
+                alert('Tất cả người chơi đều đã trả lời sai từ khóa bức tranh! Trò chơi kết thúc, người chiến thắng được xếp hạng theo số điểm.');
                 window.location.href = 'leaderboard.php?final=true';
                 return;
             }
@@ -348,14 +482,34 @@ const pollInterval = setInterval(function() {
                 playBuzzerAlarmSound();
             }
             $('#buzzerTitle').text('🔔 ' + (data.buzzer_player_name || 'Người chơi') + ' ĐANG BẤM CHUÔNG ĐOÁN TỪ KHÓA!');
-            $('#buzzerDesc').text('Thời gian nhập từ khóa còn lại: ' + data.buzzer_remaining + 's');
-            $('#buzzerTimerBadge').text(data.buzzer_remaining + 's');
+            $('#buzzerDesc').text('Đang chờ người chơi nhập câu trả lời...');
+            $('#buzzerTimerBadge').html('<i class="fas fa-edit mr-1"></i> Đang nhập...');
             $('#buzzerAlert').slideDown(200);
+            $('#hostReviewModal').hide();
+        } else if (data.buzzer_status === 'pending_review') {
+            if (!isBuzzingActive) {
+                isBuzzingActive = true;
+                playBuzzerAlarmSound();
+            }
+            $('#buzzerTitle').text('🔔 ' + (data.buzzer_player_name || 'Người chơi') + ' ĐÃ GỬI CÂU TRẢ LỜI!');
+            $('#buzzerDesc').text('Vui lòng xem và xác nhận câu trả lời là ĐÚNG hay SAI.');
+            $('#buzzerTimerBadge').html('<i class="fas fa-hourglass-half mr-1"></i> Chờ duyệt');
+            $('#buzzerAlert').slideDown(200);
+
+            $('#reviewPlayerName').text(data.buzzer_player_name || 'Người chơi');
+            $('#reviewPlayerGuess').text(data.buzzer_guess || '...');
+            if (data.obstacle_answer) {
+                $('#reviewTargetAnswer').text(data.obstacle_answer);
+            }
+            if (!$('#hostReviewModal').is(':visible') && !winnerDeclared) {
+                $('#hostReviewModal').css('display', 'flex');
+            }
         } else {
             if (isBuzzingActive) {
                 isBuzzingActive = false;
                 $('#buzzerAlert').slideUp(200);
             }
+            $('#hostReviewModal').hide();
         }
     });
 }, 750);

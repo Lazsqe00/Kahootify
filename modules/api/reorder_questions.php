@@ -14,17 +14,26 @@ if (!$quizId || empty($order)) {
     exit;
 }
 
-$quiz = db_fetch_one("SELECT id_quiz FROM quiz WHERE id_quiz = :q AND id_creator = :c", [':q' => $quizId, ':c' => $creatorId]);
+$quiz = db_fetch_one("SELECT id_quiz, game_type FROM quiz WHERE id_quiz = :q AND id_creator = :c", [':q' => $quizId, ':c' => $creatorId]);
 if (!$quiz) {
     echo json_encode(['success' => false]);
     exit;
 }
 
+$isObstacle = (($quiz['game_type'] ?? 'classic') === 'obstacle');
+
 foreach ($order as $item) {
-    db_execute(
-        "UPDATE questions SET sort_order = :o WHERE id_question = :q AND id_quiz = :qz",
-        [':o' => intval($item['order']), ':q' => intval($item['id']), ':qz' => $quizId]
-    );
+    if ($isObstacle) {
+        db_execute(
+            "UPDATE questions SET sort_order = :o, piece_index = :pi WHERE id_question = :q AND id_quiz = :qz",
+            [':o' => intval($item['order']), ':pi' => intval($item['order']) + 1, ':q' => intval($item['id']), ':qz' => $quizId]
+        );
+    } else {
+        db_execute(
+            "UPDATE questions SET sort_order = :o WHERE id_question = :q AND id_quiz = :qz",
+            [':o' => intval($item['order']), ':q' => intval($item['id']), ':qz' => $quizId]
+        );
+    }
 }
 
 echo json_encode(['success' => true]);

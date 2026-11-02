@@ -4,6 +4,7 @@ USE `kahoot_btn`;
 
 SET FOREIGN_KEY_CHECKS = 0;
 
+DROP TABLE IF EXISTS `player_question_logs`;
 DROP TABLE IF EXISTS `saved_review_questions`;
 DROP TABLE IF EXISTS `roles`;
 CREATE TABLE `roles` (
@@ -45,6 +46,7 @@ CREATE TABLE `quiz` (
   `id_creator` bigint(6) NOT NULL DEFAULT 0,
   `name` varchar(100) NOT NULL,
   `description` varchar(255) DEFAULT NULL,
+  `mode` varchar(50) NOT NULL DEFAULT 'normal',
   `game_type` enum('classic','obstacle') NOT NULL DEFAULT 'classic',
   `obstacle_image` varchar(255) DEFAULT NULL,
   `obstacle_answer` varchar(255) DEFAULT NULL,
@@ -70,6 +72,8 @@ CREATE TABLE `questions` (
   `media_type` ENUM('image','video') DEFAULT NULL,
   `sort_order` int(11) NOT NULL DEFAULT 0,
   `piece_index` int(11) NOT NULL DEFAULT 0,
+  `mode` varchar(50) NOT NULL DEFAULT 'normal',
+  `mode_config` text DEFAULT NULL,
   `questionadd` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `questionupdate` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `timestart` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -124,9 +128,15 @@ CREATE TABLE `room` (
   `game_type` enum('classic','obstacle') NOT NULL DEFAULT 'classic',
   `opened_pieces` text DEFAULT NULL,
   `buzzer_player_id` bigint(20) DEFAULT NULL,
-  `buzzer_status` enum('idle','buzzing','finished') NOT NULL DEFAULT 'idle',
+  `buzzer_status` enum('idle','buzzing','pending_review','finished') NOT NULL DEFAULT 'idle',
   `buzzer_time` int(11) DEFAULT NULL,
+  `buzzer_guess` varchar(255) DEFAULT NULL,
   `winner_player_id` bigint(20) DEFAULT NULL,
+  `starting_score` int(11) NOT NULL DEFAULT 0,
+  `max_missed_wagers` int(11) NOT NULL DEFAULT 0,
+  `allow_late_join` tinyint(1) NOT NULL DEFAULT 0,
+  `eliminated_can_play_normal` tinyint(1) NOT NULL DEFAULT 0,
+  `game_config` text DEFAULT NULL,
   `roomadd` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `roomupdate` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id_room`),
@@ -149,6 +159,11 @@ CREATE TABLE `players` (
   `current_streak` int(11) NOT NULL DEFAULT 0,
   `unlocked_pieces` text DEFAULT NULL,
   `is_disqualified_obstacle` tinyint(1) NOT NULL DEFAULT 0,
+  `status` enum('ACTIVE','ELIMINATED','SPECTATOR') NOT NULL DEFAULT 'ACTIVE',
+  `eliminated_at_question` bigint(6) DEFAULT NULL,
+  `elimination_order` int(11) DEFAULT NULL,
+  `consecutive_missed_wagers` int(11) NOT NULL DEFAULT 0,
+  `last_seen_at` int(11) DEFAULT NULL,
   `playeradd` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `playerup` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id_player`),
@@ -185,6 +200,32 @@ CREATE TABLE `saved_review_questions` (
   CONSTRAINT `fk_saved_review_creator` FOREIGN KEY (`id_creator`) REFERENCES `creators` (`id_creator`) ON DELETE CASCADE,
   CONSTRAINT `fk_saved_review_player` FOREIGN KEY (`id_player`) REFERENCES `players` (`id_player`) ON DELETE SET NULL,
   CONSTRAINT `fk_saved_review_question` FOREIGN KEY (`id_question`) REFERENCES `questions` (`id_question`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+DROP TABLE IF EXISTS `player_question_logs`;
+CREATE TABLE `player_question_logs` (
+  `id_log` bigint(20) NOT NULL AUTO_INCREMENT,
+  `id_room` bigint(11) NOT NULL,
+  `id_question` bigint(6) NOT NULL,
+  `id_player` bigint(6) NOT NULL,
+  `mode` varchar(50) NOT NULL DEFAULT 'normal',
+  `wager_tier` varchar(20) DEFAULT NULL,
+  `wager_amount` int(11) NOT NULL DEFAULT 0,
+  `delta_score` int(11) NOT NULL DEFAULT 0,
+  `points_change` int(11) NOT NULL DEFAULT 0,
+  `final_score` int(11) NOT NULL DEFAULT 0,
+  `is_correct` tinyint(1) NOT NULL DEFAULT 0,
+  `player_status` varchar(20) NOT NULL DEFAULT 'ACTIVE',
+  `is_sitting_out` tinyint(1) NOT NULL DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id_log`),
+  UNIQUE KEY `uq_room_q_player` (`id_room`, `id_question`, `id_player`),
+  KEY `idx_log_room_q` (`id_room`, `id_question`),
+  KEY `idx_log_player` (`id_player`),
+  CONSTRAINT `fk_log_room` FOREIGN KEY (`id_room`) REFERENCES `room` (`id_room`) ON DELETE CASCADE,
+  CONSTRAINT `fk_log_question` FOREIGN KEY (`id_question`) REFERENCES `questions` (`id_question`) ON DELETE CASCADE,
+  CONSTRAINT `fk_log_player` FOREIGN KEY (`id_player`) REFERENCES `players` (`id_player`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 SET FOREIGN_KEY_CHECKS = 1;

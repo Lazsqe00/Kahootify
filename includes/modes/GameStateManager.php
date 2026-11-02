@@ -441,6 +441,21 @@ class GameStateManager
             }
         }
 
+        // Obstacle mode: questions are selected individually from board.
+        // Never auto-finish room when a question ends! Simply show results so players can see if they unlocked the tile.
+        if (($room['game_type'] ?? 'classic') === 'obstacle') {
+            $newStatus = 'res_' . $questionId;
+            db_execute("UPDATE room SET status = :s WHERE id_room = :r", [
+                ':s' => $newStatus,
+                ':r' => $roomId,
+            ]);
+            return [
+                'success'     => true,
+                'status'      => $newStatus,
+                'is_finished' => false,
+            ];
+        }
+
         // Check game end conditions
         $allPlayers = db_fetch_all("SELECT * FROM players WHERE id_room = :r AND is_kicked = 0", [':r' => $roomId]);
         $selectedQIds = !empty($room['question_order']) ? json_decode($room['question_order'], true) : [];

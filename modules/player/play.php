@@ -61,7 +61,8 @@ $isEliminated = ($playerStatus === 'ELIMINATED');
 $isSpectator = ($playerStatus === 'SPECTATOR');
 $currentScore = intval($player['score'] ?? 0);
 $isObstacleMode = (($room['game_type'] ?? 'classic') === 'obstacle');
-$isDisqualified = ($isObstacleMode && !empty($player['is_disqualified_obstacle']));
+$isBuzzerLocked = ($isObstacleMode && !empty($player['is_disqualified_obstacle']));
+$isDisqualified = false;
 
 $currentQuestion = db_fetch_one("SELECT * FROM questions WHERE id_question = :qid", [':qid' => $qId]);
 $questionMode = $currentQuestion['mode'] ?? 'normal';
@@ -174,13 +175,13 @@ require_once __DIR__ . '/../../includes/header.php';
             </span>
         <?php endif; ?>
         <?php if ($isObstacleMode && !empty($currentQuestion['piece_index'])): ?>
-            <span class="badge badge-warning text-dark font-weight-bold ml-2 px-2 py-1 shadow-sm" style="font-size: 0.85rem;">
-                <i class="fas fa-puzzle-piece mr-1"></i> Tile <?= intval($currentQuestion['piece_index']) ?>
+            <span class="badge badge-warning text-dark font-weight-bold ml-2 px-2 py-1 shadow-sm vcnv-badge" style="font-size: 0.85rem;">
+                <i class="fas fa-puzzle-piece mr-1"></i> Mảnh <?= intval($currentQuestion['piece_index']) ?>
             </span>
         <?php endif; ?>
-        <?php if ($isDisqualified): ?>
-            <span class="badge badge-danger text-white font-weight-bold ml-2 px-2 py-1 shadow-sm" style="font-size: 0.85rem;">
-                <i class="fas fa-ban mr-1"></i> Disqualified
+        <?php if ($isBuzzerLocked): ?>
+            <span class="badge badge-warning text-dark font-weight-bold ml-2 px-2 py-1 shadow-sm" style="font-size: 0.85rem;" title="Tạm khóa chuông trong các mảnh ghép">
+                <i class="fas fa-lock mr-1"></i> Tạm khóa chuông
             </span>
         <?php elseif ($isEliminated): ?>
             <span class="badge badge-danger ml-1 px-2 py-1 font-weight-bold shadow-sm" style="font-size: 0.85rem;">
@@ -804,13 +805,13 @@ elseif ($phase === 'question'):
 
     <?php if ($isObstacleMode): ?>
         <div class="text-center my-4">
-            <?php if ($isDisqualified): ?>
+            <?php if ($isBuzzerLocked): ?>
                 <button type="button" class="btn btn-secondary font-weight-bold shadow-sm rounded-pill px-4 py-2" disabled>
-                    <i class="fas fa-ban mr-1"></i> YOU ARE DISQUALIFIED FROM THIS ROUND
+                    <i class="fas fa-lock mr-1"></i> TẠM KHÓA CHUÔNG (CHỜ MỞ HẾT MẢNH)
                 </button>
             <?php else: ?>
-                <button type="button" class="btn btn-danger font-weight-bold shadow rounded-pill px-4 py-3" style="font-size: 1.2rem;" onclick="claimBuzzerFromQuestion()">
-                    <i class="fas fa-bell mr-2"></i> 🔔 GUESS SECRET PICTURE
+                <button type="button" class="btn btn-danger font-weight-bold shadow rounded-pill px-4 py-3" style="font-size: 1.2rem; font-family: 'Montserrat', sans-serif;" onclick="claimBuzzerFromQuestion()">
+                    <i class="fas fa-bell mr-2"></i> ĐOÁN BỨC TRANH
                 </button>
             <?php endif; ?>
         </div>
@@ -824,7 +825,7 @@ const roomId = <?= $roomId ?>;
 const playerId = <?= $playerId ?>;
 const playerToken = '<?= htmlspecialchars($token) ?>';
 const currentStatus = '<?= $status ?>';
-const isDisqualified = <?= $isDisqualified ? 'true' : 'false' ?>;
+const isBuzzerLocked = <?= $isBuzzerLocked ? 'true' : 'false' ?>;
 
 sessionStorage.setItem('kahoot_pid', playerId);
 sessionStorage.setItem('kahoot_token', playerToken);
@@ -834,8 +835,8 @@ function refreshPlayerPage() {
 }
 
 function claimBuzzerFromQuestion() {
-    if (isDisqualified) {
-        alert('You have been disqualified from this round!');
+    if (isBuzzerLocked) {
+        alert('Bạn đang bị tạm khóa chuông trong các mảnh ghép này!');
         return;
     }
     $.post('<?= BASE_URL ?>modules/api/obstacle_action.php?action=buzz&id_room=' + roomId, {
@@ -843,7 +844,7 @@ function claimBuzzerFromQuestion() {
         token: playerToken
     }, function(res) {
         if (res && res.success && res.your_turn) {
-            var guess = prompt('🔔 YOUR TURN (20 seconds):\nEnter the secret picture keyword:');
+            var guess = prompt('🔔 LƯỢT ĐOÁN CỦA BẠN (20 giây):\nNhập từ khóa bức tranh bí mật:');
             if (guess && guess.trim()) {
                 $.post('<?= BASE_URL ?>modules/api/obstacle_action.php?action=submit_guess&id_room=' + roomId, {
                     id_player: playerId,
@@ -851,11 +852,11 @@ function claimBuzzerFromQuestion() {
                     guess: guess.trim()
                 }, function(res2) {
                     if (res2 && res2.success && res2.correct) {
-                        alert('🏆 CORRECT! You guessed the keyword and won the game!');
+                        alert('🏆 CHÚC MỪNG! Bạn đã đoán chính xác từ khóa bức tranh!');
                     } else if (res2 && res2.all_disqualified) {
-                        alert('All players have guessed incorrectly! Moving to Final Podium.');
+                        alert('Tất cả người chơi đều đã đoán sai! Chuyển sang bảng vinh danh.');
                     } else {
-                        alert(res2.message || 'Incorrect answer!');
+                        alert(res2.message || 'Đáp án chưa chính xác!');
                     }
                     refreshPlayerPage();
                 }, 'json');
@@ -864,15 +865,15 @@ function claimBuzzerFromQuestion() {
                 refreshPlayerPage();
             }
         } else {
-            alert(res.message || 'Cannot buzz in at this time');
+            alert(res.message || 'Không thể bấm chuông lúc này');
         }
     }, 'json').fail(function() {
-        alert('Server connection error');
+        alert('Lỗi kết nối máy chủ');
     });
 }
 
 function submitAnswer(answerId) {
-    if (!answerId || isDisqualified) return;
+    if (!answerId) return;
 
     const submitAudio = document.getElementById('submitSfx');
     if (submitAudio) {

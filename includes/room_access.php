@@ -87,9 +87,6 @@ function room_question_counts($room, $questionId, $state = null) {
         $playerIds = array_column($participants, 'id_player');
     } else {
         $sql = "SELECT id_player FROM players WHERE id_room = :r AND (status = 'ACTIVE' OR status IS NULL)";
-        if ($isObstacle) {
-            $sql .= ' AND is_disqualified_obstacle = 0';
-        }
         $players = filter_room_players($roomId, db_fetch_all($sql, [':r' => $roomId]), $state);
         $playerIds = array_column($players, 'id_player');
     }
