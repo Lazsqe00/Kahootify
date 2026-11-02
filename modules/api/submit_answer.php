@@ -222,7 +222,26 @@ try {
             // Obstacle puzzle: unlock piece for this player
             $unlockedPiece = null;
             if ($isCorrect && (($ans['game_type'] ?? 'classic') === 'obstacle')) {
-                $pieceIdx = intval($ans['piece_index'] ?? 0);
+                // Priority 1: Check piece index stored in room.game_config (the exact piece host clicked)
+                $roomCfg = !empty($room['game_config']) ? json_decode($room['game_config'], true) : [];
+                $pieceIdx = intval($roomCfg['current_piece_index'] ?? 0);
+
+                // Priority 2: Check question's piece_index
+                if ($pieceIdx <= 0) {
+                    $pieceIdx = intval($ans['piece_index'] ?? 0);
+                }
+
+                // Priority 3: Fallback based on question's sort order / index in quiz
+                if ($pieceIdx <= 0) {
+                    $allQ = db_fetch_all("SELECT id_question FROM questions WHERE id_quiz = :qz ORDER BY sort_order ASC, id_question ASC", [':qz' => $room['id_quiz']]);
+                    foreach ($allQ as $qIdx => $qRow) {
+                        if ($qRow['id_question'] == $qId) {
+                            $pieceIdx = $qIdx + 1;
+                            break;
+                        }
+                    }
+                }
+
                 if ($pieceIdx > 0) {
                     $pRow = db_fetch_one("SELECT unlocked_pieces FROM players WHERE id_player = :p", [':p' => $playerId]);
                     $myUnlocked = !empty($pRow['unlocked_pieces']) ? json_decode($pRow['unlocked_pieces'], true) : [];

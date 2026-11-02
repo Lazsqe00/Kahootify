@@ -71,11 +71,24 @@ if ($action === 'select_piece') {
     }
 
     $qId = intval($question['id_question']);
+
+    // Ensure this question has piece_index set to $pieceIndex
+    db_execute("UPDATE questions SET piece_index = :pi WHERE id_question = :qid", [
+        ':pi'  => $pieceIndex,
+        ':qid' => $qId
+    ]);
+
+    // Save current_piece_index to room game_config
+    $gameConfig = !empty($room['game_config']) ? json_decode($room['game_config'], true) : [];
+    if (!is_array($gameConfig)) $gameConfig = [];
+    $gameConfig['current_piece_index'] = $pieceIndex;
+
     db_execute(
         "UPDATE room 
          SET status = :s, 
              question_start_time = UNIX_TIMESTAMP(), 
              opened_pieces = :op, 
+             game_config = :gc,
              buzzer_status = 'idle', 
              buzzer_player_id = NULL, 
              buzzer_guess = NULL, 
@@ -84,6 +97,7 @@ if ($action === 'select_piece') {
         [
             ':s'  => (string)$qId,
             ':op' => json_encode($openedPieces),
+            ':gc' => json_encode($gameConfig),
             ':r'  => $roomId
         ]
     );

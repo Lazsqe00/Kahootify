@@ -23,15 +23,16 @@ if (!$quiz) {
 $isObstacle = (($quiz['game_type'] ?? 'classic') === 'obstacle');
 
 foreach ($order as $item) {
+    $idx1 = intval($item['order']) + 1;
     if ($isObstacle) {
         db_execute(
             "UPDATE questions SET sort_order = :o, piece_index = :pi WHERE id_question = :q AND id_quiz = :qz",
-            [':o' => intval($item['order']), ':pi' => intval($item['order']) + 1, ':q' => intval($item['id']), ':qz' => $quizId]
+            [':o' => $idx1, ':pi' => $idx1, ':q' => intval($item['id']), ':qz' => $quizId]
         );
     } else {
         db_execute(
             "UPDATE questions SET sort_order = :o WHERE id_question = :q AND id_quiz = :qz",
-            [':o' => intval($item['order']), ':q' => intval($item['id']), ':qz' => $quizId]
+            [':o' => $idx1, ':q' => intval($item['id']), ':qz' => $quizId]
         );
     }
 }

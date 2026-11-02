@@ -252,6 +252,21 @@ if (isset($_GET['delete_question'])) {
 }
 
 $questions = db_fetch_all("SELECT * FROM questions WHERE id_quiz = :q ORDER BY sort_order ASC, id_question ASC", [':q' => $quizId]);
+if ($isObstacle) {
+    foreach ($questions as $idx => &$q) {
+        $expected = $idx + 1;
+        if (intval($q['piece_index'] ?? 0) !== $expected || intval($q['sort_order'] ?? 0) !== $expected) {
+            db_execute("UPDATE questions SET piece_index = :pi, sort_order = :so WHERE id_question = :qid", [
+                ':pi'  => $expected,
+                ':so'  => $expected,
+                ':qid' => $q['id_question']
+            ]);
+            $q['piece_index'] = $expected;
+            $q['sort_order']  = $expected;
+        }
+    }
+    unset($q);
+}
 foreach ($questions as &$q) {
     $q['answers'] = db_fetch_all("SELECT * FROM answers WHERE id_question = :qid ORDER BY id_answer ASC", [':qid' => $q['id_question']]);
 }
