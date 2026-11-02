@@ -56,25 +56,50 @@ $flash = get_flash_message();
                 </div>
             </div>
         <?php else: ?>
-            <?php foreach ($quizzes as $q): ?>
+            <?php foreach ($quizzes as $q): 
+                $gameType = $q['game_type'] ?? 'classic';
+                $quizMode = $q['mode'] ?? 'normal';
+                $isObstacle = ($gameType === 'obstacle');
+                $isWager = ($quizMode === 'wager');
+            ?>
                 <div class="col-md-6 col-lg-4 mb-4">
-                    <div class="card h-100 border-0 shadow-sm" style="border-radius: 12px;">
-                        <div style="height: 160px; background: linear-gradient(135deg, var(--kahoot-purple), var(--kahoot-purple-light)); display: flex; align-items: center; justify-content: center; position: relative; border-top-left-radius: 12px; border-top-right-radius: 12px; overflow: hidden;">
-                            <img src="<?= BASE_URL ?>assets/img/cover.png" alt="Cover" style="max-height: 100%; object-fit: cover; opacity: 0.35; width: 100%;">
-                            <div class="position-absolute text-center px-3">
-                                <h5 class="text-white font-weight-bold mb-1"><?= htmlspecialchars($q['name']) ?></h5>
-                                <div class="d-flex justify-content-center flex-wrap">
-                                    <span class="badge badge-warning text-dark font-weight-bold m-1">
-                                        <i class="fas fa-question-circle mr-1"></i> <?= $q['question_count'] ?> questions
-                                    </span>
-                                    <?php if (($q['game_type'] ?? 'classic') === 'obstacle'): ?>
-                                    <span class="badge badge-info text-white font-weight-bold m-1">
-                                        <i class="fas fa-puzzle-piece mr-1"></i> Chướng ngại vật (<?= intval($q['total_pieces']) ?> mảnh)
-                                    </span>
-                                    <?php endif; ?>
+                    <div class="card h-100 border-0 shadow-sm" style="border-radius: 12px; overflow: hidden;">
+                        <?php if ($isWager): ?>
+                            <!-- CHẾ ĐỘ CÁ CƯỢC (WAGER): ĐỔI ẢNH NỀN RIÊNG -->
+                            <div style="height: 160px; background-color: #7c2d12; display: flex; align-items: center; justify-content: center; position: relative; border-top-left-radius: 12px; border-top-right-radius: 12px; overflow: hidden;">
+                                <img src="<?= BASE_URL ?>assets/img/mode-wager.jpg" alt="Cược điểm" style="width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0;">
+                                <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(180deg, rgba(124, 45, 18, 0.25) 0%, rgba(124, 45, 18, 0.75) 100%);"></div>
+                                <div class="position-absolute text-center px-3" style="z-index: 2;">
+                                    <h5 class="text-white font-weight-bold mb-1" style="text-shadow: 0 2px 8px rgba(0,0,0,0.85);"><?= htmlspecialchars($q['name']) ?></h5>
+                                    <div class="d-flex justify-content-center align-items-center flex-wrap">
+                                        <span class="badge badge-warning text-dark font-weight-bold m-1 shadow-sm">
+                                            <i class="fas fa-question-circle mr-1"></i> <?= $q['question_count'] ?> questions
+                                        </span>
+                                        <span class="badge badge-warning text-dark font-weight-bold m-1 shadow-sm" style="background-color: #ffedd5; border: 1px solid #fdba74;">
+                                            <i class="fas fa-coins mr-1 text-warning"></i> Cược điểm
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
+                        <?php else: ?>
+                            <!-- 2 CHẾ ĐỘ CÒN LẠI (CỔ ĐIỂN & CHƯỚNG NGẠI VẬT): GIỮ NGUYÊN NỀN MÀU TÍM NHƯ TRÊN ẢNH -->
+                            <div style="height: 160px; background: linear-gradient(135deg, var(--kahoot-purple), var(--kahoot-purple-light)); display: flex; align-items: center; justify-content: center; position: relative; border-top-left-radius: 12px; border-top-right-radius: 12px; overflow: hidden;">
+                                <img src="<?= BASE_URL ?>assets/img/cover.png" alt="Cover" style="max-height: 100%; object-fit: cover; opacity: 0.35; width: 100%;">
+                                <div class="position-absolute text-center px-3" style="z-index: 2;">
+                                    <h5 class="text-white font-weight-bold mb-1"><?= htmlspecialchars($q['name']) ?></h5>
+                                    <div class="d-flex justify-content-center flex-wrap">
+                                        <span class="badge badge-warning text-dark font-weight-bold m-1">
+                                            <i class="fas fa-question-circle mr-1"></i> <?= $q['question_count'] ?> questions
+                                        </span>
+                                        <?php if ($isObstacle): ?>
+                                            <span class="badge badge-info text-white font-weight-bold m-1">
+                                                <i class="fas fa-puzzle-piece mr-1"></i> Chướng ngại vật (<?= intval($q['total_pieces'] ?? 4) ?> mảnh)
+                                            </span>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endif; ?>
 
                         <div class="card-body d-flex flex-column justify-content-between p-3">
                             <p class="text-muted small mb-3">
