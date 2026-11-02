@@ -169,7 +169,7 @@ CREATE TABLE `votes` (
   KEY `id_player` (`id_player`),
   KEY `FK_IDPLAYER_PLAYERS2` (`id_answer`),
   CONSTRAINT `FK_IDPLAYER_PLAYERS` FOREIGN KEY (`id_player`) REFERENCES `players` (`id_player`) ON DELETE CASCADE,
-  CONSTRAINT `FK_IDPLAYER_PLAYERS2` FOREIGN KEY (`id_answer`) REFERENCES `answers` (`id_answer`)
+  CONSTRAINT `FK_IDPLAYER_PLAYERS2` FOREIGN KEY (`id_answer`) REFERENCES `answers` (`id_answer`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `saved_review_questions` (

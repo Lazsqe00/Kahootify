@@ -7,7 +7,7 @@ require_once __DIR__ . '/../../includes/player_characters.php';
 
 $roomId = intval($_SESSION['id_room'] ?? 0);
 $creatorId = intval($_SESSION['id_creator']);
-$room = db_fetch_one("SELECT r.*, q.name as quiz_name FROM room r JOIN quiz q ON r.id_quiz = q.id_quiz WHERE r.id_room = :r AND r.id_creator = :c", [':r' => $roomId, ':c' => $creatorId]);
+$room = db_fetch_one("SELECT r.*, q.name as quiz_name, q.mode as quiz_mode FROM room r JOIN quiz q ON r.id_quiz = q.id_quiz WHERE r.id_room = :r AND r.id_creator = :c", [':r' => $roomId, ':c' => $creatorId]);
 
 if (!$room || $room['status'] === 'finished') {
     set_flash_message('danger', 'Game room does not exist or has already finished!');
@@ -38,6 +38,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['set_room_lock'])) {
 $isLocked = room_is_locked($room);
 $questions = db_fetch_all("SELECT id_question FROM questions WHERE id_quiz = :q ORDER BY id_question ASC", [':q' => $room['id_quiz']]);
 $totalQuizQuestions = count($questions);
+$hasWagerInQuiz = (($room['quiz_mode'] ?? '') === 'wager')
+    || (db_count('questions', "id_quiz = :q AND mode = 'wager'", [':q' => $room['id_quiz']]) > 0);
 
 if (isset($_GET['start_game'])) {
     if ($totalQuizQuestions > 0) {
@@ -470,14 +472,14 @@ require_once __DIR__ . '/../../includes/header.php';
                 <?php if ($hasWagerInQuiz): ?>
                 <div class="p-3 mb-3 rounded" style="background-color: #fff8e1; border: 1px solid #ffe082;">
                     <h6 class="font-weight-bold mb-1 text-dark" style="font-family: 'Montserrat', sans-serif; font-weight: 800;">
-                        <i class="fas fa-coins text-warning mr-1"></i> Điểm khởi đầu (Starting Score)
+                        <i class="fas fa-coins text-warning mr-1"></i> Starting Score
                     </h6>
                     <p class="text-muted small mb-2">
-                        Bài trắc nghiệm có câu hỏi <strong>Cược điểm (Wager)</strong>. Người chơi cần có số điểm khởi đầu (&ge; 1) để có thể cược ngay từ câu đầu tiên.
+                        This quiz contains <strong>Wager</strong> questions. Players need a starting score (&ge; 1) to place bets from the first question.
                     </p>
                     <div class="d-flex align-items-center" style="gap: 8px;">
                         <input type="number" id="modalStartingScore" class="form-control form-control-sm text-center font-weight-bold" style="width: 100px; height: 34px; border-radius: 8px; border: 2px solid #ffca28;" min="1" max="100000" step="50" value="<?= max(1, intval($room['starting_score'] ?: 1000)) ?>" onchange="updateStartingScore(this.value)">
-                        <span class="font-weight-bold text-muted small">điểm ban đầu</span>
+                        <span class="font-weight-bold text-muted small">initial points</span>
                     </div>
                 </div>
                 <?php endif; ?>
