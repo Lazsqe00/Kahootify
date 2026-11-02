@@ -11,15 +11,20 @@
                 </h5>
                 <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
             </div>
-            <form action="<?= BASE_URL ?>modules/auth/login.php" method="POST">
+            <form id="loginForm" action="<?= BASE_URL ?>modules/auth/login.php" method="POST">
                 <div class="modal-body p-4">
+                    <div id="loginErrorAlert" class="alert alert-danger py-2 px-3 small font-weight-bold <?= !empty($_SESSION['login_error']) ? '' : 'd-none' ?>" style="border-radius: 8px;" role="alert">
+                        <i class="fas fa-exclamation-circle mr-1"></i>
+                        <span id="loginErrorMessage"><?= htmlspecialchars($_SESSION['login_error'] ?? '') ?></span>
+                    </div>
+
                     <div class="form-group">
                         <label class="font-weight-bold">Username or Email</label>
                         <div class="input-group">
                             <div class="input-group-prepend">
                                 <span class="input-group-text"><i class="fas fa-user"></i></span>
                             </div>
-                            <input type="text" name="username" class="form-control" required autofocus>
+                            <input type="text" name="username" id="loginUsername" class="form-control" value="<?= htmlspecialchars($_SESSION['login_username'] ?? '') ?>" required autofocus>
                         </div>
                         <small class="form-text text-muted">Demo accounts: <b>admin</b> or <b>teacher</b></small>
                     </div>
@@ -30,12 +35,12 @@
                             <div class="input-group-prepend">
                                 <span class="input-group-text"><i class="fas fa-key"></i></span>
                             </div>
-                            <input type="password" name="password" class="form-control" required>
+                            <input type="password" name="password" id="loginPassword" class="form-control" required autocomplete="current-password">
                         </div>
                         <small class="form-text text-muted">Default password: <b>123456</b></small>
                     </div>
 
-                    <button type="submit" class="btn btn-kahoot btn-kahoot-purple btn-block mt-3">
+                    <button type="submit" id="loginSubmitBtn" class="btn btn-kahoot btn-kahoot-purple btn-block mt-3">
                         <i class="fas fa-sign-in-alt mr-2"></i> Log In Now
                     </button>
 
@@ -110,5 +115,54 @@
 <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
 <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
 <script src="<?= BASE_URL ?>assets/js/app.js"></script>
+<script>
+$(document).ready(function() {
+    <?php if (!empty($_SESSION['login_error'])): ?>
+        $('#loginModal').modal('show');
+        $('#loginPassword').val('').focus();
+        <?php unset($_SESSION['login_error'], $_SESSION['login_username']); ?>
+    <?php endif; ?>
+
+    $('#loginForm').on('submit', function(e) {
+        e.preventDefault();
+        var $form = $(this);
+        var $btn = $('#loginSubmitBtn');
+        var $errAlert = $('#loginErrorAlert');
+        var $errMsg = $('#loginErrorMessage');
+        var $pwd = $('#loginPassword');
+        var originalBtnHtml = $btn.html();
+
+        $btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin mr-2"></i> Logging in...');
+        $errAlert.addClass('d-none');
+
+        $.ajax({
+            url: $form.attr('action'),
+            method: 'POST',
+            data: $form.serialize() + '&ajax=1',
+            dataType: 'json',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        }).done(function(res) {
+            if (res && res.success) {
+                window.location.href = res.redirect || '<?= BASE_URL ?>modules/quiz/list.php';
+            } else {
+                var message = (res && res.message) ? res.message : 'Incorrect password or username!';
+                $errMsg.text(message);
+                $errAlert.removeClass('d-none');
+                $pwd.val('').focus();
+                $btn.prop('disabled', false).html(originalBtnHtml);
+            }
+        }).fail(function(xhr) {
+            var msg = 'An error occurred during login. Please try again.';
+            if (xhr.responseJSON && xhr.responseJSON.message) {
+                msg = xhr.responseJSON.message;
+            }
+            $errMsg.text(msg);
+            $errAlert.removeClass('d-none');
+            $pwd.val('').focus();
+            $btn.prop('disabled', false).html(originalBtnHtml);
+        });
+    });
+});
+</script>
 </body>
 </html>

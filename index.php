@@ -10,144 +10,114 @@ require_once __DIR__ . '/includes/navbar.php';
 
 <style>
 
+/* Animations */
 @keyframes fadeInUp {
-    from { opacity: 0; transform: translateY(40px); }
+    from { opacity: 0; transform: translateY(35px); }
     to { opacity: 1; transform: translateY(0); }
 }
-@keyframes fadeInLeft {
-    from { opacity: 0; transform: translateX(-50px); }
-    to { opacity: 1; transform: translateX(0); }
-}
 @keyframes fadeInRight {
-    from { opacity: 0; transform: translateX(50px); }
+    from { opacity: 0; transform: translateX(40px); }
     to { opacity: 1; transform: translateX(0); }
 }
 @keyframes floatPhone {
-    0%, 100% { transform: translateY(0px); }
-    50% { transform: translateY(-18px); }
-}
-@keyframes floatSlow {
-    0%, 100% { transform: translateY(0) rotate(0deg); }
-    50% { transform: translateY(-12px) rotate(5deg); }
-}
-@keyframes pulseGlow {
-    0%, 100% { box-shadow: 0 0 20px rgba(255,202,40,0.3); }
-    50% { box-shadow: 0 0 40px rgba(255,202,40,0.6); }
-}
-@keyframes spinSlow {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-}
-@keyframes scaleIn {
-    from { opacity: 0; transform: scale(0.7); }
-    to { opacity: 1; transform: scale(1); }
-}
-@keyframes shimmer {
-    0% { background-position: -200% 0; }
-    100% { background-position: 200% 0; }
-}
-@keyframes countUp {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-14px); }
 }
 
+/* Hero */
 .hero-section {
-    background: linear-gradient(135deg, #46178F 0%, #1a0a3e 50%, #2d1066 100%);
-    min-height: 600px;
+    background: linear-gradient(160deg, #46178F 0%, #280a5c 100%);
+    min-height: 560px;
     position: relative;
     overflow: hidden;
     display: flex;
     align-items: center;
-    padding: 80px 0 60px;
+    padding: 70px 0 50px;
+}
+.hero-text {
+    opacity: 0;
+    animation: fadeInUp 0.7s ease-out forwards;
+}
+.hero-text .hero-title {
+    animation-delay: 0.1s;
+}
+.hero-text .hero-desc {
+    animation: fadeInUp 0.7s ease-out 0.25s forwards;
+    opacity: 0;
+}
+.hero-text .hero-actions {
+    animation: fadeInUp 0.7s ease-out 0.4s forwards;
+    opacity: 0;
 }
 
-.hero-shape {
-    position: absolute;
-    border-radius: 50%;
-    opacity: 0.08;
-}
-.hero-shape-1 {
-    width: 300px; height: 300px;
-    background: #ffca28;
-    top: -80px; left: -80px;
-    animation: floatSlow 8s ease-in-out infinite;
-}
-.hero-shape-2 {
-    width: 200px; height: 200px;
-    background: #e21b3c;
-    bottom: -60px; right: 10%;
-    animation: floatSlow 6s ease-in-out infinite 1s;
-}
-.hero-shape-3 {
-    width: 150px; height: 150px;
-    background: #1368ce;
-    top: 20%; right: -40px;
-    animation: floatSlow 7s ease-in-out infinite 2s;
-}
-.hero-shape-4 {
-    width: 100px; height: 100px;
-    background: #26890c;
-    bottom: 20%; left: 5%;
-    animation: floatSlow 5s ease-in-out infinite 0.5s;
-}
-
-.hero-deco {
-    position: absolute;
-    opacity: 0.12;
-}
-.deco-triangle {
-    width: 0; height: 0;
-    border-left: 25px solid transparent;
-    border-right: 25px solid transparent;
-    border-bottom: 43px solid #e21b3c;
-    top: 15%; left: 15%;
-    animation: spinSlow 20s linear infinite;
-}
-.deco-diamond {
-    width: 35px; height: 35px;
-    background: #1368ce;
-    transform: rotate(45deg);
-    top: 60%; left: 20%;
-    animation: floatSlow 9s ease-in-out infinite 3s;
-}
-.deco-circle {
-    width: 20px; height: 20px;
-    border-radius: 50%;
-    background: #26890c;
-    top: 30%; right: 15%;
-    animation: floatSlow 6s ease-in-out infinite 1.5s;
-}
-.deco-square {
-    width: 28px; height: 28px;
-    background: #d89e00;
-    top: 70%; right: 25%;
-    animation: spinSlow 15s linear infinite reverse;
-}
-
-.hero-badge {
-    animation: fadeInUp 0.8s ease-out both;
-    animation-delay: 0.2s;
-}
 .hero-title {
-    animation: fadeInUp 0.8s ease-out both;
-    animation-delay: 0.4s;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 2.8rem;
+    font-weight: 800;
+    line-height: 1.15;
+    color: #fff;
+    margin-bottom: 16px;
+}
+.hero-title .accent {
+    color: #ffca28;
 }
 .hero-desc {
-    animation: fadeInUp 0.8s ease-out both;
-    animation-delay: 0.6s;
+    color: #c8b8e0;
+    font-size: 1.05rem;
+    line-height: 1.7;
+    max-width: 480px;
+    margin-bottom: 28px;
 }
-.hero-buttons {
-    animation: fadeInUp 0.8s ease-out both;
-    animation-delay: 0.8s;
+.hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
 }
 
-.phone-mockup-wrapper {
-    animation: fadeInRight 1s ease-out both;
-    animation-delay: 0.5s;
-    position: relative;
-    padding: 20px;
+/* Hero buttons — simple, flat */
+.btn-hero-primary {
+    display: inline-block;
+    padding: 11px 26px;
+    background: #fff;
+    color: #46178F;
+    font-weight: 700;
+    font-size: 0.93rem;
+    border-radius: 8px;
+    text-decoration: none;
+    border: none;
+    transition: opacity 0.2s;
 }
-.phone-mockup-container {
+.btn-hero-primary:hover {
+    opacity: 0.9;
+    color: #46178F;
+    text-decoration: none;
+}
+.btn-hero-secondary {
+    display: inline-block;
+    padding: 11px 26px;
+    background: transparent;
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.93rem;
+    border-radius: 8px;
+    border: 2px solid rgba(255,255,255,0.35);
+    text-decoration: none;
+    transition: border-color 0.2s;
+    cursor: pointer;
+}
+.btn-hero-secondary:hover {
+    border-color: rgba(255,255,255,0.7);
+    color: #fff;
+    text-decoration: none;
+}
+
+/* Phone mockup */
+.phone-wrap {
+    animation: fadeInRight 0.8s ease-out 0.3s forwards;
+    opacity: 0;
+    text-align: center;
+}
+.phone-container {
     position: relative;
     display: inline-block;
     animation: floatPhone 4s ease-in-out infinite;
@@ -155,8 +125,8 @@ require_once __DIR__ . '/includes/navbar.php';
 .phone-frame {
     position: relative;
     z-index: 1;
-    max-height: 480px;
-    filter: drop-shadow(0 20px 40px rgba(0,0,0,0.45));
+    max-height: 460px;
+    filter: drop-shadow(0 20px 40px rgba(0,0,0,0.4));
     pointer-events: none;
     display: block;
 }
@@ -169,375 +139,249 @@ require_once __DIR__ . '/includes/navbar.php';
     height: 90.4%;
     object-fit: cover;
     border-radius: 36px;
-    box-shadow: inset 0 0 15px rgba(0,0,0,0.3);
 }
 
-.phone-glow {
-    position: absolute;
-    top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
-    width: 380px; height: 380px;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(255,202,40,0.2) 0%, transparent 70%);
-    animation: pulseGlow 3s ease-in-out infinite;
-    z-index: 0;
-}
-
-.floating-badge {
-    position: absolute;
-    z-index: 4;
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(8px);
-    color: #333;
-    padding: 10px 16px;
-    border-radius: 16px;
-    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    text-align: left;
-    transition: transform 0.3s ease;
-}
-.floating-badge:hover {
-    transform: scale(1.05);
-}
-.badge-top-right {
-    top: 15%;
-    right: -25px;
-    animation: floatSlow 5s ease-in-out infinite;
-}
-.badge-bottom-left {
-    bottom: 12%;
-    left: -25px;
-    animation: floatSlow 6s ease-in-out infinite 1s;
-}
-.badge-icon {
-    font-size: 1.8rem;
-    line-height: 1;
-}
-.badge-title {
-    font-size: 0.75rem;
-    font-weight: 700;
-    color: #666;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-.badge-sub {
-    font-size: 0.95rem;
-    font-weight: 800;
-    color: #46178F;
-}
-.live-pill {
-    position: absolute;
-    top: 10%;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 3;
-    background: rgba(0, 0, 0, 0.7);
-    color: #fff;
-    font-size: 0.75rem;
-    font-weight: 800;
-    padding: 4px 12px;
-    border-radius: 20px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    letter-spacing: 0.5px;
-    pointer-events: none;
-}
-.live-dot {
-    width: 8px;
-    height: 8px;
-    background: #e21b3c;
-    border-radius: 50%;
-    display: inline-block;
-    animation: pulse 1s infinite;
-}
-
-.how-it-works {
+/* Steps */
+.steps-section {
     background: #fff;
-    padding: 80px 0;
+    padding: 70px 0;
 }
-.step-card {
-    text-align: center;
-    padding: 30px 20px;
-    position: relative;
-    opacity: 0;
-    animation: fadeInUp 0.6s ease-out forwards;
-}
-.step-card:nth-child(1) { animation-delay: 0.2s; }
-.step-card:nth-child(2) { animation-delay: 0.4s; }
-.step-card:nth-child(3) { animation-delay: 0.6s; }
-.step-card:nth-child(4) { animation-delay: 0.8s; }
-
-.step-number {
-    width: 60px; height: 60px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #46178F, #7b3fc4);
-    color: #fff;
+.section-title {
     font-family: 'Montserrat', sans-serif;
-    font-size: 1.5rem;
+    font-size: 1.8rem;
     font-weight: 800;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 20px;
-    box-shadow: 0 4px 15px rgba(70,23,143,0.3);
+    color: #1a1a2e;
+    margin-bottom: 6px;
 }
-.step-icon {
-    font-size: 2.5rem;
-    margin-bottom: 15px;
+.section-sub {
+    color: #6b7280;
+    font-size: 0.95rem;
+    margin-bottom: 40px;
 }
-.step-connector {
-    position: absolute;
-    top: 60px;
-    right: -30px;
-    color: #ccc;
-    font-size: 1.5rem;
-    z-index: 2;
+.step-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 24px;
 }
-
-.stats-section {
-    background: linear-gradient(135deg, #46178F 0%, #2d1066 100%);
-    padding: 60px 0;
-    color: #fff;
+@media (max-width: 767px) {
+    .step-row { grid-template-columns: repeat(2, 1fr); }
 }
-.stat-item {
+@media (max-width: 480px) {
+    .step-row { grid-template-columns: 1fr; }
+}
+.step-item {
     text-align: center;
-    padding: 20px;
+    padding: 20px 12px;
     opacity: 0;
-    animation: countUp 0.6s ease-out forwards;
+    animation: fadeInUp 0.5s ease-out forwards;
 }
-.stat-item:nth-child(1) { animation-delay: 0.1s; }
-.stat-item:nth-child(2) { animation-delay: 0.3s; }
-.stat-item:nth-child(3) { animation-delay: 0.5s; }
-.stat-item:nth-child(4) { animation-delay: 0.7s; }
+.step-item:nth-child(1) { animation-delay: 0.1s; }
+.step-item:nth-child(2) { animation-delay: 0.2s; }
+.step-item:nth-child(3) { animation-delay: 0.3s; }
+.step-item:nth-child(4) { animation-delay: 0.4s; }
 
-.stat-number {
-    font-family: 'Montserrat', sans-serif;
-    font-size: 2.8rem;
-    font-weight: 900;
-    color: #ffca28;
-    text-shadow: 0 2px 10px rgba(255,202,40,0.3);
-}
-.stat-label {
-    font-size: 1rem;
-    font-weight: 500;
-    color: #d0c0e8;
-    margin-top: 5px;
-}
-
-.feature-cards-section {
-    padding: 80px 0;
-    background: #f8f9fa;
-}
-.feature-card-enhanced {
-    border-radius: 16px;
-    transition: transform 0.3s cubic-bezier(0.25,0.46,0.45,0.94), box-shadow 0.3s ease;
-    overflow: hidden;
-}
-.feature-card-enhanced:hover {
-    transform: translateY(-8px) scale(1.02);
-    box-shadow: 0 20px 40px rgba(0,0,0,0.15) !important;
-}
-.feature-card-enhanced .card-body {
-    position: relative;
-    z-index: 1;
-}
-.feature-card-enhanced::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: linear-gradient(180deg, transparent 50%, rgba(0,0,0,0.1) 100%);
-    z-index: 0;
-}
-.feature-icon-ring {
-    width: 80px; height: 80px;
-    border-radius: 50%;
-    background: rgba(255,255,255,0.2);
+.step-num {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    transition: transform 0.3s ease, background 0.3s ease;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #46178F;
+    color: #fff;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 1rem;
+    font-weight: 800;
+    margin-bottom: 14px;
 }
-.feature-card-enhanced:hover .feature-icon-ring {
-    transform: scale(1.1) rotate(5deg);
-    background: rgba(255,255,255,0.35);
+.step-item h5 {
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 700;
+    font-size: 1rem;
+    color: #1a1a2e;
+    margin-bottom: 6px;
+}
+.step-item p {
+    color: #6b7280;
+    font-size: 0.85rem;
+    line-height: 1.6;
+    margin: 0;
 }
 
-.video-showcase-section {
-    background: linear-gradient(180deg, #f8f9fa 0%, #ede8f7 50%, #f8f9fa 100%);
-    padding: 90px 0;
-    position: relative;
+/* Video */
+.video-section {
+    background: #f5f3fa;
+    padding: 70px 0;
 }
-.video-cinema-frame {
-    max-width: 920px;
-    margin: 0 auto 40px;
-    background: #1e1e24;
-    border-radius: 18px;
+.video-wrapper {
+    max-width: 860px;
+    margin: 0 auto;
+    border-radius: 14px;
     overflow: hidden;
-    box-shadow: 0 25px 60px rgba(70, 23, 143, 0.22);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-}
-.video-window-header {
-    background: #2b2b36;
-    padding: 12px 20px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-.window-dots {
-    display: flex;
-    gap: 8px;
-}
-.window-dots .dot {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    display: inline-block;
-}
-.window-dots .dot.red { background: #ff5f56; }
-.window-dots .dot.yellow { background: #ffbd2e; }
-.window-dots .dot.green { background: #27c93f; }
-.window-title {
-    color: #b0a8c4;
-    font-size: 0.85rem;
-    font-weight: 600;
-    letter-spacing: 0.5px;
-}
-.cinema-video-container {
-    position: relative;
     background: #000;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.12);
 }
-.cinema-video {
+.video-wrapper video {
     width: 100%;
-    max-height: 520px;
     display: block;
-    object-fit: contain;
     outline: none;
 }
-.video-feature-pill {
+
+/* Features */
+.features-section {
     background: #fff;
-    border-radius: 14px;
-    padding: 24px 20px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
-    transition: transform 0.25s, box-shadow 0.25s;
-    height: 100%;
+    padding: 70px 0;
 }
-.video-feature-pill:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 15px 35px rgba(70, 23, 143, 0.12);
+.feat-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 22px;
+}
+@media (max-width: 767px) {
+    .feat-grid { grid-template-columns: 1fr; }
+}
+.feat-card {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 26px 22px;
+    transition: box-shadow 0.2s;
+}
+.feat-card:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.05);
+}
+.feat-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 8px;
+    position: relative;
+    top: -1px;
+}
+.feat-card h5 {
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: #1a1a2e;
+    margin-bottom: 8px;
+    display: inline;
+}
+.feat-card p {
+    color: #6b7280;
+    font-size: 0.85rem;
+    line-height: 1.65;
+    margin: 10px 0 0;
 }
 
+/* CTA */
 .cta-section {
-    background: linear-gradient(135deg, #26890c 0%, #1a6207 100%);
-    padding: 80px 0;
+    background: #46178F;
+    padding: 56px 0;
+    text-align: center;
+}
+.cta-title {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 1.5rem;
+    font-weight: 800;
     color: #fff;
-    position: relative;
-    overflow: hidden;
+    margin-bottom: 8px;
 }
-.cta-section::before {
-    content: '';
-    position: absolute;
-    top: -50%; left: -50%;
-    width: 200%; height: 200%;
-    background: radial-gradient(circle at 30% 70%, rgba(255,255,255,0.05) 0%, transparent 50%);
+.cta-desc {
+    color: #c8b8e0;
+    font-size: 0.95rem;
+    margin-bottom: 24px;
+    max-width: 420px;
+    margin-left: auto;
+    margin-right: auto;
 }
-.cta-btn {
-    padding: 18px 40px;
-    font-size: 1.2rem;
-    border-radius: 50px;
+.cta-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: center;
+}
+.btn-cta-white {
+    display: inline-block;
+    padding: 11px 28px;
+    background: #fff;
+    color: #46178F;
     font-weight: 700;
-    transition: all 0.3s ease;
-    box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+    font-size: 0.93rem;
+    border-radius: 8px;
+    text-decoration: none;
+    border: none;
+    transition: opacity 0.2s;
 }
-.cta-btn:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+.btn-cta-white:hover {
+    opacity: 0.9;
+    color: #46178F;
+    text-decoration: none;
+}
+.btn-cta-outline {
+    display: inline-block;
+    padding: 11px 28px;
+    background: transparent;
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.93rem;
+    border-radius: 8px;
+    border: 2px solid rgba(255,255,255,0.35);
+    text-decoration: none;
+    transition: border-color 0.2s;
+    cursor: pointer;
+}
+.btn-cta-outline:hover {
+    border-color: rgba(255,255,255,0.7);
+    color: #fff;
+    text-decoration: none;
 }
 
 @media (max-width: 991px) {
     .hero-section { padding: 50px 0 40px; min-height: auto; }
-    .phone-frame { max-height: 350px; }
-    .phone-glow { width: 260px; height: 260px; }
-    .step-connector { display: none; }
+    .hero-title { font-size: 2.2rem; }
+    .phone-frame { max-height: 360px; }
 }
 @media (max-width: 767px) {
     .hero-section { padding: 40px 0 30px; }
+    .hero-title { font-size: 1.8rem; }
     .phone-frame { max-height: 300px; }
-    .phone-glow { width: 220px; height: 220px; }
-    .stat-number { font-size: 2rem; }
 }
 </style>
 
-<div class="hero-section text-white">
-
-    <div class="hero-shape hero-shape-1"></div>
-    <div class="hero-shape hero-shape-2"></div>
-    <div class="hero-shape hero-shape-3"></div>
-    <div class="hero-shape hero-shape-4"></div>
-    <div class="hero-deco deco-triangle"></div>
-    <div class="hero-deco deco-diamond"></div>
-    <div class="hero-deco deco-circle"></div>
-    <div class="hero-deco deco-square"></div>
-
+<!-- HERO -->
+<div class="hero-section">
     <div class="container">
         <div class="row align-items-center">
             <div class="col-lg-6 text-center text-lg-left mb-5 mb-lg-0">
-
-                <h1 class="hero-title font-weight-bold mb-3" style="font-size: 3rem; line-height: 1.15;">
-                    Make learning<br>
-                    <span style="background: linear-gradient(135deg, #ffca28, #ff9800); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">awesome!</span>
-                </h1>
-                <p class="hero-desc lead mb-4" style="color: #d0c0e8; max-width: 520px; font-size: 1.1rem; line-height: 1.7;">
-                    Real-time interactive quiz platform. Create engaging questions, host exciting competitions, and celebrate the winners!
-                </p>
-
-                <div class="hero-buttons d-flex flex-wrap justify-content-center justify-content-lg-start" style="gap: 15px;">
-                    <a href="<?= BASE_URL ?>modules/player/join.php" class="btn btn-kahoot btn-kahoot-green btn-lg px-4 py-3" style="font-size: 1rem;">
-                        <i class="fas fa-play mr-2"></i> JOIN GAME ROOM
-                    </a>
-
-                    <?php if (empty($_SESSION['id_creator'])): ?>
-                        <button type="button" class="btn btn-outline-light btn-lg px-4 py-3 font-weight-bold" style="border-width: 2px;" data-toggle="modal" data-target="#signUpModal">
-                            <i class="fas fa-user-plus mr-2"></i> Sign Up for Free
-                        </button>
-                    <?php else: ?>
-                        <a href="<?= BASE_URL ?>modules/quiz/list.php" class="btn btn-warning btn-lg px-4 py-3 font-weight-bold text-dark">
-                            <i class="fas fa-th-list mr-2"></i> Manage My Kahoots
+                <div class="hero-text">
+                    <h1 class="hero-title">
+                        Make learning<br><span class="accent">awesome!</span>
+                    </h1>
+                    <p class="hero-desc">
+                        Host real-time quiz competitions in your classroom or with friends. Create questions, share a PIN, and play together instantly.
+                    </p>
+                    <div class="hero-actions justify-content-center justify-content-lg-start">
+                        <a href="<?= BASE_URL ?>modules/player/join.php" class="btn-hero-primary">
+                            Join a Game
                         </a>
-                    <?php endif; ?>
+                        <?php if (empty($_SESSION['id_creator'])): ?>
+                            <button type="button" class="btn-hero-secondary" data-toggle="modal" data-target="#signUpModal">
+                                Sign Up Free
+                            </button>
+                        <?php else: ?>
+                            <a href="<?= BASE_URL ?>modules/quiz/list.php" class="btn-hero-secondary">
+                                My Kahoots
+                            </a>
+                        <?php endif; ?>
+                    </div>
                 </div>
             </div>
-
-            <div class="col-lg-6 text-center">
-                <div class="phone-mockup-wrapper">
-                    <div class="phone-mockup-container">
-                        <div class="phone-glow"></div>
-
-                        <div class="floating-badge badge-top-right">
-                            <span class="badge-icon">🏆</span>
-                            <div>
-                                <div class="badge-title">Top 1 Leaderboard</div>
-                                <div class="badge-sub">+1,450 pts</div>
-                            </div>
-                        </div>
-
-                        <div class="floating-badge badge-bottom-left">
-                            <span class="badge-icon">⚡</span>
-                            <div>
-                                <div class="badge-title">Game PIN</div>
-                                <div class="badge-sub" style="color: #26890c;">849 201</div>
-                            </div>
-                        </div>
-
-                        <div class="live-pill">
-                            <span class="live-dot"></span> LIVE GAME
-                        </div>
-
-                        <img src="<?= BASE_URL ?>assets/img/phone.png" alt="Kahoot Mobile App" class="phone-frame">
-                        <video class="phone-video" autoplay muted loop playsinline webkit-playsinline="true">
+            <div class="col-lg-6">
+                <div class="phone-wrap">
+                    <div class="phone-container">
+                        <img src="<?= BASE_URL ?>assets/img/phone.png" alt="Kahoot on mobile" class="phone-frame">
+                        <video class="phone-video" autoplay muted loop playsinline>
                             <source src="<?= BASE_URL ?>assets/video/home-mobile.mp4" type="video/mp4">
                         </video>
                     </div>
@@ -547,248 +391,121 @@ require_once __DIR__ . '/includes/navbar.php';
     </div>
 </div>
 
-<div class="how-it-works">
+<!-- HOW IT WORKS -->
+<div class="steps-section">
     <div class="container">
-        <div class="text-center mb-5">
-            <h2 class="font-weight-bold text-dark" style="font-size: 2.2rem;">How It Works</h2>
-            <p class="text-muted" style="max-width: 500px; margin: 0 auto;">Only 4 simple steps to start an exciting trivia challenge!</p>
+        <div class="text-center">
+            <h2 class="section-title">How It Works</h2>
+            <p class="section-sub">Four steps to a live quiz session</p>
         </div>
-
-        <div class="row">
-            <div class="col-md-6 col-lg-3">
-                <div class="step-card">
-                    <div class="step-number">1</div>
-                    <div class="step-icon">📝</div>
-                    <h5 class="font-weight-bold">Create Quiz</h5>
-                    <p class="text-muted small">Compose multiple-choice questions with 4 answers, customize timers and point values.</p>
-                    <span class="step-connector d-none d-lg-block"><i class="fas fa-chevron-right"></i></span>
-                </div>
+        <div class="step-row">
+            <div class="step-item">
+                <div class="step-num">1</div>
+                <h5>Create a Quiz</h5>
+                <p>Write your questions, set time limits, and add images or videos.</p>
             </div>
-            <div class="col-md-6 col-lg-3">
-                <div class="step-card">
-                    <div class="step-number">2</div>
-                    <div class="step-icon">🎮</div>
-                    <h5 class="font-weight-bold">Host Game</h5>
-                    <p class="text-muted small">The system generates a 6-digit game PIN. Share it for everyone to join.</p>
-                    <span class="step-connector d-none d-lg-block"><i class="fas fa-chevron-right"></i></span>
-                </div>
+            <div class="step-item">
+                <div class="step-num">2</div>
+                <h5>Host a Room</h5>
+                <p>Start a game and share the 6-digit PIN with your players.</p>
             </div>
-            <div class="col-md-6 col-lg-3">
-                <div class="step-card">
-                    <div class="step-number">3</div>
-                    <div class="step-icon">⚡</div>
-                    <h5 class="font-weight-bold">Compete</h5>
-                    <p class="text-muted small">Players submit answers on their phones while scores update in real time on the big screen.</p>
-                    <span class="step-connector d-none d-lg-block"><i class="fas fa-chevron-right"></i></span>
-                </div>
+            <div class="step-item">
+                <div class="step-num">3</div>
+                <h5>Play Live</h5>
+                <p>Players answer on their phones while scores update in real time.</p>
             </div>
-            <div class="col-md-6 col-lg-3">
-                <div class="step-card">
-                    <div class="step-number">4</div>
-                    <div class="step-icon">🏆</div>
-                    <h5 class="font-weight-bold">Podium</h5>
-                    <p class="text-muted small">Dynamic leaderboard animations, top 3 podium celebration, and confetti fireworks!</p>
-                </div>
+            <div class="step-item">
+                <div class="step-num">4</div>
+                <h5>See Results</h5>
+                <p>Leaderboard reveals the top scorers with a podium celebration.</p>
             </div>
         </div>
     </div>
 </div>
 
-<div class="stats-section">
+<!-- VIDEO -->
+<div class="video-section">
     <div class="container">
-        <div class="row">
-            <div class="col-6 col-md-3">
-                <div class="stat-item">
-                    <div class="stat-number">4</div>
-                    <div class="stat-label">Classic Colors</div>
+        <div class="text-center">
+            <h2 class="section-title">See It in Action</h2>
+            <p class="section-sub">A quick look at a live Kahoot session</p>
+        </div>
+        <div class="video-wrapper">
+            <video controls autoplay muted loop playsinline poster="<?= BASE_URL ?>assets/img/banner.png">
+                <source src="<?= BASE_URL ?>assets/video/home.mp4" type="video/mp4">
+            </video>
+        </div>
+    </div>
+</div>
+
+<!-- FEATURES -->
+<div class="features-section">
+    <div class="container">
+        <div class="text-center">
+            <h2 class="section-title">What You Can Do</h2>
+            <p class="section-sub">Everything you need for interactive quizzes</p>
+        </div>
+        <div class="feat-grid">
+            <div class="feat-card">
+                <div>
+                    <span class="feat-dot" style="background: #e21b3c;"></span>
+                    <h5>Quiz Builder</h5>
                 </div>
+                <p>Create multiple-choice questions with images, videos, and custom timers. Supports Classic, Wager, and Puzzle game modes.</p>
             </div>
-            <div class="col-6 col-md-3">
-                <div class="stat-item">
-                    <div class="stat-number">6</div>
-                    <div class="stat-label">Game PIN Digits</div>
+            <div class="feat-card">
+                <div>
+                    <span class="feat-dot" style="background: #1368ce;"></span>
+                    <h5>Live Hosting</h5>
                 </div>
+                <p>Generate a game room with a unique PIN. Control the pace, see live answer counts, and advance questions from your screen.</p>
             </div>
-            <div class="col-6 col-md-3">
-                <div class="stat-item">
-                    <div class="stat-number">∞</div>
-                    <div class="stat-label">Quizzes Allowed</div>
+            <div class="feat-card">
+                <div>
+                    <span class="feat-dot" style="background: #26890c;"></span>
+                    <h5>Play on Any Device</h5>
                 </div>
+                <p>Players join from their phone or laptop browser — no app install needed. Just enter the PIN and a nickname to start.</p>
             </div>
-            <div class="col-6 col-md-3">
-                <div class="stat-item">
-                    <div class="stat-number">Real-time</div>
-                    <div class="stat-label">Live Result Sync</div>
+            <div class="feat-card">
+                <div>
+                    <span class="feat-dot" style="background: #d89e00;"></span>
+                    <h5>Real-Time Scores</h5>
                 </div>
+                <p>Points are calculated by speed and accuracy. Streak bonuses reward consecutive correct answers. Leaderboards update live.</p>
+            </div>
+            <div class="feat-card">
+                <div>
+                    <span class="feat-dot" style="background: #46178F;"></span>
+                    <h5>Reports & Review</h5>
+                </div>
+                <p>After each game, view detailed answer breakdowns and player rankings. Save questions for later review and study.</p>
+            </div>
+            <div class="feat-card">
+                <div>
+                    <span class="feat-dot" style="background: #e21b3c;"></span>
+                    <h5>Puzzle Mode</h5>
+                </div>
+                <p>A hidden image is divided into tiles. Correct answers reveal pieces. Players race to guess the secret picture first.</p>
             </div>
         </div>
     </div>
 </div>
 
-<div class="feature-cards-section">
+<!-- CTA -->
+<div class="cta-section">
     <div class="container">
-        <div class="text-center mb-5">
-            <h2 class="font-weight-bold text-dark" style="font-size: 2.2rem;">Classic 4-Color Experience</h2>
-            <p class="text-muted">Experience next-level interactive learning and real-time multiplayer competition</p>
-        </div>
-
-        <div class="row">
-
-            <div class="col-md-6 col-lg-3 mb-4">
-                <div class="card h-100 border-0 shadow-sm text-white feature-card-enhanced" style="background: linear-gradient(145deg, #e21b3c, #b3142e); border-radius: 16px;">
-                    <div class="card-body p-4 text-center d-flex flex-column justify-content-between">
-                        <div>
-                            <div class="mb-3 feature-icon-ring d-inline-flex align-items-center justify-content-center">
-                                <span style="font-size: 2.2rem;">🔺</span>
-                            </div>
-                            <h4 class="font-weight-bold mb-2">Dashboard</h4>
-                            <p class="badge badge-light text-dark font-weight-bold mb-3 px-3 py-1">Secure Management</p>
-                            <p class="small text-light" style="line-height: 1.6;">Register, log in, manage personal account, change password, and view analytics overview.</p>
-                        </div>
-                        <div>
-                            <a href="<?= BASE_URL ?>modules/auth/dashboard.php" class="btn btn-light btn-sm font-weight-bold mt-3 text-danger px-3 py-2 shadow-sm rounded-pill">
-                                Go to Dashboard &raquo;
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-6 col-lg-3 mb-4">
-                <div class="card h-100 border-0 shadow-sm text-white feature-card-enhanced" style="background: linear-gradient(145deg, #1368ce, #0c4da0); border-radius: 16px;">
-                    <div class="card-body p-4 text-center d-flex flex-column justify-content-between">
-                        <div>
-                            <div class="mb-3 feature-icon-ring d-inline-flex align-items-center justify-content-center">
-                                <span style="font-size: 2.2rem;">🔷</span>
-                            </div>
-                            <h4 class="font-weight-bold mb-2">Quiz Creator</h4>
-                            <p class="badge badge-light text-dark font-weight-bold mb-3 px-3 py-1">Flexible Builder</p>
-                            <p class="small text-light" style="line-height: 1.6;">Create rich quizzes, visually edit questions, customize time limits (10s/20s/30s/60s), and set scores.</p>
-                        </div>
-                        <div>
-                            <a href="<?= BASE_URL ?>modules/quiz/list.php" class="btn btn-light btn-sm font-weight-bold mt-3 text-primary px-3 py-2 shadow-sm rounded-pill">
-                                Manage Quizzes &raquo;
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-6 col-lg-3 mb-4">
-                <div class="card h-100 border-0 shadow-sm text-white feature-card-enhanced" style="background: linear-gradient(145deg, #d89e00, #a97c00); border-radius: 16px;">
-                    <div class="card-body p-4 text-center d-flex flex-column justify-content-between">
-                        <div>
-                            <div class="mb-3 feature-icon-ring d-inline-flex align-items-center justify-content-center">
-                                <span style="font-size: 2.2rem;">🟡</span>
-                            </div>
-                            <h4 class="font-weight-bold mb-2">Host Screen</h4>
-                            <p class="badge badge-light text-dark font-weight-bold mb-3 px-3 py-1">Real-Time Live Play</p>
-                            <p class="small text-light" style="line-height: 1.6;">Instant room hosting with 6-digit PIN, synchronized countdowns, live score jumps, and auto-transitions.</p>
-                        </div>
-                        <div>
-                            <a href="<?= BASE_URL ?>modules/quiz/list.php" class="btn btn-light btn-sm font-weight-bold mt-3 px-3 py-2 shadow-sm rounded-pill" style="color: #8f6700 !important;">
-                                Host a Game &raquo;
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-6 col-lg-3 mb-4">
-                <div class="card h-100 border-0 shadow-sm text-white feature-card-enhanced" style="background: linear-gradient(145deg, #26890c, #1a6207); border-radius: 16px;">
-                    <div class="card-body p-4 text-center d-flex flex-column justify-content-between">
-                        <div>
-                            <div class="mb-3 feature-icon-ring d-inline-flex align-items-center justify-content-center">
-                                <span style="font-size: 2.2rem;">🟩</span>
-                            </div>
-                            <h4 class="font-weight-bold mb-2">Player Experience</h4>
-                            <p class="badge badge-light text-dark font-weight-bold mb-3 px-3 py-1">Cross-Device Friendly</p>
-                            <p class="small text-light" style="line-height: 1.6;">Join instantly via PIN and nickname, responsive 4-color buttons, and seamless multi-tab support.</p>
-                        </div>
-                        <div>
-                            <a href="<?= BASE_URL ?>modules/player/join.php" class="btn btn-light btn-sm font-weight-bold mt-3 text-success px-3 py-2 shadow-sm rounded-pill">
-                                Join Game Now &raquo;
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-<div class="video-showcase-section">
-    <div class="container">
-        <div class="text-center mb-5">
-            <span class="badge badge-pill badge-primary px-3 py-2 font-weight-bold mb-3" style="font-size: 0.85rem; background: linear-gradient(135deg, #46178F, #7b3fc4);">
-                🎬 LIVE EXPERIENCE
-            </span>
-            <h2 class="font-weight-bold text-dark" style="font-size: 2.2rem;">See Kahoot! Bring Learning to Life</h2>
-            <p class="text-muted" style="max-width: 620px; margin: 0 auto;">Discover how Kahoot transforms ordinary lessons into vibrant, interactive knowledge arenas.</p>
-        </div>
-
-        <div class="video-cinema-frame">
-            <div class="video-window-header">
-                <div class="window-dots">
-                    <span class="dot red"></span>
-                    <span class="dot yellow"></span>
-                    <span class="dot green"></span>
-                </div>
-                <div class="window-title">
-                    <i class="fas fa-play-circle mr-1 text-warning"></i> Kahoot! Classroom Experience - Demo Video
-                </div>
-                <div class="d-none d-md-block" style="width: 50px;"></div>
-            </div>
-            <div class="cinema-video-container">
-                <video class="cinema-video" controls autoplay muted loop playsinline poster="<?= BASE_URL ?>assets/img/banner.png">
-                    <source src="<?= BASE_URL ?>assets/video/home.mp4" type="video/mp4">
-                    Your browser does not support the video tag.
-                </video>
-            </div>
-        </div>
-
-        <div class="row text-center mt-4">
-            <div class="col-md-4 mb-4">
-                <div class="video-feature-pill">
-                    <div class="mb-3" style="font-size: 2.5rem;">🎯</div>
-                    <h5 class="font-weight-bold text-dark">100% Student Engagement</h5>
-                    <p class="text-muted small mb-0">Every participant answers directly from their phone or browser without installing any app.</p>
-                </div>
-            </div>
-            <div class="col-md-4 mb-4">
-                <div class="video-feature-pill">
-                    <div class="mb-3" style="font-size: 2.5rem;">⚡</div>
-                    <h5 class="font-weight-bold text-dark">Real-Time Scoring & Feedback</h5>
-                    <p class="text-muted small mb-0">Instant vote analytics, speed-based scoring, and automatic leaderboard updates after every round.</p>
-                </div>
-            </div>
-            <div class="col-md-4 mb-4">
-                <div class="video-feature-pill">
-                    <div class="mb-3" style="font-size: 2.5rem;">🏆</div>
-                    <h5 class="font-weight-bold text-dark">Learn Through Play</h5>
-                    <p class="text-muted small mb-0">Fosters healthy learning competition, sparks excitement, and reinforces knowledge retention through gamified trivia.</p>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="cta-section text-center">
-    <div class="container position-relative" style="z-index: 1;">
-        <h2 class="font-weight-bold mb-3" style="font-size: 2.2rem;">Ready to get started?</h2>
-        <p class="lead mb-4" style="color: rgba(255,255,255,0.85); max-width: 500px; margin: 0 auto 30px;">
-            Create a free quiz or join an exciting live challenge with your friends right now!
-        </p>
-        <div class="d-flex flex-wrap justify-content-center" style="gap: 20px;">
-            <a href="<?= BASE_URL ?>modules/player/join.php" class="btn btn-light text-success cta-btn">
-                <i class="fas fa-play mr-2"></i> Join Game Now
-            </a>
+        <h2 class="cta-title">Ready to play?</h2>
+        <p class="cta-desc">Create a quiz or jump into a live game right now.</p>
+        <div class="cta-actions">
+            <a href="<?= BASE_URL ?>modules/player/join.php" class="btn-cta-white">Join a Game</a>
             <?php if (empty($_SESSION['id_creator'])): ?>
-                <button type="button" class="btn btn-outline-light cta-btn" data-toggle="modal" data-target="#signUpModal">
-                    <i class="fas fa-user-plus mr-2"></i> Create Account
+                <button type="button" class="btn-cta-outline" data-toggle="modal" data-target="#signUpModal">
+                    Create Account
                 </button>
             <?php else: ?>
-                <a href="<?= BASE_URL ?>modules/quiz/create.php" class="btn btn-outline-light cta-btn">
-                    <i class="fas fa-plus-circle mr-2"></i> Create New Quiz
+                <a href="<?= BASE_URL ?>modules/quiz/create.php" class="btn-cta-outline">
+                    Create New Quiz
                 </a>
             <?php endif; ?>
         </div>
