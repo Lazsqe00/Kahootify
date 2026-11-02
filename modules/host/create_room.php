@@ -21,6 +21,15 @@ if (empty($questions)) {
 
 $gameType = $quiz['game_type'] ?? 'classic';
 
+if ($gameType === 'obstacle') {
+    $quizDetail = db_fetch_one("SELECT total_pieces FROM quiz WHERE id_quiz = :q", [':q' => $quizId]);
+    $requiredPieces = intval($quizDetail['total_pieces'] ?? 4);
+    if (count($questions) < $requiredPieces) {
+        set_flash_message('warning', "This Puzzle quiz requires exactly {$requiredPieces} questions for all {$requiredPieces} tiles before hosting! (Currently has " . count($questions) . " questions)");
+        redirect('modules/quiz/edit.php?id=' . $quizId);
+    }
+}
+
 do {
     $pin = sprintf("%06d", mt_rand(100000, 999999));
     $existing = db_fetch_one("SELECT id_room FROM room WHERE pin = :pin AND status != 'finished'", [':pin' => $pin]);

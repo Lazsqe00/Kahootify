@@ -4,7 +4,7 @@
 
 $quiz = db_fetch_one("SELECT * FROM quiz WHERE id_quiz = :q", [':q' => $room['id_quiz']]);
 $totalPieces = intval($quiz['total_pieces'] ?? 4);
-if (!in_array($totalPieces, [4, 6, 8, 9])) $totalPieces = 4;
+if (!in_array($totalPieces, [4, 6, 8, 9, 10, 12, 15, 16, 20, 25])) $totalPieces = 4;
 
 $openedPieces = !empty($room['opened_pieces']) ? json_decode($room['opened_pieces'], true) : [];
 if (!is_array($openedPieces)) $openedPieces = [];
@@ -12,7 +12,13 @@ if (!is_array($openedPieces)) $openedPieces = [];
 $myUnlocked = !empty($player['unlocked_pieces']) ? json_decode($player['unlocked_pieces'], true) : [];
 if (!is_array($myUnlocked)) $myUnlocked = [];
 
-$isDisqualified = !empty($player['is_disqualified_obstacle']);
+$allOpened = (count($openedPieces) >= $totalPieces);
+if ($allOpened) {
+    $myUnlocked = range(1, $totalPieces);
+    $isDisqualified = !empty($player['is_disqualified_obstacle']) && !empty($room['all_pieces_final_revealed']);
+} else {
+    $isDisqualified = !empty($player['is_disqualified_obstacle']);
+}
 $secretImageUrl = !empty($quiz['obstacle_image']) ? BASE_URL . $quiz['obstacle_image'] : '';
 
 // Grid layout
@@ -20,6 +26,12 @@ $cols = 2; $rows = 2;
 if ($totalPieces === 6) { $cols = 3; $rows = 2; }
 elseif ($totalPieces === 8) { $cols = 4; $rows = 2; }
 elseif ($totalPieces === 9) { $cols = 3; $rows = 3; }
+elseif ($totalPieces === 10) { $cols = 5; $rows = 2; }
+elseif ($totalPieces === 12) { $cols = 4; $rows = 3; }
+elseif ($totalPieces === 15) { $cols = 5; $rows = 3; }
+elseif ($totalPieces === 16) { $cols = 4; $rows = 4; }
+elseif ($totalPieces === 20) { $cols = 5; $rows = 4; }
+elseif ($totalPieces === 25) { $cols = 5; $rows = 5; }
 
 $pageTitle = "Vượt Chướng Ngại Vật - " . htmlspecialchars($nickname);
 $bodyClass = "backgroundColorChanges";
@@ -75,72 +87,98 @@ require_once __DIR__ . '/header.php';
     width: 100%; height: 100%;
     display: grid;
     z-index: 2;
-    gap: 4px;
-    background: rgba(0,0,0,0.5);
 }
-.cols-2 { grid-template-columns: repeat(2, 1fr); }
-.cols-3 { grid-template-columns: repeat(3, 1fr); }
-.cols-4 { grid-template-columns: repeat(4, 1fr); }
+.grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
+.grid-cols-3 { grid-template-columns: repeat(3, 1fr); }
+.grid-cols-4 { grid-template-columns: repeat(4, 1fr); }
+.grid-cols-5 { grid-template-columns: repeat(5, 1fr); }
 
-.rows-2 { grid-template-rows: repeat(2, 1fr); }
-.rows-3 { grid-template-rows: repeat(3, 1fr); }
+.grid-rows-2 { grid-template-rows: repeat(2, 1fr); }
+.grid-rows-3 { grid-template-rows: repeat(3, 1fr); }
+.grid-rows-4 { grid-template-rows: repeat(4, 1fr); }
+.grid-rows-5 { grid-template-rows: repeat(5, 1fr); }
 
 .obstacle-piece-tile {
     position: relative;
+    border: 2px solid rgba(255, 255, 255, 0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.piece-locked {
+    background: linear-gradient(135deg, #2b1055 0%, #150630 100%);
+    opacity: 1;
+}
+.piece-locked::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: radial-gradient(circle at center, rgba(120, 60, 200, 0.4) 0%, rgba(20, 5, 40, 0.85) 100%);
+    pointer-events: none;
+}
+
+.piece-unlocked {
+    background: transparent !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+}
+.piece-unlocked .piece-label {
+    display: none !important;
+}
+
+.piece-label {
+    position: relative;
+    z-index: 3;
+    font-size: 2.2rem;
+    font-weight: 900;
+    color: #fff;
+    text-shadow: 0 4px 12px rgba(0,0,0,0.8);
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    background: linear-gradient(135deg, #46178f 0%, #22084d 100%);
-    color: #fff;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1), transform 0.5s ease;
-    user-select: none;
-    text-align: center;
-    padding: 10px;
+    pointer-events: none;
 }
-.obstacle-piece-tile.piece-unlocked {
-    opacity: 0 !important;
-    pointer-events: none !important;
-}
-.obstacle-piece-tile.piece-locked {
-    opacity: 1;
-}
-.p-tile-num {
-    font-size: 2rem;
-    font-weight: 900;
-    text-shadow: 0 2px 8px rgba(0,0,0,0.6);
-}
-.p-tile-state {
+.piece-badge {
     font-size: 0.75rem;
-    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 12px;
+    background: rgba(0,0,0,0.5);
+    color: #f2994a;
+    border: 1px solid rgba(242, 153, 74, 0.5);
     margin-top: 4px;
-    opacity: 0.85;
 }
+
+/* STICKY BOTTOM BUZZER */
 .bottom-buzz-bar {
     position: fixed;
     bottom: 0; left: 0; right: 0;
-    background: rgba(24, 14, 43, 0.95);
+    padding: 16px 20px;
+    background: rgba(18, 10, 32, 0.95);
     backdrop-filter: blur(12px);
-    padding: 14px 20px;
+    border-top: 2px solid rgba(255, 255, 255, 0.15);
     display: flex;
     justify-content: center;
-    z-index: 999;
-    box-shadow: 0 -8px 24px rgba(0,0,0,0.4);
-    border-top: 1px solid rgba(255,255,255,0.1);
+    z-index: 1000;
+    box-shadow: 0 -8px 30px rgba(0,0,0,0.6);
 }
 .btn-buzz {
-    background: linear-gradient(135deg, #e21b3c 0%, #ff4757 100%);
+    background: linear-gradient(135deg, #e21b3c 0%, #b3122c 100%);
     color: #fff !important;
-    font-size: 1.35rem;
-    font-weight: 800;
-    padding: 14px 42px;
-    border-radius: 50px;
-    border: none;
-    box-shadow: 0 8px 24px rgba(226, 27, 60, 0.5);
-    transition: all 0.25s ease;
+    font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+    font-size: 1.4rem;
+    font-weight: 900;
     letter-spacing: 0.5px;
+    border-radius: 50px;
+    padding: 16px 48px;
+    border: 3px solid #fff;
+    box-shadow: 0 8px 24px rgba(226, 27, 60, 0.55);
+    transition: all 0.25s ease;
     animation: buzzPulse 1.8s infinite;
+    max-width: 600px;
+    width: 100%;
 }
 .btn-buzz:hover:not(:disabled) {
     transform: translateY(-2px) scale(1.03);
@@ -153,10 +191,16 @@ require_once __DIR__ . '/header.php';
 }
 .btn-buzz-disabled {
     background: #4a4a58 !important;
-    color: #999 !important;
+    color: #bbb !important;
     cursor: not-allowed !important;
     animation: none !important;
     box-shadow: none !important;
+    font-size: 1.15rem !important;
+}
+.vcnv-badge {
+    font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.5px;
 }
 
 /* MODALS */
@@ -187,13 +231,6 @@ require_once __DIR__ . '/header.php';
     from { opacity: 0; transform: scale(0.9); }
     to { opacity: 1; transform: scale(1); }
 }
-.countdown-ring {
-    font-size: 2.8rem;
-    font-weight: 900;
-    color: #e21b3c;
-    margin: 12px 0;
-    text-shadow: 0 2px 10px rgba(226, 27, 60, 0.5);
-}
 </style>
 
 <div class="player-obstacle-wrapper">
@@ -201,7 +238,7 @@ require_once __DIR__ . '/header.php';
     <!-- TOP BAR -->
     <div class="player-top-bar">
         <div class="d-flex align-items-center">
-            <span class="badge badge-warning text-dark font-weight-bold px-3 py-1 mr-2" style="font-size: 0.9rem;">
+            <span class="badge badge-warning text-dark font-weight-bold px-3 py-1 mr-2 vcnv-badge" style="font-size: 0.9rem;">
                 <i class="fas fa-puzzle-piece mr-1"></i> VƯỢT CHƯỚNG NGẠI VẬT
             </span>
             <span class="font-weight-bold d-none d-sm-inline"><?= htmlspecialchars($nickname) ?></span>
@@ -214,13 +251,13 @@ require_once __DIR__ . '/header.php';
     </div>
 
     <!-- PUZZLE CONTAINER -->
-    <?php if ($isDisqualified): ?>
-        <div class="alert alert-danger font-weight-bold text-center py-3 px-4 shadow mb-4" style="border-radius: 16px; background: rgba(226, 27, 60, 0.95); border: 2px solid #fff; color: #fff;">
-            <i class="fas fa-ban fa-2x d-block mb-2 text-white"></i>
-            <h4 class="font-weight-bold mb-1">BẠN ĐÃ BỊ HỦY TƯ CÁCH THI ĐẤU!</h4>
-            <p class="mb-0 small" style="opacity: 0.95;">
-                Do bạn đã bấm chuông và đoán sai từ khóa bức tranh bí mật, bạn đã bị hủy tư cách chơi ở tất cả các vòng tiếp theo. Hãy theo dõi các người chơi còn lại thi đấu.
-            </p>
+    <?php if ($isDisqualified && !$allOpened): ?>
+        <div class="alert alert-warning font-weight-bold text-center py-2 px-3 shadow-sm mb-3" style="border-radius: 14px; font-size: 0.9rem; background: #fff3cd; color: #856404; border: 1px solid #ffeeba;">
+            <i class="fas fa-info-circle mr-1 text-warning"></i> Bạn đã đoán sai từ khóa nên bị tạm khóa quyền bấm chuông trong các mảnh này. Bạn vẫn được tham gia trả lời câu hỏi và cộng điểm bình thường. Chuông sẽ được mở lại cho bạn khi mở hết các mảnh ghép!
+        </div>
+    <?php elseif ($allOpened): ?>
+        <div class="alert alert-success font-weight-bold text-center py-2 px-3 shadow-sm mb-3" style="border-radius: 14px; font-size: 0.95rem; background: #d4edda; color: #155724; border: 1px solid #c3e6cb;">
+            <i class="fas fa-unlock-alt mr-1 text-success"></i> TẤT CẢ MẢNH GHÉP ĐÃ ĐƯỢC MỞ! Chuông đoán từ khóa đã được mở lại cho TẤT CẢ người chơi. Hãy nhanh tay bấm chuông giành quyền trả lời!
         </div>
     <?php endif; ?>
 
@@ -235,38 +272,46 @@ require_once __DIR__ . '/header.php';
         </div>
 
         <div class="obstacle-puzzle-container">
-            <!-- Ảnh bí mật lớn nằm ở tầng nền dưới -->
             <?php if ($secretImageUrl): ?>
-                <img src="<?= htmlspecialchars($secretImageUrl) ?>" class="obstacle-secret-img" alt="Secret Puzzle" id="secretImg">
+                <img src="<?= htmlspecialchars($secretImageUrl) ?>" class="obstacle-secret-img" alt="Bức tranh bí mật">
             <?php endif; ?>
 
-            <!-- Lưới các mảnh ghép che bên trên -->
-            <div class="obstacle-grid-overlay cols-<?= $cols ?> rows-<?= $rows ?>" id="puzzleGrid">
+            <div class="obstacle-grid-overlay grid-cols-<?= $cols ?> grid-rows-<?= $rows ?>" id="playerPiecesGrid">
                 <?php for ($p = 1; $p <= $totalPieces; $p++): 
-                    $isUnlocked = in_array($p, $myUnlocked);
+                    $isPieceUnlocked = in_array($p, $myUnlocked);
                 ?>
-                    <div class="obstacle-piece-tile <?= $isUnlocked ? 'piece-unlocked' : 'piece-locked' ?>" 
-                         id="pieceTile_<?= $p ?>">
-                        <div class="p-tile-num">🧩 <?= $p ?></div>
-                        <div class="p-tile-state">
-                            <?= in_array($p, $openedPieces) ? 'Đã mở câu hỏi' : 'Đang che kín' ?>
+                    <div class="obstacle-piece-tile <?= $isPieceUnlocked ? 'piece-unlocked' : 'piece-locked' ?>" 
+                         id="pieceTile_<?= $p ?>"
+                         data-piece="<?= $p ?>">
+                        <div class="piece-label">
+                            <span>🧩 <?= $p ?></span>
+                            <span class="piece-badge"><i class="fas fa-lock mr-1"></i> BÍ MẬT</span>
                         </div>
                     </div>
                 <?php endfor; ?>
             </div>
+        </div>
+
+        <div class="mt-3 text-center text-white-50 small">
+            <i class="fas fa-lightbulb text-warning mr-1"></i>
+            Trả lời đúng các câu hỏi để mở từng mảnh ghép của riêng bạn, hoặc bấm chuông bên dưới để đoán từ khóa bức tranh!
         </div>
     </div>
 </div>
 
 <!-- NÚT BẤM CHUÔNG STICKY Ở ĐÁY MÀN HÌNH -->
 <div class="bottom-buzz-bar">
-    <?php if ($isDisqualified): ?>
-        <button type="button" class="btn btn-buzz btn-buzz-disabled" disabled>
-            <i class="fas fa-ban mr-2"></i> BẠN ĐÃ BỊ HỦY TƯ CÁCH THI ĐẤU
+    <?php if ($isDisqualified && !$allOpened): ?>
+        <button type="button" class="btn btn-buzz btn-buzz-disabled" disabled id="btnBuzz">
+            <i class="fas fa-lock mr-2"></i> TẠM KHÓA CHUÔNG (CHỜ MỞ HẾT MẢNH)
+        </button>
+    <?php elseif ($isDisqualified && $allOpened): ?>
+        <button type="button" class="btn btn-buzz btn-buzz-disabled" disabled id="btnBuzz">
+            <i class="fas fa-ban mr-2"></i> ĐÃ HẾT LƯỢT ĐOÁN
         </button>
     <?php else: ?>
         <button type="button" class="btn btn-buzz" id="btnBuzz" onclick="claimBuzzer()">
-            <i class="fas fa-bell mr-2"></i> 🔔 ĐOÁN BỨC TRANH
+            <i class="fas fa-bell mr-2"></i> ĐOÁN BỨC TRANH
         </button>
     <?php endif; ?>
 </div>
@@ -277,19 +322,28 @@ require_once __DIR__ . '/header.php';
         <h3 class="font-weight-bold text-warning mb-1">
             🔔 LƯỢT ĐOÁN CỦA BẠN!
         </h3>
-        <p class="text-muted small">Nhập từ khóa bức tranh bí mật trước khi hết giờ:</p>
-        
-        <div class="countdown-ring" id="guessCountdown">20</div>
+        <p class="text-white-50 small mb-3">Nhập từ khóa bức tranh bí mật:</p>
 
+        <!-- FORM NHẬP CÂU TRẢ LỜI (KHÔNG CÒN ĐẾM NGƯỢC THỜI GIAN) -->
         <form id="guessForm" onsubmit="submitGuess(event)">
-            <div class="form-group">
+            <div class="form-group mb-3">
                 <input type="text" id="guessInput" class="form-control form-control-lg text-center font-weight-bold" 
                        placeholder="Nhập từ khóa đáp án..." autocomplete="off" required>
             </div>
-            <button type="submit" class="btn btn-kahoot btn-kahoot-green btn-lg btn-block font-weight-bold" id="btnSubmitGuess">
+            <button type="submit" class="btn btn-kahoot btn-kahoot-green btn-lg btn-block font-weight-bold shadow" id="btnSubmitGuess">
                 <i class="fas fa-paper-plane mr-1"></i> XÁC NHẬN ĐÁP ÁN
             </button>
         </form>
+
+        <!-- TRẠNG THÁI ĐÃ GỬI VÀ CHỜ HOST XÁC NHẬN -->
+        <div id="guessWaitingHost" style="display: none;" class="py-3">
+            <div class="spinner-border text-warning mb-3" style="width: 3.2rem; height: 3.2rem;" role="status"></div>
+            <h4 class="font-weight-bold text-white mb-2">ĐÃ GỬI CÂU TRẢ LỜI!</h4>
+            <div class="p-2 mb-2 rounded bg-dark border border-secondary text-warning font-weight-bold" id="submittedGuessDisplay" style="font-size: 1.3rem; word-break: break-word;">
+                ...
+            </div>
+            <p class="text-white-50 small mb-0">Đang chờ Host xác nhận đáp án của bạn...</p>
+        </div>
     </div>
 </div>
 
@@ -300,8 +354,8 @@ require_once __DIR__ . '/header.php';
         <h4 class="font-weight-bold text-white mb-2" id="lockedPlayerNotice">
             CÓ NGƯỜI CHƠI BẤM CHUÔNG!
         </h4>
-        <p class="text-white-50 mb-4">
-            Phòng chơi đang tạm khóa trong 20 giây để người chơi đó gửi từ khóa đáp án. Vui lòng chờ...
+        <p class="text-white-50 mb-4" id="lockedPlayerSubtext">
+            Phòng chơi đang tạm khóa để người chơi trả lời và Host xác nhận. Vui lòng chờ...
         </p>
         <div class="spinner-border text-danger" role="status"></div>
     </div>
@@ -334,9 +388,8 @@ const roomId = <?= $roomId ?>;
 const playerId = <?= $playerId ?>;
 const playerToken = '<?= htmlspecialchars($token) ?>';
 let isDisqualified = <?= $isDisqualified ? 'true' : 'false' ?>;
+let isAllOpened = <?= $allOpened ? 'true' : 'false' ?>;
 let isMyTurnToGuess = false;
-let guessTimer = null;
-let guessSecondsLeft = 20;
 let winnerDeclared = false;
 
 function playBuzzerSound() {
@@ -375,26 +428,11 @@ function claimBuzzer() {
 
 function openGuessModal() {
     isMyTurnToGuess = true;
-    $('#guessModal').css('display', 'flex');
+    $('#guessForm').show();
+    $('#guessWaitingHost').hide();
     $('#guessInput').val('').focus();
-    guessSecondsLeft = 20;
-    $('#guessCountdown').text(guessSecondsLeft);
-
-    clearInterval(guessTimer);
-    guessTimer = setInterval(function() {
-        guessSecondsLeft--;
-        $('#guessCountdown').text(guessSecondsLeft);
-        if (guessSecondsLeft <= 0) {
-            clearInterval(guessTimer);
-            $('#guessModal').hide();
-            isMyTurnToGuess = false;
-            // Báo timeout
-            $.post('<?= BASE_URL ?>modules/api/obstacle_action.php?action=buzzer_timeout&id_room=' + roomId);
-            isDisqualified = true;
-            $('#btnBuzz').replaceWith('<button type="button" class="btn btn-buzz btn-buzz-disabled" disabled><i class="fas fa-ban mr-2"></i> BẠN ĐÃ BỊ HỦY TƯ CÁCH THI ĐẤU</button>');
-            alert('Hết 20 giây! Bạn đã bị hủy tư cách thi đấu ở các vòng sau.');
-        }
-    }, 1000);
+    $('#btnSubmitGuess').prop('disabled', false).html('<i class="fas fa-paper-plane mr-1"></i> XÁC NHẬN ĐÁP ÁN');
+    $('#guessModal').css('display', 'flex');
 }
 
 function submitGuess(e) {
@@ -402,30 +440,20 @@ function submitGuess(e) {
     const guessText = $('#guessInput').val().trim();
     if (!guessText) return;
 
-    clearInterval(guessTimer);
-    $('#btnSubmitGuess').prop('disabled', true).text('Đang kiểm tra...');
+    $('#btnSubmitGuess').prop('disabled', true).html('<i class="fas fa-spinner fa-spin mr-1"></i> Đang gửi...');
 
     $.post('<?= BASE_URL ?>modules/api/obstacle_action.php?action=submit_guess&id_room=' + roomId, {
         id_player: playerId,
         token: playerToken,
         guess: guessText
     }, function(res) {
-        $('#guessModal').hide();
-        $('#btnSubmitGuess').prop('disabled', false).html('<i class="fas fa-paper-plane mr-1"></i> XÁC NHẬN ĐÁP ÁN');
-        isMyTurnToGuess = false;
-
         if (res && res.success) {
-            if (res.correct) {
-                revealEntirePuzzle(res.winner_name, res.answer);
-            } else {
-                isDisqualified = true;
-                $('#btnBuzz').replaceWith('<button type="button" class="btn btn-buzz btn-buzz-disabled" disabled><i class="fas fa-ban mr-2"></i> BẠN ĐÃ BỊ HỦY TƯ CÁCH THI ĐẤU</button>');
-                alert(res.message || 'Đáp án chưa chính xác! Bạn đã bị hủy tư cách chơi các vòng sau.');
-                if (res.all_disqualified) {
-                    window.location.href = '<?= BASE_URL ?>modules/player/play.php?pid=' + playerId + '&token=' + encodeURIComponent(playerToken);
-                }
-            }
+            // Chuyển modal sang trạng thái chờ Host xác nhận
+            $('#guessForm').hide();
+            $('#submittedGuessDisplay').text('"' + guessText + '"');
+            $('#guessWaitingHost').show();
         } else {
+            $('#btnSubmitGuess').prop('disabled', false).html('<i class="fas fa-paper-plane mr-1"></i> XÁC NHẬN ĐÁP ÁN');
             alert(res.message || 'Lỗi gửi đáp án');
         }
     }, 'json').fail(function() {
@@ -450,9 +478,14 @@ const pollInterval = setInterval(function() {
     $.getJSON('<?= BASE_URL ?>modules/api/obstacle_action.php?action=get_obstacle_state&id_room=' + roomId + '&pid=' + playerId, function(data) {
         if (!data || !data.success) return;
 
-        // 1. Nếu trò chơi đã kết thúc hoặc tất cả người chơi bị loại
-        if (data.status === 'finished' || data.all_disqualified) {
+        // 1. Nếu trò chơi đã kết thúc
+        if (data.status === "finished") {
             clearInterval(pollInterval);
+            $('#guessModal').hide();
+            $('#roomLockedModal').hide();
+            if (data.all_disqualified) {
+                alert('Tất cả người chơi đều đã trả lời sai từ khóa bức tranh! Trò chơi kết thúc, người chiến thắng được xếp hạng theo số điểm.');
+            }
             window.location.href = '<?= BASE_URL ?>modules/player/play.php?pid=' + playerId + '&token=' + encodeURIComponent(playerToken);
             return;
         }
@@ -468,11 +501,13 @@ const pollInterval = setInterval(function() {
         if (data.is_revealed && data.winner_player_name && !winnerDeclared) {
             winnerDeclared = true;
             clearInterval(pollInterval);
+            $('#guessModal').hide();
+            $('#roomLockedModal').hide();
             revealEntirePuzzle(data.winner_player_name, data.obstacle_answer);
             return;
         }
 
-        // 3. Xử lý Buzzer
+        // 4. Xử lý Buzzer
         if (data.buzzer_status === 'buzzing') {
             if (data.buzzer_player_id === playerId) {
                 // Đây là lượt của chính mình
@@ -482,6 +517,27 @@ const pollInterval = setInterval(function() {
             } else {
                 // Người chơi khác bấm chuông: Khóa màn hình
                 $('#lockedPlayerNotice').text('🔔 ' + (data.buzzer_player_name || 'Người chơi') + ' ĐANG BẤM CHUÔNG!');
+                $('#lockedPlayerSubtext').text('Người chơi đang nhập câu trả lời...');
+                if (!$('#roomLockedModal').is(':visible')) {
+                    playBuzzerSound();
+                    $('#roomLockedModal').css('display', 'flex');
+                }
+            }
+        } else if (data.buzzer_status === 'pending_review') {
+            if (data.buzzer_player_id === playerId) {
+                // Mình đã gửi đáp án, đang chờ Host duyệt
+                if (!$('#guessModal').is(':visible')) {
+                    $('#guessModal').css('display', 'flex');
+                }
+                $('#guessForm').hide();
+                if (data.buzzer_guess) {
+                    $('#submittedGuessDisplay').text('"' + data.buzzer_guess + '"');
+                }
+                $('#guessWaitingHost').show();
+            } else {
+                // Người chơi khác đã gửi đáp án, đang chờ Host xác nhận
+                $('#lockedPlayerNotice').text('🔔 ' + (data.buzzer_player_name || 'Người chơi') + ' ĐÃ GỬI CÂU TRẢ LỜI!');
+                $('#lockedPlayerSubtext').text('Đang chờ Host xác nhận đáp án...');
                 if (!$('#roomLockedModal').is(':visible')) {
                     playBuzzerSound();
                     $('#roomLockedModal').css('display', 'flex');
@@ -492,21 +548,56 @@ const pollInterval = setInterval(function() {
             if ($('#roomLockedModal').is(':visible')) {
                 $('#roomLockedModal').hide();
             }
+            if (isMyTurnToGuess) {
+                isMyTurnToGuess = false;
+                $('#guessModal').hide();
+                $('#guessForm').show();
+                $('#guessWaitingHost').hide();
+
+                // Kiểm tra nếu mình vừa bị Host đánh dấu là SAI
+                if (data.my_is_disqualified) {
+                    isDisqualified = true;
+                    if (data.all_pieces_opened) {
+                        $('#btnBuzz').replaceWith('<button type="button" class="btn btn-buzz btn-buzz-disabled" disabled id="btnBuzz"><i class="fas fa-ban mr-2"></i> ĐÃ HẾT LƯỢT ĐOÁN</button>');
+                        alert('Host đã xác nhận đáp án chưa chính xác! Bạn đã mất quyền đoán từ khóa bức tranh.');
+                    } else {
+                        $('#btnBuzz').replaceWith('<button type="button" class="btn btn-buzz btn-buzz-disabled" disabled id="btnBuzz"><i class="fas fa-lock mr-2"></i> TẠM KHÓA CHUÔNG (CHỜ MỞ HẾT MẢNH)</button>');
+                        alert('Host đã xác nhận đáp án chưa chính xác! Bạn bị tạm khóa quyền bấm chuông. Bạn vẫn được tham gia trả lời các câu hỏi tiếp theo và chuông sẽ được mở lại khi mở hết các mảnh ghép.');
+                    }
+                }
+            }
         }
 
-        // 4. Đồng bộ các mảnh ghép đã mở của cá nhân người chơi
-        if (data.my_unlocked_pieces && Array.isArray(data.my_unlocked_pieces)) {
-            data.my_unlocked_pieces.forEach(function(pIdx) {
-                $('#pieceTile_' + pIdx).removeClass('piece-locked').addClass('piece-unlocked');
-            });
-            $('#unlockedCountBadge').text(data.my_unlocked_pieces.length + ' / ' + data.total_pieces + ' Mảnh đã mở');
+        // 5. Đồng bộ khi mở hết mảnh ghép (all_pieces_opened)
+        if (data.all_pieces_opened) {
+            isAllOpened = true;
+            $('.obstacle-piece-tile').removeClass('piece-locked').addClass('piece-unlocked');
+            $('#unlockedCountBadge').text(data.total_pieces + ' / ' + data.total_pieces + ' Mảnh đã mở');
+            // Nếu người chơi chưa bấm chuông sai ở vòng cuối này: Mở nút chuông!
+            if (!data.my_is_disqualified) {
+                isDisqualified = false;
+                if ($('#btnBuzz').hasClass('btn-buzz-disabled')) {
+                    $('#btnBuzz').replaceWith('<button type="button" class="btn btn-buzz" id="btnBuzz" onclick="claimBuzzer()"><i class="fas fa-bell mr-2"></i> ĐOÁN BỨC TRANH</button>');
+                }
+            }
+        } else {
+            // Đồng bộ các mảnh ghép đã mở của cá nhân người chơi
+            if (data.my_unlocked_pieces && Array.isArray(data.my_unlocked_pieces)) {
+                data.my_unlocked_pieces.forEach(function(pIdx) {
+                    $('#pieceTile_' + pIdx).removeClass('piece-locked').addClass('piece-unlocked');
+                });
+                $('#unlockedCountBadge').text(data.my_unlocked_pieces.length + ' / ' + data.total_pieces + ' Mảnh đã mở');
+            }
         }
 
-        // 5. Đồng bộ trạng thái bị loại
+        // 6. Đồng bộ trạng thái bị khóa chuông
         if (data.my_is_disqualified && !isDisqualified) {
             isDisqualified = true;
-            $('#btnBuzz').replaceWith('<button type="button" class="btn btn-buzz btn-buzz-disabled" disabled><i class="fas fa-ban mr-2"></i> BẠN ĐÃ BỊ HỦY TƯ CÁCH THI ĐẤU</button>');
-            window.location.reload();
+            if (data.all_pieces_opened) {
+                $('#btnBuzz').replaceWith('<button type="button" class="btn btn-buzz btn-buzz-disabled" disabled id="btnBuzz"><i class="fas fa-ban mr-2"></i> ĐÃ HẾT LƯỢT ĐOÁN</button>');
+            } else {
+                $('#btnBuzz').replaceWith('<button type="button" class="btn btn-buzz btn-buzz-disabled" disabled id="btnBuzz"><i class="fas fa-lock mr-2"></i> TẠM KHÓA CHUÔNG (CHỜ MỞ HẾT MẢNH)</button>');
+            }
         }
     });
 }, 750);

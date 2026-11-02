@@ -40,10 +40,6 @@ if (!$playerCheck) {
     echo json_encode(['success' => false, 'message' => 'Player not found in this room']);
     exit;
 }
-if (!empty($playerCheck['is_disqualified_obstacle']) && ($room['game_type'] ?? 'classic') === 'obstacle') {
-    echo json_encode(['success' => false, 'disqualified' => true, 'message' => 'Bạn đã bị hủy tư cách thi đấu do đoán sai từ khóa chướng ngại vật!']);
-    exit;
-}
 $currentStreak = intval($playerCheck['current_streak'] ?? 0);
 
 try {

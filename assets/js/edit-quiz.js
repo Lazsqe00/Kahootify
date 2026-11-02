@@ -47,23 +47,23 @@ function updateQuestionNumberLabels() {
     if (!listEl) return;
     var items = listEl.querySelectorAll('.q-list-item');
     items.forEach(function (item, idx) {
+        var pIdx = idx + 1;
+        item.dataset.piece = pIdx;
         var numEl = item.querySelector('.q-thumb-num');
         if (numEl) {
             if (EQ.gameType === 'obstacle') {
-                var pIdx = item.dataset.piece || (idx + 1);
-                numEl.textContent = '🧩 Mảnh ' + pIdx;
+                numEl.textContent = '🧩 Tile ' + pIdx;
             } else {
-                numEl.textContent = 'Q' + (idx + 1);
+                numEl.textContent = 'Q' + pIdx;
             }
         }
         if (editingQuestionId && item.dataset.id == editingQuestionId) {
             var label = document.getElementById('canvasModeLabel');
             if (label) {
                 if (EQ.gameType === 'obstacle') {
-                    var pIdx = item.dataset.piece || (idx + 1);
-                    label.textContent = 'Sửa câu hỏi Mảnh ' + pIdx;
+                    label.textContent = 'Edit Question for Tile ' + pIdx;
                 } else {
-                    label.textContent = 'Editing Question ' + (idx + 1);
+                    label.textContent = 'Editing Question ' + pIdx;
                 }
             }
         }
@@ -367,6 +367,17 @@ function initFormValidation() {
             localStorage.setItem('kahoot_qtype_' + EQ.quizId, document.getElementById('propQuestionType').value);
         } catch (err) {}
 
+        var formAction = document.getElementById('formAction').value;
+        if (formAction === 'add_question' && EQ.gameType === 'obstacle') {
+            var curItems = document.querySelectorAll('.q-list-item');
+            var maxPieces = EQ.totalPieces || 4;
+            if (curItems.length >= maxPieces) {
+                e.preventDefault();
+                alert('This quiz already has all ' + maxPieces + ' questions for ' + maxPieces + ' tiles. Cannot add more questions!');
+                return;
+            }
+        }
+
         var qText = (document.getElementById('questionTextInput').value || '').trim();
         if (!qText) {
             e.preventDefault();
@@ -427,11 +438,25 @@ function isFormDirty() {
 }
 
 function resetToNewMode() {
+    if (EQ.gameType === 'obstacle') {
+        var curItems = document.querySelectorAll('.q-list-item');
+        var maxPieces = EQ.totalPieces || 4;
+        if (curItems.length >= maxPieces) {
+            alert('This quiz already has all ' + maxPieces + ' questions for ' + maxPieces + ' tiles. Cannot add more questions!');
+            return;
+        }
+    }
+
     editingQuestionId = null;
     document.getElementById('formAction').value          = 'add_question';
     document.getElementById('editingQuestionId').value   = '';
     document.getElementById('questionTextInput').value   = '';
-    document.getElementById('canvasModeLabel').textContent = 'New Question';
+    if (EQ.gameType === 'obstacle') {
+        var nextP = document.querySelectorAll('.q-list-item').length + 1;
+        document.getElementById('canvasModeLabel').textContent = 'Create Question for Tile ' + nextP;
+    } else {
+        document.getElementById('canvasModeLabel').textContent = 'New Question';
+    }
     document.getElementById('btnCancelEdit').style.display  = 'none';
     document.getElementById('btnSaveQuestion').innerHTML = '<i class="fas fa-plus mr-1"></i> Save &amp; Add Question';
 
@@ -479,20 +504,21 @@ function resetToNewMode() {
     var wagerSpeedEl = document.getElementById('propWagerSpeedBonus');
     if (wagerSpeedEl) wagerSpeedEl.checked = false;
 
-    if (document.getElementById('propPieceIndex')) {
+    if (EQ.gameType === 'obstacle') {
         var nextPiece = 1;
         if (EQ.questions && EQ.questions.length > 0) {
             var used = EQ.questions.map(function(item) { return parseInt(item.piece_index, 10) || 0; });
-            for (var p = 1; p <= (EQ.totalPieces || 9); p++) {
+            for (var p = 1; p <= (EQ.totalPieces || 25); p++) {
                 if (used.indexOf(p) === -1) { nextPiece = p; break; }
             }
             if (nextPiece === 1 && used.indexOf(1) !== -1) {
                 nextPiece = Math.min(EQ.questions.length + 1, EQ.totalPieces || 9);
             }
         }
-        document.getElementById('propPieceIndex').value = nextPiece;
         var hPi = document.getElementById('hiddenPieceIndex');
         if (hPi) hPi.value = nextPiece;
+        var piEl = document.getElementById('propPieceIndex');
+        if (piEl) piEl.value = nextPiece;
     }
     syncPropsToForm();
 }
@@ -517,7 +543,11 @@ window.loadQuestionForEdit = function (questionId) {
     document.querySelectorAll('.q-list-item').forEach(function (el, idx) {
         if (el.dataset.id == questionId) qIdx = idx + 1;
     });
-    document.getElementById('canvasModeLabel').textContent = 'Editing Question ' + qIdx;
+    if (EQ.gameType === 'obstacle') {
+        document.getElementById('canvasModeLabel').textContent = 'Edit Question for Tile ' + (q.piece_index || qIdx);
+    } else {
+        document.getElementById('canvasModeLabel').textContent = 'Editing Question ' + qIdx;
+    }
     document.getElementById('btnCancelEdit').style.display = '';
     document.getElementById('btnSaveQuestion').innerHTML   = '<i class="fas fa-check mr-1"></i> Update Question';
 
@@ -547,11 +577,12 @@ window.loadQuestionForEdit = function (questionId) {
     if (wagerTimeEl) wagerTimeEl.value = cfg.wagerTimeSec || 10;
     if (wagerSpeedEl) wagerSpeedEl.checked = !!cfg.speedBonusEnabled;
 
-    if (document.getElementById('propPieceIndex')) {
-        var piVal = q.piece_index || 1;
-        document.getElementById('propPieceIndex').value = piVal;
+    if (EQ.gameType === 'obstacle') {
+        var piVal = q.piece_index || qIdx || 1;
         var hPi = document.getElementById('hiddenPieceIndex');
         if (hPi) hPi.value = piVal;
+        var piEl = document.getElementById('propPieceIndex');
+        if (piEl) piEl.value = piVal;
     }
     syncPropsToForm();
 
@@ -603,6 +634,14 @@ window.loadQuestionForEdit = function (questionId) {
 };
 
 window.duplicateQuestion = function (questionId) {
+    if (EQ.gameType === 'obstacle') {
+        var items = document.querySelectorAll('.q-list-item');
+        var maxAllowed = EQ.totalPieces || 4;
+        if (items.length >= maxAllowed) {
+            alert('This Puzzle quiz already has all ' + maxAllowed + ' questions for ' + maxAllowed + ' tiles. Cannot duplicate more questions!');
+            return;
+        }
+    }
     fetch(EQ.baseUrl + 'modules/api/duplicate_question.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
