@@ -124,8 +124,12 @@ if ($action === 'return_to_board') {
     if (!is_array($openedPieces)) $openedPieces = [];
     $totalPieces = intval($room['total_pieces'] ?? 4);
 
+    $gameConfig = !empty($room['game_config']) ? json_decode($room['game_config'], true) : [];
+    if (!is_array($gameConfig)) $gameConfig = [];
+
     // Nếu đã mở hết tất cả các mảnh ghép, reset lại quyền bấm chuông cho TẤT CẢ người chơi!
     if (count($openedPieces) >= $totalPieces) {
+        $gameConfig['final_round_reset'] = true;
         db_execute("UPDATE players SET is_disqualified_obstacle = 0 WHERE id_room = :r", [':r' => $roomId]);
     }
 
@@ -135,9 +139,13 @@ if ($action === 'return_to_board') {
              buzzer_status = 'idle', 
              buzzer_player_id = NULL, 
              buzzer_guess = NULL, 
-             buzzer_time = NULL 
+             buzzer_time = NULL,
+             game_config = :gc
          WHERE id_room = :r",
-        [':r' => $roomId]
+        [
+            ':gc' => json_encode($gameConfig),
+            ':r'  => $roomId
+        ]
     );
 
     echo json_encode(['success' => true]);
@@ -190,16 +198,32 @@ if ($action === 'buzz') {
         exit;
     }
 
+    $gameConfig = !empty($room['game_config']) ? json_decode($room['game_config'], true) : [];
+    if (!is_array($gameConfig)) $gameConfig = [];
+
+    // Nếu đang trong câu hỏi (status là id câu hỏi), lưu số giây còn lại để đóng băng timer của host và người chơi
+    if (is_numeric($room['status']) && intval($room['status']) > 0) {
+        $qId = intval($room['status']);
+        $qRow = db_fetch_one("SELECT time_limit FROM questions WHERE id_question = :q", [':q' => $qId]);
+        $tLimit = intval($qRow['time_limit'] ?? 20);
+        $elapsed = time() - intval($room['question_start_time'] ?? time());
+        $rem = max(1, $tLimit - $elapsed);
+        $gameConfig['paused_remaining_seconds'] = $rem;
+        $gameConfig['paused_time_limit'] = $tLimit;
+    }
+
     $affected = db_execute(
         "UPDATE room 
          SET buzzer_status = 'buzzing', 
              buzzer_player_id = :p, 
              buzzer_guess = NULL, 
-             buzzer_time = UNIX_TIMESTAMP() 
+             buzzer_time = UNIX_TIMESTAMP(),
+             game_config = :gc
          WHERE id_room = :r AND buzzer_status = 'idle'",
         [
-            ':p' => $playerId,
-            ':r' => $roomId
+            ':p'  => $playerId,
+            ':gc' => json_encode($gameConfig),
+            ':r'  => $roomId
         ]
     );
 
@@ -232,8 +256,31 @@ if ($action === 'submit_guess') {
         exit;
     }
 
+    // Nếu người chơi nhấn chuông nhưng không nhập đáp án: MẤT QUYỀN BẤM CHUÔNG!
     if ($guess === '') {
-        echo json_encode(['success' => false, 'message' => 'Vui lòng nhập câu trả lời!']);
+        db_execute("UPDATE players SET is_disqualified_obstacle = 1 WHERE id_player = :p", [':p' => $playerId]);
+
+        $gameConfig = !empty($room['game_config']) ? json_decode($room['game_config'], true) : [];
+        if (!is_array($gameConfig)) $gameConfig = [];
+        $updateSql = "UPDATE room SET buzzer_status = 'idle', buzzer_player_id = NULL, buzzer_guess = NULL, buzzer_time = NULL";
+        $updateParams = [':r' => $roomId];
+        if (!empty($gameConfig['paused_remaining_seconds'])) {
+            $rem = intval($gameConfig['paused_remaining_seconds']);
+            $tLim = intval($gameConfig['paused_time_limit'] ?? 20);
+            $newStartTime = time() - ($tLim - $rem);
+            unset($gameConfig['paused_remaining_seconds'], $gameConfig['paused_time_limit']);
+            $updateSql .= ", question_start_time = :st, game_config = :gc";
+            $updateParams[':st'] = $newStartTime;
+            $updateParams[':gc'] = json_encode($gameConfig);
+        }
+        $updateSql .= " WHERE id_room = :r";
+        db_execute($updateSql, $updateParams);
+
+        echo json_encode([
+            'success'      => false,
+            'disqualified' => true,
+            'message'      => 'Bạn không nhập câu trả lời nên bị mất quyền bấm chuông!'
+        ]);
         exit;
     }
 
@@ -258,6 +305,48 @@ if ($action === 'submit_guess') {
         'guess'          => $guess,
         'message'        => 'Câu trả lời đã được gửi tới Host! Vui lòng chờ Host xác nhận.'
     ]);
+    exit;
+}
+
+// 4b. NGƯỜI BẤM CHUÔNG HỦY HOẶC HẾT THỜI GIAN NHẬP ĐÁP ÁN (BỊ MẤT QUYỀN ĐOÁN)
+if ($action === 'cancel_or_timeout_guess') {
+    $playerId = intval($_POST['id_player'] ?? ($jsonData['id_player'] ?? 0));
+    $token    = trim($_POST['token'] ?? ($jsonData['token'] ?? ''));
+
+    if ($playerId <= 0 || !player_request_is_valid($playerId, $roomId, $token)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Phiên người chơi không hợp lệ']);
+        exit;
+    }
+
+    if ($room['buzzer_status'] === 'buzzing' && intval($room['buzzer_player_id']) === $playerId) {
+        db_execute("UPDATE players SET is_disqualified_obstacle = 1 WHERE id_player = :p", [':p' => $playerId]);
+
+        $gameConfig = !empty($room['game_config']) ? json_decode($room['game_config'], true) : [];
+        if (!is_array($gameConfig)) $gameConfig = [];
+        $updateSql = "UPDATE room SET buzzer_status = 'idle', buzzer_player_id = NULL, buzzer_guess = NULL, buzzer_time = NULL";
+        $updateParams = [':r' => $roomId];
+        if (!empty($gameConfig['paused_remaining_seconds'])) {
+            $rem = intval($gameConfig['paused_remaining_seconds']);
+            $tLim = intval($gameConfig['paused_time_limit'] ?? 20);
+            $newStartTime = time() - ($tLim - $rem);
+            unset($gameConfig['paused_remaining_seconds'], $gameConfig['paused_time_limit']);
+            $updateSql .= ", question_start_time = :st, game_config = :gc";
+            $updateParams[':st'] = $newStartTime;
+            $updateParams[':gc'] = json_encode($gameConfig);
+        }
+        $updateSql .= " WHERE id_room = :r";
+        db_execute($updateSql, $updateParams);
+
+        echo json_encode([
+            'success'      => true,
+            'disqualified' => true,
+            'message'      => 'Bạn đã không đưa ra câu trả lời và bị mất quyền bấm chuông!'
+        ]);
+        exit;
+    }
+
+    echo json_encode(['success' => false, 'message' => 'Lượt chuông không hợp lệ']);
     exit;
 }
 
@@ -323,21 +412,32 @@ if ($action === 'host_confirm_guess') {
             [':p' => $playerId]
         );
 
-        db_execute(
-            "UPDATE room 
-             SET buzzer_status = 'idle', 
-                 buzzer_player_id = NULL, 
-                 buzzer_guess = NULL, 
-                 buzzer_time = NULL 
-             WHERE id_room = :r",
-            [':r' => $roomId]
-        );
+        $gameConfig = !empty($room['game_config']) ? json_decode($room['game_config'], true) : [];
+        if (!is_array($gameConfig)) $gameConfig = [];
 
-        // KIỂM TRA ĐIỀU KIỆN KẾT THÚC KHI ĐÃ HIỂN THỊ CẢ BỨC TRANH:
-        // Nếu đã mở hết tất cả các mảnh ghép mà TẤT CẢ người chơi đều đã trả lời sai bức tranh:
+        $updateSql = "UPDATE room SET buzzer_status = 'idle', buzzer_player_id = NULL, buzzer_guess = NULL, buzzer_time = NULL";
+        $updateParams = [':r' => $roomId];
+        if (!empty($gameConfig['paused_remaining_seconds'])) {
+            $rem = intval($gameConfig['paused_remaining_seconds']);
+            $tLim = intval($gameConfig['paused_time_limit'] ?? 20);
+            $newStartTime = time() - ($tLim - $rem);
+            unset($gameConfig['paused_remaining_seconds'], $gameConfig['paused_time_limit']);
+            $updateSql .= ", question_start_time = :st, game_config = :gc";
+            $updateParams[':st'] = $newStartTime;
+            $updateParams[':gc'] = json_encode($gameConfig);
+        }
+        $updateSql .= " WHERE id_room = :r";
+        db_execute($updateSql, $updateParams);
+
+        $gameConfig = !empty($room['game_config']) ? json_decode($room['game_config'], true) : [];
+        if (!is_array($gameConfig)) $gameConfig = [];
+        $isFinalRound = !empty($gameConfig['final_round_reset']);
+
+        // KIỂM TRA ĐIỀU KIỆN KẾT THÚC KHI ĐÃ Ở VÒNG CUỐI (HIỂN THỊ CẢ BỨC TRANH):
+        // Chỉ kết thúc nếu đã ở vòng đoán cuối (isFinalRound) và TẤT CẢ người chơi đều đã trả lời sai ở vòng này:
         $activeRemaining = db_count('players', 'id_room = :r AND is_kicked = 0 AND is_disqualified_obstacle = 0', [':r' => $roomId]);
         $totalInRoom = db_count('players', 'id_room = :r AND is_kicked = 0', [':r' => $roomId]);
-        $allDisqualifiedAtEnd = ($allPiecesOpened && $totalInRoom > 0 && $activeRemaining === 0);
+        $allDisqualifiedAtEnd = ($isFinalRound && $allPiecesOpened && $totalInRoom > 0 && $activeRemaining === 0);
 
         if ($allDisqualifiedAtEnd) {
             // Tìm người có số điểm cao nhất để vinh danh quán quân theo điểm số
@@ -380,7 +480,7 @@ if ($action === 'host_confirm_guess') {
             'correct'           => false,
             'all_pieces_opened' => $allPiecesOpened,
             'all_disqualified'  => false,
-            'message'           => 'Xác nhận SAI! Người chơi đã bị tạm khóa quyền bấm chuông.'
+            'message'           => $isFinalRound ? 'Đã xác nhận SAI! Các người chơi khác vẫn còn cơ hội bấm chuông đoán tiếp.' : 'Đã xác nhận SAI! Người chơi tạm khóa chuông cho đến khi mở hết các mảnh ghép.'
         ]);
         exit;
     }
@@ -391,15 +491,27 @@ if ($action === 'host_cancel_buzz') {
     $creatorId = intval($_SESSION['id_creator'] ?? 0);
     $creatorCheck = db_fetch_one("SELECT id_creator FROM room WHERE id_room = :r AND id_creator = :c", [':r' => $roomId, ':c' => $creatorId]);
     if ($creatorCheck) {
-        db_execute(
-            "UPDATE room 
-             SET buzzer_status = 'idle', 
-                 buzzer_player_id = NULL, 
-                 buzzer_guess = NULL, 
-                 buzzer_time = NULL 
-             WHERE id_room = :r",
-            [':r' => $roomId]
-        );
+        $buzzerPid = intval($room['buzzer_player_id'] ?? 0);
+        if ($buzzerPid > 0) {
+            db_execute("UPDATE players SET is_disqualified_obstacle = 1 WHERE id_player = :p", [':p' => $buzzerPid]);
+        }
+
+        $gameConfig = !empty($room['game_config']) ? json_decode($room['game_config'], true) : [];
+        if (!is_array($gameConfig)) $gameConfig = [];
+
+        $updateSql = "UPDATE room SET buzzer_status = 'idle', buzzer_player_id = NULL, buzzer_guess = NULL, buzzer_time = NULL";
+        $updateParams = [':r' => $roomId];
+        if (!empty($gameConfig['paused_remaining_seconds'])) {
+            $rem = intval($gameConfig['paused_remaining_seconds']);
+            $tLim = intval($gameConfig['paused_time_limit'] ?? 20);
+            $newStartTime = time() - ($tLim - $rem);
+            unset($gameConfig['paused_remaining_seconds'], $gameConfig['paused_time_limit']);
+            $updateSql .= ", question_start_time = :st, game_config = :gc";
+            $updateParams[':st'] = $newStartTime;
+            $updateParams[':gc'] = json_encode($gameConfig);
+        }
+        $updateSql .= " WHERE id_room = :r";
+        db_execute($updateSql, $updateParams);
         echo json_encode(['success' => true]);
         exit;
     }
@@ -411,6 +523,23 @@ if ($action === 'get_obstacle_state') {
     if (!is_array($openedPieces)) $openedPieces = [];
     $totalPieces = intval($room['total_pieces'] ?? 4);
     $allPiecesOpened = (count($openedPieces) >= $totalPieces);
+
+    $gameConfig = !empty($room['game_config']) ? json_decode($room['game_config'], true) : [];
+    if (!is_array($gameConfig)) $gameConfig = [];
+
+    // Nếu đã mở hết tất cả mảnh ghép và đang ở trạng thái 'board' (hoặc kết thúc câu hỏi cuối),
+    // mà chưa kích hoạt vòng đoán cuối (final_round_reset): Mở lại lượt cho tất cả người chơi!
+    if ($allPiecesOpened && empty($gameConfig['final_round_reset']) && ($room['status'] === 'board' || !is_numeric($room['status']))) {
+        $gameConfig['final_round_reset'] = true;
+        db_execute("UPDATE room SET game_config = :gc WHERE id_room = :r", [
+            ':gc' => json_encode($gameConfig),
+            ':r'  => $roomId
+        ]);
+        db_execute("UPDATE players SET is_disqualified_obstacle = 0 WHERE id_room = :r", [
+            ':r'  => $roomId
+        ]);
+        $room['game_config'] = json_encode($gameConfig);
+    }
 
     $buzzerPlayerName = '';
     if (!empty($room['buzzer_player_id'])) {
@@ -436,33 +565,10 @@ if ($action === 'get_obstacle_state') {
         }
     }
 
+    $isFinalRound = !empty($gameConfig['final_round_reset']);
     $activeRemaining = db_count('players', 'id_room = :r AND is_kicked = 0 AND is_disqualified_obstacle = 0', [':r' => $roomId]);
     $totalInRoom = db_count('players', 'id_room = :r AND is_kicked = 0', [':r' => $roomId]);
-    $allDisqualified = ($allPiecesOpened && $totalInRoom > 0 && $activeRemaining === 0);
-
-    if ($allDisqualified && $room['status'] !== 'finished') {
-        $topPlayer = db_fetch_one(
-            "SELECT id_player, nickname, score FROM players 
-             WHERE id_room = :r AND is_kicked = 0 
-             ORDER BY score DESC, playeradd ASC, id_player ASC LIMIT 1",
-            [':r' => $roomId]
-        );
-        $topPid = $topPlayer ? intval($topPlayer['id_player']) : null;
-        db_execute(
-            "UPDATE room 
-             SET status = 'finished', 
-                 buzzer_status = 'finished', 
-                 winner_player_id = :wp, 
-                 buzzer_player_id = NULL, 
-                 buzzer_guess = NULL, 
-                 buzzer_time = NULL 
-             WHERE id_room = :r",
-            [':wp' => $topPid, ':r' => $roomId]
-        );
-        $room['status'] = 'finished';
-        $room['buzzer_status'] = 'finished';
-        $room['winner_player_id'] = $topPid;
-    }
+    $allDisqualified = ($isFinalRound && $allPiecesOpened && $totalInRoom > 0 && $activeRemaining === 0);
 
     $isRevealed = ($room['buzzer_status'] === 'finished' || $room['status'] === 'finished' || !empty($room['winner_player_id']));
 

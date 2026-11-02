@@ -806,14 +806,61 @@ elseif ($phase === 'question'):
     <?php if ($isObstacleMode): ?>
         <div class="text-center my-4">
             <?php if ($isBuzzerLocked): ?>
-                <button type="button" class="btn btn-secondary font-weight-bold shadow-sm rounded-pill px-4 py-2" disabled>
+                <button type="button" class="btn btn-secondary font-weight-bold shadow-sm rounded-pill px-4 py-2" disabled id="btnBuzzQuestion">
                     <i class="fas fa-lock mr-1"></i> TẠM KHÓA CHUÔNG (CHỜ MỞ HẾT MẢNH)
                 </button>
             <?php else: ?>
-                <button type="button" class="btn btn-danger font-weight-bold shadow rounded-pill px-4 py-3" style="font-size: 1.2rem; font-family: 'Montserrat', sans-serif;" onclick="claimBuzzerFromQuestion()">
+                <button type="button" class="btn btn-danger font-weight-bold shadow rounded-pill px-4 py-3" style="font-size: 1.2rem; font-family: 'Montserrat', sans-serif;" onclick="claimBuzzerFromQuestion()" id="btnBuzzQuestion">
                     <i class="fas fa-bell mr-2"></i> ĐOÁN BỨC TRANH
                 </button>
             <?php endif; ?>
+        </div>
+
+        <!-- GAMIFIED GUESS MODAL CHO CÂU HỎI (ĐẸP GIỐNG BẢNG CHƯỚNG NGẠI VẬT) -->
+        <div class="player-modal-backdrop" id="obstacleGuessModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px); z-index: 99999; align-items: center; justify-content: center; padding: 20px;">
+            <div class="player-modal-card" style="background: #1e1136; border-radius: 24px; border: 3px solid #794bc4; max-width: 520px; width: 100%; padding: 30px; color: #fff; text-align: center; box-shadow: 0 24px 60px rgba(0,0,0,0.7);">
+                <h3 class="font-weight-bold text-warning mb-1" style="color: #f2994a !important;">
+                    🔔 LƯỢT ĐOÁN CỦA BẠN!
+                </h3>
+                <p class="text-white-50 small mb-2">Nhập từ khóa bức tranh bí mật:</p>
+
+
+                <form id="obstacleGuessForm" onsubmit="submitObstacleGuess(event)">
+                    <div class="form-group mb-3">
+                        <input type="text" id="obstacleGuessInput" class="form-control form-control-lg text-center font-weight-bold" 
+                               placeholder="Nhập từ khóa đáp án..." autocomplete="off" required style="border-radius: 12px; height: 55px; font-size: 1.25rem; font-weight: bold;">
+                    </div>
+                    <button type="submit" class="btn btn-success btn-lg btn-block font-weight-bold shadow mb-2" id="btnConfirmGuess" style="background: #28a745; border-bottom: 4px solid #1e7e34; border-radius: 12px; height: 55px; font-size: 1.25rem; font-weight: 800; color: #fff;">
+                        <i class="fas fa-paper-plane mr-2"></i> XÁC NHẬN ĐÁP ÁN
+                    </button>
+                    <button type="button" class="btn btn-sm btn-link text-white-50 font-weight-bold" onclick="cancelObstacleGuess()" style="text-decoration: underline;">
+                        <i class="fas fa-times-circle mr-1"></i> Không nhập đáp án (Mất quyền đoán)
+                    </button>
+                </form>
+
+                <div id="guessWaitingHost" style="display: none;" class="py-3">
+                    <div class="spinner-border text-warning mb-3" style="width: 3.2rem; height: 3.2rem;" role="status"></div>
+                    <h4 class="font-weight-bold text-white mb-2">ĐÃ GỬI CÂU TRẢ LỜI!</h4>
+                    <div class="p-2 mb-2 rounded bg-dark border border-secondary text-warning font-weight-bold" id="submittedGuessDisplay" style="font-size: 1.3rem; word-break: break-word;">
+                        ...
+                    </div>
+                    <p class="text-white-50 small mb-0">Đang chờ Host xác nhận đáp án của bạn...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL THÔNG BÁO TẠM DỪNG CHO CÁC NGƯỜI CHƠI KHÁC -->
+        <div class="player-modal-backdrop" id="obstacleRoomLockedModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px); z-index: 99999; align-items: center; justify-content: center; padding: 20px;">
+            <div class="player-modal-card" style="background: #1e1136; border-radius: 24px; border: 3px solid #e21b3c; max-width: 520px; width: 100%; padding: 30px; color: #fff; text-align: center; box-shadow: 0 24px 60px rgba(0,0,0,0.7);">
+                <i class="fas fa-bell fa-4x text-danger mb-3"></i>
+                <h4 class="font-weight-bold text-white mb-2" id="lockedPlayerNotice">
+                    CÓ NGƯỜI CHƠI BẤM CHUÔNG!
+                </h4>
+                <p class="text-white-50 mb-3" id="lockedPlayerSubtext">
+                    Phòng chơi và thời gian đang tạm dừng để người chơi trả lời và Host xác nhận. Vui lòng chờ...
+                </p>
+                <div class="spinner-border text-danger" role="status"></div>
+            </div>
         </div>
     <?php endif; ?>
 
@@ -834,6 +881,8 @@ function refreshPlayerPage() {
     window.location.href = 'play.php?pid=' + playerId + '&token=' + encodeURIComponent(playerToken);
 }
 
+let isPausedByBuzzer = false;
+
 function claimBuzzerFromQuestion() {
     if (isBuzzerLocked) {
         alert('Bạn đang bị tạm khóa chuông trong các mảnh ghép này!');
@@ -844,31 +893,60 @@ function claimBuzzerFromQuestion() {
         token: playerToken
     }, function(res) {
         if (res && res.success && res.your_turn) {
-            var guess = prompt('🔔 LƯỢT ĐOÁN CỦA BẠN (20 giây):\nNhập từ khóa bức tranh bí mật:');
-            if (guess && guess.trim()) {
-                $.post('<?= BASE_URL ?>modules/api/obstacle_action.php?action=submit_guess&id_room=' + roomId, {
-                    id_player: playerId,
-                    token: playerToken,
-                    guess: guess.trim()
-                }, function(res2) {
-                    if (res2 && res2.success && res2.correct) {
-                        alert('🏆 CHÚC MỪNG! Bạn đã đoán chính xác từ khóa bức tranh!');
-                    } else if (res2 && res2.all_disqualified) {
-                        alert('Tất cả người chơi đều đã đoán sai! Chuyển sang bảng vinh danh.');
-                    } else {
-                        alert(res2.message || 'Đáp án chưa chính xác!');
-                    }
-                    refreshPlayerPage();
-                }, 'json');
-            } else {
-                $.post('<?= BASE_URL ?>modules/api/obstacle_action.php?action=buzzer_timeout&id_room=' + roomId);
-                refreshPlayerPage();
-            }
+            openObstacleGuessModal();
         } else {
             alert(res.message || 'Không thể bấm chuông lúc này');
         }
     }, 'json').fail(function() {
         alert('Lỗi kết nối máy chủ');
+    });
+}
+
+function openObstacleGuessModal() {
+    isPausedByBuzzer = true;
+    $('#obstacleGuessForm').show();
+    $('#guessWaitingHost').hide();
+    $('#obstacleGuessInput').val('').focus();
+    $('#btnConfirmGuess').prop('disabled', false).html('<i class="fas fa-paper-plane mr-2"></i> XÁC NHẬN ĐÁP ÁN');
+    $('#obstacleGuessModal').css('display', 'flex');
+}
+
+function submitObstacleGuess(e) {
+    e.preventDefault();
+    const guessText = $('#obstacleGuessInput').val().trim();
+    if (!guessText) return;
+
+    $('#btnConfirmGuess').prop('disabled', true).html('<i class="fas fa-spinner fa-spin mr-1"></i> Đang gửi...');
+
+    $.post('<?= BASE_URL ?>modules/api/obstacle_action.php?action=submit_guess&id_room=' + roomId, {
+        id_player: playerId,
+        token: playerToken,
+        guess: guessText
+    }, function(res) {
+        if (res && res.success && res.pending_review) {
+            $('#obstacleGuessForm').hide();
+            $('#submittedGuessDisplay').text(guessText);
+            $('#guessWaitingHost').show();
+        } else {
+            alert(res.message || 'Lỗi gửi câu trả lời');
+            $('#obstacleGuessModal').hide();
+            refreshPlayerPage();
+        }
+    }, 'json').fail(function() {
+        alert('Lỗi kết nối máy chủ');
+        $('#obstacleGuessModal').hide();
+    });
+}
+
+function cancelObstacleGuess() {
+    $.post('<?= BASE_URL ?>modules/api/obstacle_action.php?action=cancel_or_timeout_guess&id_room=' + roomId, {
+        id_player: playerId,
+        token: playerToken
+    }, function() {
+        alert('Bạn không đưa ra câu trả lời nên bị mất quyền bấm chuông cho tới khi mở hết các mảnh ghép!');
+        refreshPlayerPage();
+    }, 'json').fail(function() {
+        refreshPlayerPage();
     });
 }
 
@@ -915,6 +993,8 @@ if (playerSeconds <= 0) {
     $('.answer-box, .player-btn').css('pointer-events', 'none').css('opacity', '0.6');
 } else if (timerEl) {
     const playerCountdown = setInterval(function() {
+        if (isPausedByBuzzer) return; // Đóng băng countdown người chơi khi có chuông
+
         playerSeconds--;
         if (playerSeconds <= 0) {
             playerSeconds = 0;
@@ -938,12 +1018,38 @@ setInterval(function() {
             return;
         }
         if (res && res.success) {
+            // Kiểm tra trạng thái chuông tạm dừng trong chế độ chướng ngại vật
+            if (res.game_type === 'obstacle' && res.buzzer_status) {
+                if (res.buzzer_status === 'buzzing' || res.buzzer_status === 'pending_review') {
+                    if (res.buzzer_player_id !== playerId) {
+                        isPausedByBuzzer = true;
+                        $('.answer-box, .player-btn').css('pointer-events', 'none').css('opacity', '0.4');
+                        $('#lockedPlayerNotice').text((res.buzzer_player_name || 'NGƯỜI CHƠI KHÁC') + ' ĐANG BẤM CHUÔNG!');
+                        $('#obstacleRoomLockedModal').css('display', 'flex');
+                    }
+                } else if (res.buzzer_status === 'idle') {
+                    if (isPausedByBuzzer) {
+                        isPausedByBuzzer = false;
+                        $('#obstacleRoomLockedModal').hide();
+                        $('#obstacleGuessModal').hide();
+                        $('.answer-box, .player-btn').css('pointer-events', 'auto').css('opacity', '1');
+                        if (res.paused_remaining_seconds && timerEl) {
+                            playerSeconds = res.paused_remaining_seconds;
+                            timerEl.textContent = playerSeconds;
+                        }
+                        if (res.is_disqualified_obstacle) {
+                            $('#btnBuzzQuestion').replaceWith('<button type="button" class="btn btn-secondary font-weight-bold shadow-sm rounded-pill px-4 py-2" disabled id="btnBuzzQuestion"><i class="fas fa-lock mr-1"></i> TẠM KHÓA CHUÔNG (CHỜ MỞ HẾT MẢNH)</button>');
+                        }
+                    }
+                }
+            }
+
             if (res.status !== currentStatus) {
                 refreshPlayerPage();
             }
         }
     });
-}, 1000);
+}, 800);
 </script>
 </body>
 </html>

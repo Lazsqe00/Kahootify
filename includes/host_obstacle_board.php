@@ -10,6 +10,19 @@ $openedPieces = !empty($room['opened_pieces']) ? json_decode($room['opened_piece
 if (!is_array($openedPieces)) $openedPieces = [];
 $allOpened = (count($openedPieces) >= $totalPieces);
 
+$gameConfig = !empty($room['game_config']) ? json_decode($room['game_config'], true) : [];
+if (!is_array($gameConfig)) $gameConfig = [];
+if ($allOpened && empty($gameConfig['final_round_reset'])) {
+    $gameConfig['final_round_reset'] = true;
+    db_execute("UPDATE room SET game_config = :gc WHERE id_room = :r", [
+        ':gc' => json_encode($gameConfig),
+        ':r'  => $room['id_room']
+    ]);
+    db_execute("UPDATE players SET is_disqualified_obstacle = 0 WHERE id_room = :r", [
+        ':r'  => $room['id_room']
+    ]);
+}
+
 $counts = room_question_counts($room, 0);
 $totalPlayers = $counts['total_players'];
 
