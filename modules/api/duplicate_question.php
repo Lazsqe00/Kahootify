@@ -14,7 +14,7 @@ if (!$questionId || !$quizId) {
     exit;
 }
 
-$quiz = db_fetch_one("SELECT id_quiz FROM quiz WHERE id_quiz = :q AND id_creator = :c", [':q' => $quizId, ':c' => $creatorId]);
+$quiz = db_fetch_one("SELECT id_quiz, game_type, total_pieces FROM quiz WHERE id_quiz = :q AND id_creator = :c", [':q' => $quizId, ':c' => $creatorId]);
 if (!$quiz) {
     echo json_encode(['success' => false]);
     exit;
@@ -26,16 +26,26 @@ if (!$srcQ) {
     exit;
 }
 
+$isObstacle = (($quiz['game_type'] ?? 'classic') === 'obstacle');
+$curCount   = db_count('questions', 'id_quiz = :qz', [':qz' => $quizId]);
+$maxPieces  = intval($quiz['total_pieces'] ?? 4);
+
+if ($isObstacle && $curCount >= $maxPieces) {
+    echo json_encode(['success' => false, 'message' => "All {$maxPieces} questions for {$maxPieces} tiles already created!"]);
+    exit;
+}
+
 $maxSo  = db_fetch_one("SELECT COALESCE(MAX(sort_order), 0) AS mo FROM questions WHERE id_quiz = :qz", [':qz' => $quizId]);
 $newSo  = intval($maxSo['mo']) + 1;
 $qType  = $srcQ['question_type'] ?? 'multiple_choice';
 $mType  = $srcQ['media_type']    ?? null;
 $qMode  = $srcQ['mode']          ?? 'normal';
 $mConf  = $srcQ['mode_config']   ?? null;
+$newPi  = $isObstacle ? ($curCount + 1) : 0;
 
 $newQId = db_insert(
     "INSERT INTO questions (id_quiz, text, points, time_limit, image, question_type, media_type, sort_order, mode, mode_config, piece_index) VALUES (:qz,:t,:p,:tl,:img,:qt,:mt,:so,:m,:mc,:pi)",
-    [':qz'=>$quizId,':t'=>$srcQ['text'],':p'=>$srcQ['points'],':tl'=>$srcQ['time_limit'],':img'=>$srcQ['image'],':qt'=>$qType,':mt'=>$mType,':so'=>$newSo,':m'=>$qMode,':mc'=>$mConf,':pi'=>intval($srcQ['piece_index'] ?? 0)]
+    [':qz'=>$quizId,':t'=>$srcQ['text'],':p'=>$srcQ['points'],':tl'=>$srcQ['time_limit'],':img'=>$srcQ['image'],':qt'=>$qType,':mt'=>$mType,':so'=>$newSo,':m'=>$qMode,':mc'=>$mConf,':pi'=>$newPi]
 );
 
 $srcAnswers = db_fetch_all("SELECT * FROM answers WHERE id_question = :q ORDER BY id_answer ASC", [':q' => $questionId]);

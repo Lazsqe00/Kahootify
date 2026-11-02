@@ -15,12 +15,25 @@ $myUnlocked = !empty($player['unlocked_pieces']) ? json_decode($player['unlocked
 if (!is_array($myUnlocked)) $myUnlocked = [];
 
 $allOpened = (count($openedPieces) >= $totalPieces);
+$gameConfig = !empty($room['game_config']) ? json_decode($room['game_config'], true) : [];
+if (!is_array($gameConfig)) $gameConfig = [];
+
 if ($allOpened) {
+    if (empty($gameConfig['final_round_reset'])) {
+        $gameConfig['final_round_reset'] = true;
+        db_execute("UPDATE room SET game_config = :gc WHERE id_room = :r", [
+            ':gc' => json_encode($gameConfig),
+            ':r'  => $room['id_room']
+        ]);
+        db_execute("UPDATE players SET is_disqualified_obstacle = 0 WHERE id_room = :r", [
+            ':r'  => $room['id_room']
+        ]);
+        $player['is_disqualified_obstacle'] = 0;
+    }
     $myUnlocked = range(1, $totalPieces);
-    $isDisqualified = !empty($player['is_disqualified_obstacle']) && !empty($room['all_pieces_final_revealed']);
-} else {
-    $isDisqualified = !empty($player['is_disqualified_obstacle']);
 }
+
+$isDisqualified = !empty($player['is_disqualified_obstacle']);
 $secretImageUrl = !empty($quiz['obstacle_image']) ? BASE_URL . $quiz['obstacle_image'] : '';
 
 // Grid layout
@@ -264,9 +277,13 @@ require_once __DIR__ . '/header.php';
         <div class="alert alert-warning font-weight-bold text-center py-2 px-3 shadow-sm mb-3" style="border-radius: 14px; font-size: 0.9rem; background: #fff3cd; color: #856404; border: 1px solid #ffeeba;">
             <i class="fas fa-info-circle mr-1 text-warning"></i> Bạn đã đoán sai từ khóa nên bị tạm khóa quyền bấm chuông trong các mảnh này. Bạn vẫn được tham gia trả lời câu hỏi và cộng điểm bình thường. Chuông sẽ được mở lại cho bạn khi mở hết các mảnh ghép!
         </div>
+    <?php elseif ($isDisqualified && $allOpened): ?>
+        <div class="alert alert-danger font-weight-bold text-center py-2 px-3 shadow-sm mb-3" style="border-radius: 14px; font-size: 0.95rem; background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb;">
+            <i class="fas fa-ban mr-1 text-danger"></i> Bạn đã sử dụng hết lượt đoán từ khóa ở vòng cuối này. Vui lòng chờ kết quả chung cuộc!
+        </div>
     <?php elseif ($allOpened): ?>
         <div class="alert alert-success font-weight-bold text-center py-2 px-3 shadow-sm mb-3" style="border-radius: 14px; font-size: 0.95rem; background: #d4edda; color: #155724; border: 1px solid #c3e6cb;">
-            <i class="fas fa-unlock-alt mr-1 text-success"></i> TẤT CẢ MẢNH GHÉP ĐÃ ĐƯỢC MỞ! Chuông đoán từ khóa đã được mở lại cho TẤT CẢ người chơi. Hãy nhanh tay bấm chuông giành quyền trả lời!
+            <i class="fas fa-unlock-alt mr-1 text-success"></i> TẤT CẢ MẢNH GHÉP ĐÃ ĐƯỢC MỞ! Bức tranh bí mật đã lộ diện hoàn toàn. Chuông đoán từ khóa đã được mở lại cho TẤT CẢ người chơi. Hãy nhanh tay bấm chuông giành quyền trả lời!
         </div>
     <?php endif; ?>
 
@@ -339,8 +356,11 @@ require_once __DIR__ . '/header.php';
                 <input type="text" id="guessInput" class="form-control form-control-lg text-center font-weight-bold" 
                        placeholder="Nhập từ khóa đáp án..." autocomplete="off" required>
             </div>
-            <button type="submit" class="btn btn-kahoot btn-kahoot-green btn-lg btn-block font-weight-bold shadow" id="btnSubmitGuess">
+            <button type="submit" class="btn btn-kahoot btn-kahoot-green btn-lg btn-block font-weight-bold shadow mb-2" id="btnSubmitGuess">
                 <i class="fas fa-paper-plane mr-1"></i> XÁC NHẬN ĐÁP ÁN
+            </button>
+            <button type="button" class="btn btn-sm btn-link text-white-50 font-weight-bold" onclick="cancelGuess()" style="text-decoration: underline;">
+                <i class="fas fa-times-circle mr-1"></i> Không nhập đáp án (Mất quyền đoán)
             </button>
         </form>
 
@@ -442,6 +462,18 @@ function openGuessModal() {
     $('#guessInput').val('').focus();
     $('#btnSubmitGuess').prop('disabled', false).html('<i class="fas fa-paper-plane mr-1"></i> XÁC NHẬN ĐÁP ÁN');
     $('#guessModal').css('display', 'flex');
+}
+
+function cancelGuess() {
+    $.post('<?= BASE_URL ?>modules/api/obstacle_action.php?action=cancel_or_timeout_guess&id_room=' + roomId, {
+        id_player: playerId,
+        token: playerToken
+    }, function() {
+        alert('Bạn không đưa ra câu trả lời nên bị mất quyền bấm chuông cho tới khi mở hết các mảnh ghép!');
+        window.location.reload();
+    }, 'json').fail(function() {
+        window.location.reload();
+    });
 }
 
 function submitGuess(e) {
@@ -582,6 +614,13 @@ const pollInterval = setInterval(function() {
         // 5. Đồng bộ khi mở hết mảnh ghép (all_pieces_opened)
         if (data.all_pieces_opened) {
             isAllOpened = true;
+            if (data.obstacle_image) {
+                if (!$('.obstacle-secret-img').length) {
+                    $('.obstacle-puzzle-container').prepend('<img src="' + data.obstacle_image + '" class="obstacle-secret-img" alt="Bức tranh bí mật">');
+                } else if (!$('.obstacle-secret-img').attr('src')) {
+                    $('.obstacle-secret-img').attr('src', data.obstacle_image);
+                }
+            }
             $('.obstacle-piece-tile').removeClass('piece-locked').addClass('piece-unlocked');
             $('#unlockedCountBadge').text(data.total_pieces + ' / ' + data.total_pieces + ' Mảnh đã mở');
             // Nếu người chơi chưa bấm chuông sai ở vòng cuối này: Mở nút chuông!
@@ -589,6 +628,11 @@ const pollInterval = setInterval(function() {
                 isDisqualified = false;
                 if ($('#btnBuzz').hasClass('btn-buzz-disabled')) {
                     $('#btnBuzz').replaceWith('<button type="button" class="btn btn-buzz" id="btnBuzz" onclick="claimBuzzer()"><i class="fas fa-bell mr-2"></i> ĐOÁN BỨC TRANH</button>');
+                }
+            } else {
+                isDisqualified = true;
+                if (!$('#btnBuzz').hasClass('btn-buzz-disabled')) {
+                    $('#btnBuzz').replaceWith('<button type="button" class="btn btn-buzz btn-buzz-disabled" disabled id="btnBuzz"><i class="fas fa-ban mr-2"></i> ĐÃ HẾT LƯỢT ĐOÁN</button>');
                 }
             }
         } else {
@@ -599,14 +643,10 @@ const pollInterval = setInterval(function() {
                 });
                 $('#unlockedCountBadge').text(data.my_unlocked_pieces.length + ' / ' + data.total_pieces + ' Mảnh đã mở');
             }
-        }
 
-        // 6. Đồng bộ trạng thái bị khóa chuông
-        if (data.my_is_disqualified && !isDisqualified) {
-            isDisqualified = true;
-            if (data.all_pieces_opened) {
-                $('#btnBuzz').replaceWith('<button type="button" class="btn btn-buzz btn-buzz-disabled" disabled id="btnBuzz"><i class="fas fa-ban mr-2"></i> ĐÃ HẾT LƯỢT ĐOÁN</button>');
-            } else {
+            // Đồng bộ trạng thái bị khóa chuông ở giai đoạn đang mở mảnh
+            if (data.my_is_disqualified && !isDisqualified) {
+                isDisqualified = true;
                 $('#btnBuzz').replaceWith('<button type="button" class="btn btn-buzz btn-buzz-disabled" disabled id="btnBuzz"><i class="fas fa-lock mr-2"></i> TẠM KHÓA CHUÔNG (CHỜ MỞ HẾT MẢNH)</button>');
             }
         }

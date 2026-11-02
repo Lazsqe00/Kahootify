@@ -21,10 +21,16 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_to_board') {
     if (!is_array($openedPieces)) $openedPieces = [];
     $quizDetail = db_fetch_one("SELECT total_pieces FROM quiz WHERE id_quiz = :q", [':q' => $room['id_quiz']]);
     $totalPieces = intval($quizDetail['total_pieces'] ?? 4);
+    $gameConfig = !empty($room['game_config']) ? json_decode($room['game_config'], true) : [];
+    if (!is_array($gameConfig)) $gameConfig = [];
     if (count($openedPieces) >= $totalPieces) {
+        $gameConfig['final_round_reset'] = true;
         db_execute("UPDATE players SET is_disqualified_obstacle = 0 WHERE id_room = :r", [':r' => $roomId]);
     }
-    db_execute("UPDATE room SET status = 'board', buzzer_status = 'idle', buzzer_player_id = NULL, buzzer_time = NULL WHERE id_room = :r", [':r' => $roomId]);
+    db_execute("UPDATE room SET status = 'board', buzzer_status = 'idle', buzzer_player_id = NULL, buzzer_time = NULL, game_config = :gc WHERE id_room = :r", [
+        ':gc' => json_encode($gameConfig),
+        ':r'  => $roomId
+    ]);
     redirect('modules/host/play.php');
 }
 
@@ -344,6 +350,59 @@ require_once __DIR__ . '/../../includes/header.php';
     </div>
 </nav>
 
+<?php if (($room['game_type'] ?? 'classic') === 'obstacle'): ?>
+    <!-- BUZZER ALERT BANNER TRONG CÂU HỎI -->
+    <div class="buzzer-alert-banner" id="hostQuestionBuzzerBanner" style="display: none; position: fixed; top: 15px; left: 50%; transform: translateX(-50%); z-index: 99999; max-width: 820px; width: 95%; background: linear-gradient(135deg, #e21b3c 0%, #b3122c 100%); border: 3px solid #ffcc00; border-radius: 20px; padding: 16px 24px; box-shadow: 0 16px 40px rgba(0,0,0,0.6); color: #fff;">
+        <div class="d-flex align-items-center justify-content-between flex-wrap">
+            <div class="d-flex align-items-center mb-2 mb-sm-0">
+                <i class="fas fa-bell fa-2x mr-3 text-warning"></i>
+                <div>
+                    <h5 class="font-weight-bold mb-0" id="hostQBuzzTitle">🔔 CÓ NGƯỜI BẤM CHUÔNG!</h5>
+                    <span id="hostQBuzzDesc" style="opacity: 0.95;">Người chơi đang trả lời từ khóa bức tranh bí mật...</span>
+                </div>
+            </div>
+            <div class="d-flex align-items-center">
+                <span class="badge badge-light font-weight-bold py-2 px-3 mr-2 text-danger" style="font-size: 1rem;" id="hostQBuzzStatus">
+                    Tạm dừng câu hỏi
+                </span>
+                <button type="button" class="btn btn-sm btn-outline-light font-weight-bold rounded-pill px-3" onclick="hostCancelBuzzFromQuestion()">
+                    <i class="fas fa-times mr-1"></i> Hủy chuông
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- HOST REVIEW MODAL TRONG CÂU HỎI -->
+    <div class="host-modal-backdrop" id="hostQReviewModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); z-index: 999999; align-items: center; justify-content: center; padding: 20px;">
+        <div class="host-modal-card" style="background: #1e1136; border: 3px solid #f2994a; border-radius: 24px; max-width: 580px; width: 100%; padding: 30px; color: #fff; text-align: center; box-shadow: 0 24px 60px rgba(0,0,0,0.7);">
+            <h3 class="font-weight-bold text-warning mb-2" style="color: #f2994a !important;">
+                <i class="fas fa-gavel mr-2"></i> XÁC NHẬN CÂU TRẢ LỜI
+            </h3>
+            <p class="text-white-50 small mb-3">Người chơi đã gửi từ khóa dự đoán bức tranh bí mật:</p>
+            <div class="p-3 rounded mb-3" style="background: rgba(255,255,255,0.08); border: 2px dashed rgba(255,255,255,0.25);">
+                <div class="small text-white-50">NGƯỜI BẤM CHUÔNG:</div>
+                <div class="h4 font-weight-bold text-info mb-3" id="hostQReviewPlayerName">...</div>
+                <div class="small text-white-50">TỪ KHÓA DỰ ĐOÁN:</div>
+                <div class="h3 font-weight-bold text-warning mb-0" id="hostQReviewPlayerGuess" style="letter-spacing: 1px; word-break: break-word;">...</div>
+            </div>
+            <?php if (!empty($room['obstacle_answer'])): ?>
+                <div class="alert alert-dark border border-secondary text-left py-2 px-3 mb-3 small" style="background: #120924;">
+                    <span class="text-white-50">Đáp án chuẩn của bức tranh:</span> 
+                    <span class="font-weight-bold text-success ml-1"><?= htmlspecialchars($room['obstacle_answer']) ?></span>
+                </div>
+            <?php endif; ?>
+            <div class="d-flex justify-content-between mt-4">
+                <button type="button" class="btn btn-danger btn-lg font-weight-bold px-4 py-3 shadow" style="border-radius: 14px; width: 48%; font-size: 1.15rem;" onclick="hostConfirmQGuess(false)">
+                    <i class="fas fa-times-circle mr-2"></i> SAI (FALSE)
+                </button>
+                <button type="button" class="btn btn-success btn-lg font-weight-bold px-4 py-3 shadow" style="border-radius: 14px; width: 48%; font-size: 1.15rem;" onclick="hostConfirmQGuess(true)">
+                    <i class="fas fa-check-circle mr-2"></i> ĐÚNG (TRUE)
+                </button>
+            </div>
+        </div>
+    </div>
+<?php endif; ?>
+
 <div class="container my-3" style="max-width: 1050px;">
 
     <details class="text-white mb-3">
@@ -502,9 +561,12 @@ const roomId = <?= $roomId ?>;
 const qId = <?= $qId ?>;
 const isObstacleGame = <?= ($room['game_type'] ?? 'classic') === 'obstacle' ? 'true' : 'false' ?>;
 const finishQuestionUrl = 'play.php?action=show_result';
+let isPausedByBuzzer = false;
 
 // Countdown timer: when time runs out, auto-transition immediately to leaderboard
 const timerInterval = setInterval(function() {
+    if (isPausedByBuzzer) return; // Đóng băng countdown khi có người bấm chuông
+
     remaining--;
     if (remaining <= 0) {
         clearInterval(timerInterval);
@@ -521,12 +583,48 @@ const timerInterval = setInterval(function() {
     }
 }, 1000);
 
-// Polling: when ALL participants have answered, immediately transition to leaderboard
+// Polling: đồng bộ số người trả lời và trạng thái chuông chướng ngại vật
 const pollInterval = setInterval(function() {
     $.getJSON('<?= BASE_URL ?>modules/api/game_state.php?action=get_question_status&id_room=' + roomId + '&id_question=' + qId, function(data) {
         if (data && data.success) {
             $('#voteCount').text(data.voted_count);
             $('#totalPlayerCount').text(data.total_players);
+
+            // Kiểm tra trạng thái Buzzer trong câu hỏi
+            if (isObstacleGame && data.buzzer_status) {
+                if (data.buzzer_status === 'buzzing' || data.buzzer_status === 'pending_review') {
+                    if (!isPausedByBuzzer) {
+                        isPausedByBuzzer = true;
+                        stopQuestionAudio();
+                        $('#timerBox').css('opacity', '0.4');
+                    }
+                    $('#hostQuestionBuzzerBanner').slideDown(200);
+
+                    if (data.buzzer_status === 'buzzing') {
+                        $('#hostQBuzzTitle').text('🔔 ' + (data.buzzer_player_name || 'Người chơi') + ' ĐANG BẤM CHUÔNG ĐOÁN TỪ KHÓA!');
+                        $('#hostQBuzzDesc').text('Trò chơi và thời gian đếm ngược đang tạm dừng. Đang chờ người chơi nhập câu trả lời...');
+                        $('#hostQReviewModal').hide();
+                    } else if (data.buzzer_status === 'pending_review') {
+                        $('#hostQBuzzTitle').text('🔔 ' + (data.buzzer_player_name || 'Người chơi') + ' ĐÃ GỬI CÂU TRẢ LỜI!');
+                        $('#hostQBuzzDesc').text('Vui lòng xem và xác nhận câu trả lời là ĐÚNG hay SAI.');
+                        $('#hostQReviewPlayerName').text(data.buzzer_player_name || 'Người chơi');
+                        $('#hostQReviewPlayerGuess').text(data.buzzer_guess || '...');
+                        $('#hostQReviewModal').css('display', 'flex');
+                    }
+                } else if (data.buzzer_status === 'idle') {
+                    if (isPausedByBuzzer) {
+                        isPausedByBuzzer = false;
+                        $('#hostQuestionBuzzerBanner').slideUp(200);
+                        $('#hostQReviewModal').hide();
+                        $('#timerBox').css('opacity', '1');
+                        if (data.paused_remaining_seconds) {
+                            remaining = data.paused_remaining_seconds;
+                            $('#timerSeconds').text(remaining);
+                        }
+                        playQuestionAudio();
+                    }
+                }
+            }
 
             if (data.status === 'finished') {
                 clearInterval(pollInterval);
@@ -536,15 +634,44 @@ const pollInterval = setInterval(function() {
                 return;
             }
 
-            if ((data.total_players > 0 && data.voted_count >= data.total_players) || (data.status && data.status.startsWith('res_'))) {
-                clearInterval(pollInterval);
-                clearInterval(timerInterval);
-                stopQuestionAudio();
-                window.location.href = finishQuestionUrl;
+            if (!isPausedByBuzzer) {
+                if ((data.total_players > 0 && data.voted_count >= data.total_players) || (data.status && data.status.startsWith('res_'))) {
+                    clearInterval(pollInterval);
+                    clearInterval(timerInterval);
+                    stopQuestionAudio();
+                    window.location.href = finishQuestionUrl;
+                }
             }
         }
     });
 }, 800);
+
+function hostConfirmQGuess(isCorrect) {
+    $.post('<?= BASE_URL ?>modules/api/obstacle_action.php?action=host_confirm_guess&id_room=' + roomId, {
+        decision: isCorrect ? 'true' : 'false'
+    }, function(res) {
+        if (res && res.success && res.correct) {
+            window.location.href = 'leaderboard.php?final=true';
+        } else {
+            isPausedByBuzzer = false;
+            $('#hostQReviewModal').hide();
+            $('#hostQuestionBuzzerBanner').slideUp(200);
+            $('#timerBox').css('opacity', '1');
+            playQuestionAudio();
+        }
+    }, 'json');
+}
+
+function hostCancelBuzzFromQuestion() {
+    if (!confirm('Bạn có chắc muốn hủy lượt chuông này? Người chơi sẽ bị mất quyền bấm chuông.')) return;
+    $.post('<?= BASE_URL ?>modules/api/obstacle_action.php?action=host_cancel_buzz&id_room=' + roomId, function(res) {
+        isPausedByBuzzer = false;
+        $('#hostQReviewModal').hide();
+        $('#hostQuestionBuzzerBanner').slideUp(200);
+        $('#timerBox').css('opacity', '1');
+        playQuestionAudio();
+    }, 'json');
+}
 </script>
 </body>
 </html>

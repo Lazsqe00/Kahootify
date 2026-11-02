@@ -74,11 +74,24 @@ if ($action === 'get_room_status') {
     $room = db_fetch_one("SELECT * FROM room WHERE id_room = :r", [':r' => $roomId]);
     if ($room) {
         $parsed = GameStateManager::parseRoomStatus($room['status'] ?? '');
+        $buzzerPlayerName = '';
+        if (!empty($room['buzzer_player_id'])) {
+            $bp = db_fetch_one("SELECT nickname FROM players WHERE id_player = :p", [':p' => $room['buzzer_player_id']]);
+            $buzzerPlayerName = $bp['nickname'] ?? '';
+        }
+
+        $gameConfig = !empty($room['game_config']) ? json_decode($room['game_config'], true) : [];
+        if (!is_array($gameConfig)) $gameConfig = [];
+
         $response = [
             'success'                   => true,
             'status'                    => $room['status'],
             'game_type'                 => $room['game_type'] ?? 'classic',
             'buzzer_status'             => $room['buzzer_status'] ?? 'idle',
+            'buzzer_player_id'          => $room['buzzer_player_id'] ? intval($room['buzzer_player_id']) : null,
+            'buzzer_player_name'        => $buzzerPlayerName,
+            'buzzer_guess'              => $room['buzzer_guess'] ?? '',
+            'paused_remaining_seconds'  => $gameConfig['paused_remaining_seconds'] ?? null,
             'current_phase'             => $parsed['phase'],
             'current_qid'               => $parsed['qid'],
             'is_locked'                 => room_is_locked($room),
@@ -89,10 +102,11 @@ if ($action === 'get_room_status') {
         ];
 
         if ($playerId > 0) {
-            $p = db_fetch_one("SELECT id_player, nickname, score, status, eliminated_at_question, elimination_order, team_id, team_name FROM players WHERE id_player = :p", [':p' => $playerId]);
+            $p = db_fetch_one("SELECT id_player, nickname, score, status, is_disqualified_obstacle, eliminated_at_question, elimination_order, team_id, team_name FROM players WHERE id_player = :p", [':p' => $playerId]);
             if ($p) {
                 $response['player_status'] = $p['status'] ?? 'ACTIVE';
                 $response['player_score']  = intval($p['score'] ?? 0);
+                $response['is_disqualified_obstacle'] = intval($p['is_disqualified_obstacle'] ?? 0);
                 $response['team_id']       = $p['team_id'] ? intval($p['team_id']) : null;
                 $response['team_name']     = $p['team_name'] ?? null;
 
@@ -145,18 +159,33 @@ if ($action === 'get_players') {
 
 if ($action === 'get_question_status') {
     $qId = intval($_GET['id_question'] ?? 0);
-    $room = db_fetch_one('SELECT id_room, pin, game_type, status FROM room WHERE id_room = :r', [':r' => $roomId]);
+    $room = db_fetch_one('SELECT * FROM room WHERE id_room = :r', [':r' => $roomId]);
     if (!$room) {
         echo json_encode(['success' => false, 'message' => 'Room does not exist']);
         exit;
     }
     $counts = room_question_counts($room, $qId);
 
+    $buzzerPlayerName = '';
+    if (!empty($room['buzzer_player_id'])) {
+        $bp = db_fetch_one("SELECT nickname FROM players WHERE id_player = :p", [':p' => $room['buzzer_player_id']]);
+        $buzzerPlayerName = $bp['nickname'] ?? '';
+    }
+
+    $gameConfig = !empty($room['game_config']) ? json_decode($room['game_config'], true) : [];
+    if (!is_array($gameConfig)) $gameConfig = [];
+
     echo json_encode([
-        'success'       => true,
-        'status'        => $room['status'],
-        'total_players' => $counts['total_players'],
-        'voted_count'   => $counts['voted_count']
+        'success'                  => true,
+        'status'                   => $room['status'],
+        'total_players'            => $counts['total_players'],
+        'voted_count'              => $counts['voted_count'],
+        'game_type'                => $room['game_type'] ?? 'classic',
+        'buzzer_status'            => $room['buzzer_status'] ?? 'idle',
+        'buzzer_player_id'         => $room['buzzer_player_id'] ? intval($room['buzzer_player_id']) : null,
+        'buzzer_player_name'       => $buzzerPlayerName,
+        'buzzer_guess'             => $room['buzzer_guess'] ?? '',
+        'paused_remaining_seconds' => $gameConfig['paused_remaining_seconds'] ?? null
     ]);
     exit;
 }
