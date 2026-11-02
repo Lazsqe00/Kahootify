@@ -216,7 +216,7 @@ class TeamManager {
 
         $teamCount = self::getTeamCount($room);
         if ($teamId < 1 || $teamId > $teamCount) {
-            return ['valid' => false, 'message' => 'Vui lòng chọn một đội hợp lệ (từ 1 đến ' . $teamCount . ').'];
+            return ['valid' => false, 'message' => 'Please choose a valid team (from 1 to ' . $teamCount . ').'];
         }
 
         $limit = self::getTeamPlayerLimit($room);
@@ -227,7 +227,7 @@ class TeamManager {
                 [':r' => $roomId, ':t' => $teamId]
             );
             if ($currentCount >= $limit) {
-                return ['valid' => false, 'message' => 'Đội này đã đủ ' . $limit . ' thành viên! Vui lòng chọn đội khác.'];
+                return ['valid' => false, 'message' => 'This team already has the maximum of ' . $limit . ' players! Please choose another team.'];
             }
         }
 

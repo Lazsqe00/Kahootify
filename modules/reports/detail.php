@@ -55,7 +55,8 @@ $sqlPlayers = "
             JOIN answers a ON v.id_answer = a.id_answer 
             WHERE v.id_player = p.id_player AND a.is_correct = 1) as correct_count,
            (SELECT COUNT(*) FROM votes v 
-            WHERE v.id_player = p.id_player) as total_answered
+            WHERE v.id_player = p.id_player) as total_answered,
+           COALESCE(p.finished_at, (SELECT MAX(rankingadd) FROM votes v WHERE v.id_player = p.id_player AND p.is_finished = 1)) as review_completed_at
     FROM players p
     WHERE p.id_room = :r
     ORDER BY p.score DESC, p.playeradd ASC
@@ -518,8 +519,8 @@ require_once __DIR__ . '/../../includes/navbar.php';
                                                 <?php endif; ?>
                                             </div>
                                             <div class="small text-muted font-weight-medium mt-1">
-                                                <span class="mr-2"><i class="fas fa-user-friends mr-1 text-primary"></i> <?= $teamItem['member_count'] ?> thành viên</span>
-                                                <span><i class="fas fa-check-circle mr-1 text-success"></i> <?= (int)$teamItem['total_correct'] ?> câu đúng</span>
+                                                <span class="mr-2"><i class="fas fa-user-friends mr-1 text-primary"></i> <?= $teamItem['member_count'] ?> members</span>
+                                                <span><i class="fas fa-check-circle mr-1 text-success"></i> <?= (int)$teamItem['total_correct'] ?> correct</span>
                                             </div>
                                         </div>
                                     </div>
@@ -531,7 +532,7 @@ require_once __DIR__ . '/../../includes/navbar.php';
                                             <small class="text-muted font-weight-bold text-uppercase" style="font-size: 0.72rem;">pts</small>
                                         </div>
                                         <button type="button" class="saas-btn saas-btn-outline" style="font-size: 12px; padding: 6px 12px;" onclick="openTeamReportModal(<?= (int)$teamItem['id'] ?>)">
-                                            <span>Chi tiết</span>
+                                            <span>Details</span>
                                             <i class="fas fa-chevron-right ml-1" style="font-size: 10px;"></i>
                                         </button>
                                     </div>
@@ -540,7 +541,7 @@ require_once __DIR__ . '/../../includes/navbar.php';
                                 <!-- TOP 3 PLAYERS IN TEAM -->
                                 <div class="report-team-top3 pt-3 mt-2 border-top">
                                     <div class="small font-weight-bold text-muted mb-2 text-uppercase d-flex align-items-center" style="font-size: 0.72rem; letter-spacing: 0.5px;">
-                                        <i class="fas fa-medal text-warning mr-1"></i> Top 3 cá nhân cao điểm nhất:
+                                        <i class="fas fa-medal text-warning mr-1"></i> Top 3 team members:
                                     </div>
                                     <?php if (!empty($teamItem['top_3_players'])): ?>
                                         <div class="d-flex flex-wrap" style="gap: 8px;">
@@ -564,7 +565,7 @@ require_once __DIR__ . '/../../includes/navbar.php';
                                             <?php endforeach; ?>
                                         </div>
                                     <?php else: ?>
-                                        <div class="text-muted small font-italic">Chưa có người chơi nào trong đội này.</div>
+                                        <div class="text-muted small font-italic">No players in this team yet.</div>
                                     <?php endif; ?>
                                 </div>
                             </div>
@@ -609,6 +610,9 @@ require_once __DIR__ . '/../../includes/navbar.php';
                                 <th class="text-left">Student Nickname</th>
                                 <?php if ($isTeamMode): ?>
                                     <th class="text-left" style="width: 170px;">Team</th>
+                                <?php endif; ?>
+                                <?php if (!empty($room['is_review_mode'])): ?>
+                                    <th class="text-center" style="width: 180px;">Completed At</th>
                                 <?php endif; ?>
                                 <th class="text-right" style="width: 150px;">Total Score</th>
                                 <th class="text-right" style="width: 150px;">Correct Answers</th>
@@ -658,6 +662,22 @@ require_once __DIR__ . '/../../includes/navbar.php';
                                     <?php if ($isTeamMode): ?>
                                     <td class="text-left">
                                         <?= TeamManager::renderTeamBadge(intval($p['team_id'] ?? 0), $p['team_name'] ?? null) ?>
+                                    </td>
+                                    <?php endif; ?>
+                                    <?php if (!empty($room['is_review_mode'])): ?>
+                                    <td class="text-center">
+                                        <?php if (!empty($p['is_finished']) && !empty($p['review_completed_at'])): ?>
+                                            <div class="font-weight-bold" style="color: #0f172a; font-size: 13.5px;">
+                                                <i class="fas fa-check-circle text-success mr-1"></i><?= date('M d, Y', strtotime($p['review_completed_at'])) ?>
+                                            </div>
+                                            <div style="font-size: 11.5px; color: #64748b; margin-top: 2px;">
+                                                <?= date('H:i:s', strtotime($p['review_completed_at'])) ?>
+                                            </div>
+                                        <?php else: ?>
+                                            <span class="badge badge-warning text-dark px-2 py-1" style="font-size: 11px; font-weight: 600; border-radius: 6px;">
+                                                <i class="fas fa-spinner fa-spin mr-1"></i> In Progress
+                                            </span>
+                                        <?php endif; ?>
                                     </td>
                                     <?php endif; ?>
                                     <td class="text-right">
@@ -818,17 +838,17 @@ require_once __DIR__ . '/../../includes/navbar.php';
             <div class="modal-body p-0">
                 <div class="d-flex justify-content-around py-3 px-4 bg-light border-bottom text-center">
                     <div>
-                        <div class="small text-muted font-weight-bold text-uppercase">Thành viên</div>
+                        <div class="small text-muted font-weight-bold text-uppercase">Members</div>
                         <div class="font-weight-bold h5 mb-0" id="teamReportMemberCount">0</div>
                     </div>
                     <div class="border-left"></div>
                     <div>
-                        <div class="small text-muted font-weight-bold text-uppercase">Tổng điểm</div>
+                        <div class="small text-muted font-weight-bold text-uppercase">Total Score</div>
                         <div class="font-weight-bold h5 mb-0 text-primary tabular-nums" id="teamReportTotalScore">0 pts</div>
                     </div>
                     <div class="border-left"></div>
                     <div>
-                        <div class="small text-muted font-weight-bold text-uppercase">Tổng câu đúng</div>
+                        <div class="small text-muted font-weight-bold text-uppercase">Total Correct</div>
                         <div class="font-weight-bold h5 mb-0 text-success tabular-nums" id="teamReportTotalCorrect">0</div>
                     </div>
                 </div>
@@ -850,7 +870,7 @@ require_once __DIR__ . '/../../includes/navbar.php';
                 </div>
             </div>
             <div class="modal-footer bg-light py-2">
-                <button type="button" class="saas-btn saas-btn-outline" data-dismiss="modal">Đóng</button>
+                <button type="button" class="saas-btn saas-btn-outline" data-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
@@ -895,23 +915,23 @@ function openTeamReportModal(teamId) {
     if (icon) icon.innerHTML = '<i class="' + (team.icon || 'fas fa-users') + '"></i>';
 
     const sub = document.getElementById('teamReportModalSubtitle');
-    if (sub) sub.textContent = 'Hạng ' + (team.rank || '-') + ' toàn trận • ' + (team.member_count || 0) + ' thành viên';
+    if (sub) sub.textContent = 'Rank ' + (team.rank || '-') + ' overall • ' + (team.member_count || 0) + ' members';
 
     const countEl = document.getElementById('teamReportMemberCount');
-    if (countEl) countEl.textContent = team.member_count + ' thành viên';
+    if (countEl) countEl.textContent = team.member_count + ' members';
 
     const scoreEl = document.getElementById('teamReportTotalScore');
     if (scoreEl) scoreEl.textContent = Number(team.total_score).toLocaleString() + ' pts';
 
     const corrEl = document.getElementById('teamReportTotalCorrect');
-    if (corrEl) corrEl.textContent = Number(team.total_correct || 0) + ' câu';
+    if (corrEl) corrEl.textContent = Number(team.total_correct || 0) + ' correct';
 
     const tbody = document.getElementById('teamReportTableBody');
     if (!tbody) return;
     tbody.innerHTML = '';
 
     if (!team.members || team.members.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted font-weight-bold">Chưa có người chơi nào gia nhập đội này.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted font-weight-bold">No players in this team yet.</td></tr>';
     } else {
         team.members.forEach((m, idx) => {
             const tr = document.createElement('tr');

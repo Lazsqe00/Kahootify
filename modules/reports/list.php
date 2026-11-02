@@ -28,6 +28,10 @@ $sql = "
     SELECT 
         r.id_room,
         r.pin,
+        r.status as room_status,
+        r.is_review_mode,
+        r.review_start_time,
+        r.review_end_time,
         r.roomadd,
         r.roomupdate,
         r.is_team_mode,
@@ -45,7 +49,7 @@ $sql = "
     FROM room r
     JOIN quiz q ON r.id_quiz = q.id_quiz
     LEFT JOIN players p ON r.id_room = p.id_room
-    WHERE r.id_creator = :c AND r.status = 'finished'
+    WHERE r.id_creator = :c AND (r.status = 'finished' OR (r.is_review_mode = 1 AND r.status = 'review_active'))
     GROUP BY r.id_room
     ORDER BY r.id_room DESC
 ";
@@ -179,9 +183,9 @@ require_once __DIR__ . '/../../includes/navbar.php';
                             <th class="text-center" style="width: 50px;">#</th>
                             <th class="text-left">Quiz Name</th>
                             <th class="text-center" style="width: 120px;">PIN</th>
-                            <th class="text-left" style="width: 180px;">Hosted Date</th>
-                            <th class="text-right" style="width: 130px;">Players</th>
-                            <th class="text-left" style="width: 230px;">Winner / High Score</th>
+                            <th class="text-left" style="width: 220px;">Hosted Date</th>
+                            <th class="text-right" style="width: 120px;">Players</th>
+                            <th class="text-left" style="width: 210px;">Winner / High Score</th>
                             <th class="text-right" style="width: 130px;">Actions</th>
                         </tr>
                     </thead>
@@ -192,9 +196,32 @@ require_once __DIR__ . '/../../includes/navbar.php';
                                     <?= $index + 1 ?>
                                 </td>
                                 <td class="text-left">
-                                    <a href="<?= BASE_URL ?>modules/reports/detail.php?id_room=<?= $rep['id_room'] ?>" class="font-weight-bold text-decoration-none" style="color: #0f172a; font-size: 14px;">
-                                        <?= htmlspecialchars($rep['quiz_name']) ?><?php if (!empty($rep['is_team_mode'])): ?><span class="badge badge-info text-white font-weight-bold ml-1" style="font-size: 10px; border-radius: 6px; vertical-align: middle;"><i class="fas fa-users mr-1"></i>Team</span><?php endif; ?>
-                                    </a>
+                                    <div class="d-flex align-items-center flex-wrap" style="gap: 4px;">
+                                        <a href="<?= BASE_URL ?>modules/reports/detail.php?id_room=<?= $rep['id_room'] ?>" class="font-weight-bold text-decoration-none mr-1" style="color: #0f172a; font-size: 14px;">
+                                            <?= htmlspecialchars($rep['quiz_name']) ?>
+                                        </a>
+                                        <?php if (!empty($rep['is_review_mode'])): ?>
+                                            <span class="badge text-white font-weight-bold" style="font-size: 10px; border-radius: 6px; vertical-align: middle; background-color: #6366f1;">
+                                                <i class="fas fa-book-reader mr-1"></i>Review
+                                            </span>
+                                            <?php 
+                                            $isReviewActive = ($rep['room_status'] === 'review_active' && (empty($rep['review_end_time']) || strtotime($rep['review_end_time']) > time()));
+                                            if ($isReviewActive): ?>
+                                                <span class="badge badge-success font-weight-bold" style="font-size: 10px; border-radius: 6px; vertical-align: middle;">
+                                                    <i class="fas fa-dot-circle mr-1"></i>Active
+                                                </span>
+                                            <?php else: ?>
+                                                <span class="badge badge-secondary font-weight-bold" style="font-size: 10px; border-radius: 6px; vertical-align: middle; background-color: #64748b;">
+                                                    <i class="fas fa-lock mr-1"></i>Closed
+                                                </span>
+                                            <?php endif; ?>
+                                        <?php endif; ?>
+                                        <?php if (!empty($rep['is_team_mode'])): ?>
+                                            <span class="badge badge-info text-white font-weight-bold" style="font-size: 10px; border-radius: 6px; vertical-align: middle;">
+                                                <i class="fas fa-users mr-1"></i>Team
+                                            </span>
+                                        <?php endif; ?>
+                                    </div>
                                     <div style="font-size: 11.5px; color: #94a3b8; margin-top: 2px;">
                                         Session ID: #<?= $rep['id_room'] ?>
                                     </div>
@@ -205,12 +232,24 @@ require_once __DIR__ . '/../../includes/navbar.php';
                                     </span>
                                 </td>
                                 <td class="text-left" style="font-size: 13px;">
-                                    <div class="font-weight-medium" style="color: #334155;">
-                                        <?= date('M d, Y', strtotime($rep['roomadd'] ?? 'now')) ?>
-                                    </div>
-                                    <div style="font-size: 11.5px; color: #94a3b8;">
-                                        <?= date('h:i A', strtotime($rep['roomadd'] ?? 'now')) ?>
-                                    </div>
+                                    <?php if (!empty($rep['is_review_mode'])): 
+                                        $startTs = !empty($rep['review_start_time']) ? strtotime($rep['review_start_time']) : strtotime($rep['roomadd'] ?? 'now');
+                                        $endTs   = !empty($rep['review_end_time']) ? strtotime($rep['review_end_time']) : null;
+                                    ?>
+                                        <div class="font-weight-medium" style="color: #334155; white-space: nowrap;">
+                                            <?= date('M d, Y', $startTs) ?> &ndash; <?= $endTs ? date('M d, Y', $endTs) : 'No limit' ?>
+                                        </div>
+                                        <div style="font-size: 11.5px; color: #64748b; white-space: nowrap;">
+                                            <?= date('h:i A', $startTs) ?> &ndash; <?= $endTs ? date('h:i A', $endTs) : '&infin;' ?>
+                                        </div>
+                                    <?php else: ?>
+                                        <div class="font-weight-medium" style="color: #334155;">
+                                            <?= date('M d, Y', strtotime($rep['roomadd'] ?? 'now')) ?>
+                                        </div>
+                                        <div style="font-size: 11.5px; color: #94a3b8;">
+                                            <?= date('h:i A', strtotime($rep['roomadd'] ?? 'now')) ?>
+                                        </div>
+                                    <?php endif; ?>
                                 </td>
                                 <td class="text-right">
                                     <span class="saas-numeric font-weight-bold" style="color: #0f172a; font-size: 13.5px;">
@@ -230,9 +269,15 @@ require_once __DIR__ . '/../../includes/navbar.php';
                                             </span>
                                         </div>
                                     <?php else: ?>
-                                        <span style="color: #94a3b8; font-size: 12px; font-style: italic;">
-                                            No players
-                                        </span>
+                                        <?php if (!empty($rep['is_review_mode']) && $rep['room_status'] === 'review_active'): ?>
+                                            <span class="text-warning small font-weight-medium">
+                                                <i class="fas fa-spinner fa-spin mr-1"></i>Awaiting players
+                                            </span>
+                                        <?php else: ?>
+                                            <span style="color: #94a3b8; font-size: 12px; font-style: italic;">
+                                                No players
+                                            </span>
+                                        <?php endif; ?>
                                     <?php endif; ?>
                                 </td>
                                 <td class="text-right">
@@ -243,6 +288,17 @@ require_once __DIR__ . '/../../includes/navbar.php';
                                             <i class="fas fa-chevron-down" style="font-size: 10px; color: #64748b;"></i>
                                         </button>
                                         <div class="dropdown-menu dropdown-menu-right saas-dropdown-menu shadow" aria-labelledby="actionMenu_<?= $rep['id_room'] ?>">
+                                            <?php if (!empty($rep['is_review_mode']) && $rep['room_status'] === 'review_active'): ?>
+                                                <a class="dropdown-item saas-dropdown-item" href="<?= BASE_URL ?>modules/host/review_lobby.php?id_room=<?= $rep['id_room'] ?>">
+                                                    <span class="saas-menu-icon" style="color: #d97706; background: #fef3c7;">
+                                                        <i class="fas fa-qrcode"></i>
+                                                    </span>
+                                                    <div>
+                                                        <div class="font-weight-medium">Join Info (Lobby)</div>
+                                                        <small class="text-muted" style="font-size: 11px;">Game PIN & QR code</small>
+                                                    </div>
+                                                </a>
+                                            <?php endif; ?>
                                             <!-- Action 1: View Details -->
                                             <a class="dropdown-item saas-dropdown-item" href="<?= BASE_URL ?>modules/reports/detail.php?id_room=<?= $rep['id_room'] ?>">
                                                 <span class="saas-menu-icon icon-purple">

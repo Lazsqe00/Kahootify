@@ -19,7 +19,7 @@ if ($quizId > 0) {
         }
 
         $newQuizId = db_insert(
-            "INSERT INTO quiz (id_creator, name, description, mode, game_type, obstacle_image, obstacle_answer, total_pieces) VALUES (:c, :n, :d, :m, :gt, :img, :ans, :tp)",
+            "INSERT INTO quiz (id_creator, name, description, mode, game_type, obstacle_image, obstacle_answer, total_pieces, is_team_mode, team_count, team_player_limit, is_review_mode, review_start_time, review_end_time) VALUES (:c, :n, :d, :m, :gt, :img, :ans, :tp, :tm, :tc, :tpl, 0, NULL, NULL)",
             [
                 ':c'   => $creatorId,
                 ':n'   => $newName,
@@ -28,7 +28,10 @@ if ($quizId > 0) {
                 ':gt'  => $srcQuiz['game_type'] ?? 'classic',
                 ':img' => $srcQuiz['obstacle_image'] ?? null,
                 ':ans' => $srcQuiz['obstacle_answer'] ?? null,
-                ':tp'  => $srcQuiz['total_pieces'] ?? 4
+                ':tp'  => $srcQuiz['total_pieces'] ?? 4,
+                ':tm'  => intval($srcQuiz['is_team_mode'] ?? 0),
+                ':tc'  => intval($srcQuiz['team_count'] ?? 2),
+                ':tpl' => intval($srcQuiz['team_player_limit'] ?? 0)
             ]
         );
 

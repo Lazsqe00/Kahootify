@@ -225,8 +225,8 @@ require_once __DIR__ . '/header.php';
     ?>
         <div class="card border-0 shadow-sm p-3 mb-3" style="border-radius: 16px; background: rgba(30, 17, 54, 0.95); border: 1px solid rgba(255,255,255,0.15);">
             <div class="d-flex align-items-center justify-content-between mb-2">
-                <span class="font-weight-bold text-white small"><i class="fas fa-users text-primary mr-1"></i> BẢNG ĐIỂM CÁC ĐỘI</span>
-                <span class="badge badge-primary font-weight-bold"><?= count($hostTeamScores) ?> Đội</span>
+                <span class="font-weight-bold text-white small"><i class="fas fa-users text-primary mr-1"></i> TEAM SCORES</span>
+                <span class="badge badge-primary font-weight-bold"><?= count($hostTeamScores) ?> Teams</span>
             </div>
             <div class="d-flex flex-wrap" id="hostTeamScoresContainer" style="gap: 10px;">
                 <?php foreach ($hostTeamScores as $ht): ?>
@@ -237,7 +237,7 @@ require_once __DIR__ . '/header.php';
                         <div class="font-weight-bold" style="font-size: 1.2rem; color: #ffca28;" id="team_score_<?= $ht['id'] ?>">
                             <?= number_format($ht['total_score']) ?>
                         </div>
-                        <small class="text-white-50"><?= $ht['member_count'] ?> người</small>
+                        <small class="text-white-50"><?= $ht['member_count'] ?> players</small>
                     </div>
                 <?php endforeach; ?>
             </div>

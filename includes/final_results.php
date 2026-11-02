@@ -267,7 +267,7 @@ require __DIR__ . '/header.php';
                     <?= player_appearance_image($resultCharacters[$myResult['id_player']], 'results-personal-character') ?>
                     <p class="results-personal-correct"><?= (int) $myResult['correct_count'] ?> out of <?= $questionCount ?> correct</p>
                     <?php if ($isTeamMode && $myTeam !== null): ?>
-                        <p class="results-personal-total">Đội đạt <strong><?= number_format($myTeam['total_score']) ?></strong> điểm &bull; <?= $myTeam['member_count'] ?> thành viên</p>
+                        <p class="results-personal-total">Team scored <strong><?= number_format($myTeam['total_score']) ?></strong> points &bull; <?= $myTeam['member_count'] ?> members</p>
                     <?php else: ?>
                         <p class="results-personal-total">Out of <?= $participantCount ?> <?= $participantCount === 1 ? 'player' : 'players' ?></p>
                     <?php endif; ?>
@@ -512,11 +512,11 @@ require __DIR__ . '/header.php';
                 <?php if ($isTeamMode): ?>
                     <!-- TEAM LEADERBOARD STANDINGS -->
                     <div class="results-standings-heading">
-                        <h2 id="resultsStandingsTitle"><i class="fas fa-users mr-2 text-primary"></i>Bảng xếp hạng các Đội</h2>
-                        <span><?= $teamCount ?> Đội &bull; <?= $participantCount ?> Người chơi</span>
+                        <h2 id="resultsStandingsTitle"><i class="fas fa-users mr-2 text-primary"></i>Team Leaderboard</h2>
+                        <span><?= $teamCount ?> Teams &bull; <?= $participantCount ?> Players</span>
                     </div>
                     <p class="text-muted small mb-3">
-                        <i class="fas fa-info-circle mr-1"></i> Nhấn vào một Đội để xem chi tiết bảng xếp hạng tất cả thành viên trong đội đó.
+                        <i class="fas fa-info-circle mr-1"></i> Click on a Team to view detailed standings of all its members.
                     </p>
 
                     <div class="team-standings-list">
@@ -538,11 +538,11 @@ require __DIR__ . '/header.php';
                                                     <?= htmlspecialchars($teamItem['name']) ?>
                                                 </h3>
                                                 <span class="badge badge-light border text-muted font-weight-bold" style="font-size: 0.78rem;">
-                                                    <?= $teamItem['member_count'] ?> thành viên
+                                                    <?= $teamItem['member_count'] ?> members
                                                 </span>
                                             </div>
                                             <div class="small text-muted font-weight-bold mt-1">
-                                                Tổng đúng: <strong><?= (int)$teamItem['total_correct'] ?></strong> câu
+                                                Total correct: <strong><?= (int)$teamItem['total_correct'] ?></strong> questions
                                             </div>
                                         </div>
                                     </div>
@@ -554,7 +554,7 @@ require __DIR__ . '/header.php';
                                             <small class="text-muted font-weight-bold text-uppercase" style="font-size: 0.75rem;">points</small>
                                         </div>
                                         <button type="button" class="btn btn-sm btn-outline-primary font-weight-bold rounded-pill px-3" style="font-size: 0.8rem;" onclick="event.stopPropagation(); openTeamModal(<?= (int)$teamItem['id'] ?>)">
-                                            Chi tiết <i class="fas fa-chevron-right ml-1"></i>
+                                            Details <i class="fas fa-chevron-right ml-1"></i>
                                         </button>
                                     </div>
                                 </div>
@@ -562,7 +562,7 @@ require __DIR__ . '/header.php';
                                 <!-- TOP 3 PLAYERS PREVIEW -->
                                 <div class="border-top pt-2 mt-2">
                                     <div class="small font-weight-bold text-muted mb-2 text-uppercase" style="font-size: 0.72rem; letter-spacing: 0.5px;">
-                                        <i class="fas fa-medal text-warning mr-1"></i> Top 3 cá nhân cao điểm nhất:
+                                        <i class="fas fa-medal text-warning mr-1"></i> Top 3 team members:
                                     </div>
                                     <?php if (!empty($teamItem['top_3_players'])): ?>
                                         <div class="team-top3-grid">
@@ -587,7 +587,7 @@ require __DIR__ . '/header.php';
                                             <?php endforeach; ?>
                                         </div>
                                     <?php else: ?>
-                                        <div class="text-muted small font-italic">Chưa có người chơi nào trong đội này.</div>
+                                        <div class="text-muted small font-italic">No players in this team yet.</div>
                                     <?php endif; ?>
                                 </div>
                             </div>
@@ -671,8 +671,8 @@ require __DIR__ . '/header.php';
                 <div class="d-flex align-items-center" style="gap: 12px;">
                     <div id="teamModalIcon" style="font-size: 1.8rem;"></div>
                     <div>
-                        <h4 class="modal-title font-weight-bold mb-0 text-white" id="teamDetailModalLabel">Chi tiết Đội</h4>
-                        <small class="text-white-50 font-weight-bold" id="teamModalSubtitle">Danh sách xếp hạng thành viên</small>
+                        <h4 class="modal-title font-weight-bold mb-0 text-white" id="teamDetailModalLabel">Team Details</h4>
+                        <small class="text-white-50 font-weight-bold" id="teamModalSubtitle">Member Rankings</small>
                     </div>
                 </div>
                 <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close" style="opacity: 0.9;">
@@ -681,17 +681,17 @@ require __DIR__ . '/header.php';
             </div>
             <div class="modal-body p-0">
                 <div class="p-3 bg-light border-bottom d-flex justify-content-between align-items-center">
-                    <span class="font-weight-bold text-dark" id="teamModalMemberCount">0 thành viên</span>
+                    <span class="font-weight-bold text-dark" id="teamModalMemberCount">0 members</span>
                     <span class="font-weight-bold text-primary" id="teamModalTotalScore" style="font-size: 1.2rem;">0 pts</span>
                 </div>
                 <div class="table-responsive" style="max-height: 420px; overflow-y: auto;">
                     <table class="team-detail-table">
                         <thead class="bg-light text-muted small font-weight-bold text-uppercase">
                             <tr>
-                                <th style="width: 70px;">Hạng</th>
-                                <th>Người chơi</th>
-                                <th class="text-center">Số câu đúng</th>
-                                <th class="text-right">Điểm cá nhân</th>
+                                <th style="width: 70px;">Rank</th>
+                                <th>Player</th>
+                                <th class="text-center">Correct</th>
+                                <th class="text-right">Points</th>
                             </tr>
                         </thead>
                         <tbody id="teamModalTableBody">
@@ -701,7 +701,7 @@ require __DIR__ . '/header.php';
                 </div>
             </div>
             <div class="modal-footer bg-light py-2">
-                <button type="button" class="btn btn-secondary font-weight-bold rounded-pill px-4" data-dismiss="modal">Đóng</button>
+                <button type="button" class="btn btn-secondary font-weight-bold rounded-pill px-4" data-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
@@ -727,10 +727,10 @@ function openTeamModal(teamId) {
     if (icon) icon.innerHTML = '<i class="' + (team.icon || 'fas fa-users') + '"></i>';
 
     const sub = document.getElementById('teamModalSubtitle');
-    if (sub) sub.textContent = 'Hạng ' + (team.rank || '-') + ' toàn trận • Tổng ' + Number(team.total_score).toLocaleString() + ' điểm';
+    if (sub) sub.textContent = 'Rank ' + (team.rank || '-') + ' overall • Total ' + Number(team.total_score).toLocaleString() + ' points';
 
     const countEl = document.getElementById('teamModalMemberCount');
-    if (countEl) countEl.textContent = team.member_count + ' thành viên';
+    if (countEl) countEl.textContent = team.member_count + ' members';
 
     const scoreEl = document.getElementById('teamModalTotalScore');
     if (scoreEl) scoreEl.textContent = Number(team.total_score).toLocaleString() + ' points';
@@ -740,7 +740,7 @@ function openTeamModal(teamId) {
     tbody.innerHTML = '';
 
     if (!team.members || team.members.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-muted font-weight-bold">Chưa có người chơi nào gia nhập đội này.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-muted font-weight-bold">No players in this team yet.</td></tr>';
     } else {
         team.members.forEach((m, idx) => {
             const tr = document.createElement('tr');

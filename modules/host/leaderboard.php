@@ -288,8 +288,8 @@ require_once __DIR__ . '/../../includes/header.php';
     ?>
         <div class="card border-0 shadow-sm p-3 mb-4" style="border-radius: 16px; background: rgba(255,255,255,0.95);">
             <div class="d-flex align-items-center justify-content-between mb-2">
-                <h6 class="font-weight-bold text-dark mb-0"><i class="fas fa-users text-primary mr-2"></i>Tổng điểm các Đội</h6>
-                <span class="badge badge-primary font-weight-bold"><?= count($liveTeamScores) ?> Đội</span>
+                <h6 class="font-weight-bold text-dark mb-0"><i class="fas fa-users text-primary mr-2"></i>Team Scores</h6>
+                <span class="badge badge-primary font-weight-bold"><?= count($liveTeamScores) ?> Teams</span>
             </div>
             <div class="d-flex flex-wrap" style="gap: 10px;">
                 <?php foreach ($liveTeamScores as $lt): ?>
@@ -300,7 +300,7 @@ require_once __DIR__ . '/../../includes/header.php';
                         <div class="font-weight-bold" style="font-size: 1.25rem; color: #1368ce;">
                             <?= number_format($lt['total_score']) ?>
                         </div>
-                        <small class="text-muted font-weight-bold"><?= $lt['member_count'] ?> người</small>
+                        <small class="text-muted font-weight-bold"><?= $lt['member_count'] ?> players</small>
                     </div>
                 <?php endforeach; ?>
             </div>

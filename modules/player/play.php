@@ -34,61 +34,151 @@ if (!$room) {
 $status = $room['status'];
 if (player_is_kicked($room, $playerId)) redirect_removed_player($playerId);
 
-if ($status === 'waiting') {
-    redirect('modules/player/waiting.php?pid=' . $playerId . '&token=' . urlencode($token));
+$isReviewMode = !empty($room['is_review_mode']);
+
+if ($isReviewMode) {
+    // Check if review session has ended or expired
+    $isExpired = (!empty($room['review_end_time']) && strtotime($room['review_end_time']) < time());
+    if ($status === 'finished' || $isExpired) {
+        if ($isExpired && $status !== 'finished') {
+            db_execute("UPDATE room SET status = 'finished' WHERE id_room = :r", [':r' => $roomId]);
+            db_execute("UPDATE quiz SET is_review_mode = 0, review_start_time = NULL, review_end_time = NULL WHERE id_quiz = :q", [':q' => $room['id_quiz']]);
+        }
+        if (empty($player['is_finished']) || empty($player['finished_at'])) {
+            db_execute("UPDATE players SET is_finished = 1, finished_at = COALESCE(finished_at, NOW()) WHERE id_player = :p", [':p' => $playerId]);
+        }
+        $leaderboard = get_room_leaderboard($roomId);
+        $leaderboard = WagerCalculator::calculateFinalRanking($leaderboard);
+        $resultsPlayerId = $playerId;
+        require __DIR__ . '/../../includes/final_results.php';
+        exit;
+    }
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['review_action'])) {
+        if ($_POST['review_action'] === 'next_question') {
+            db_execute(
+                "UPDATE players SET current_question_index = current_question_index + 1, question_start_time = UNIX_TIMESTAMP() WHERE id_player = :p",
+                [':p' => $playerId]
+            );
+            redirect('modules/player/play.php?pid=' . $playerId . '&token=' . urlencode($token));
+        } elseif ($_POST['review_action'] === 'finish_review') {
+            db_execute("UPDATE players SET is_finished = 1, finished_at = COALESCE(finished_at, NOW()) WHERE id_player = :p", [':p' => $playerId]);
+            redirect('modules/player/play.php?pid=' . $playerId . '&token=' . urlencode($token));
+        }
+    }
+
+    $allQ = db_fetch_all("SELECT id_question FROM questions WHERE id_quiz = :q ORDER BY sort_order ASC, id_question ASC", [':q' => $room['id_quiz']]);
+    $totalQuestions = count($allQ);
+    $selectedQIds = array_column($allQ, 'id_question');
+    $pIdx = intval($player['current_question_index'] ?? 0);
+
+    if (!empty($player['is_finished']) || $pIdx >= $totalQuestions) {
+        if (empty($player['is_finished']) || empty($player['finished_at'])) {
+            db_execute("UPDATE players SET is_finished = 1, finished_at = COALESCE(finished_at, NOW()) WHERE id_player = :p", [':p' => $playerId]);
+            $player['is_finished'] = 1;
+            $player['finished_at'] = date('Y-m-d H:i:s');
+        }
+        $leaderboard = get_room_leaderboard($roomId);
+        $leaderboard = WagerCalculator::calculateFinalRanking($leaderboard);
+        $resultsPlayerId = $playerId;
+        require __DIR__ . '/../../includes/final_results.php';
+        exit;
+    }
+
+    $qId = intval($selectedQIds[$pIdx] ?? 0);
+    $currentQuestion = db_fetch_one("SELECT * FROM questions WHERE id_question = :qid", [':qid' => $qId]);
+    $answers = db_fetch_all("SELECT * FROM answers WHERE id_question = :qid ORDER BY id_answer ASC", [':qid' => $qId]);
+
+    $myVoteCheck = db_fetch_one(
+        "SELECT v.id_vote FROM votes v JOIN answers a ON v.id_answer = a.id_answer WHERE v.id_player = :pid AND a.id_question = :qid LIMIT 1",
+        [':pid' => $playerId, ':qid' => $qId]
+    );
+    $isResultPhase = ($myVoteCheck !== false && $myVoteCheck !== null);
+    $phase = $isResultPhase ? 'result' : 'question';
+
+    if (empty($player['question_start_time'])) {
+        db_execute("UPDATE players SET question_start_time = UNIX_TIMESTAMP() WHERE id_player = :p", [':p' => $playerId]);
+        $startTime = time();
+    } else {
+        $startTime = intval($player['question_start_time']);
+    }
+
+    $timeLimit = intval($currentQuestion['time_limit'] ?? 20);
+    if ($timeLimit <= 0) $timeLimit = 20;
+    $elapsed = max(0, time() - $startTime);
+    $remainingSeconds = max(0, $timeLimit - $elapsed);
+    $showOnDevice = true;
+
+    $playerStatus = 'ACTIVE';
+    $isEliminated = false;
+    $isSpectator = false;
+    $currentScore = intval($player['score'] ?? 0);
+    $isObstacleMode = false;
+    $isBuzzerLocked = false;
+    $isDisqualified = false;
+    $questionMode = 'normal';
+    $modeConfig = [];
+    $isSittingOut = false;
+    $myWagerTier = null;
+    $myWagerTierLabel = null;
+    $myWagerAmount = 0;
+    $playerLog = null;
+} else {
+    if ($status === 'waiting') {
+        redirect('modules/player/waiting.php?pid=' . $playerId . '&token=' . urlencode($token));
+    }
+
+    if (($room['game_type'] ?? 'classic') === 'obstacle' && $status === 'board') {
+        require __DIR__ . '/../../includes/player_obstacle_board.php';
+        exit;
+    }
+
+    if ($status === 'finished') {
+        $leaderboard = get_room_leaderboard($roomId);
+        $leaderboard = WagerCalculator::calculateFinalRanking($leaderboard);
+        $resultsPlayerId = $playerId;
+        require __DIR__ . '/../../includes/final_results.php';
+        exit;
+    }
+
+    $parsed = GameStateManager::parseStatus($status);
+    $phase = $parsed['phase'];
+    $qId = $parsed['question_id'];
+    $isResultPhase = ($phase === 'result');
+
+    $playerStatus = strtoupper((string)($player['status'] ?? 'ACTIVE'));
+    $isEliminated = ($playerStatus === 'ELIMINATED');
+    $isSpectator = ($playerStatus === 'SPECTATOR');
+    $currentScore = intval($player['score'] ?? 0);
+    $isObstacleMode = (($room['game_type'] ?? 'classic') === 'obstacle');
+    $isBuzzerLocked = ($isObstacleMode && !empty($player['is_disqualified_obstacle']));
+    $isDisqualified = false;
+
+    $currentQuestion = db_fetch_one("SELECT * FROM questions WHERE id_question = :qid", [':qid' => $qId]);
+    $questionMode = $currentQuestion['mode'] ?? 'normal';
+    $modeConfig = !empty($currentQuestion['mode_config']) ? json_decode($currentQuestion['mode_config'], true) : [];
+
+    $playerLog = db_fetch_one("SELECT * FROM player_question_logs WHERE id_room = :r AND id_question = :q AND id_player = :p", [
+        ':r' => $roomId,
+        ':q' => $qId,
+        ':p' => $playerId
+    ]);
+    $isSittingOut = !empty($playerLog['is_sitting_out']);
+    $myWagerTier = $playerLog['wager_tier'] ?? null;
+    $myWagerTierLabel = $myWagerTier ? WagerCalculator::getTierLabel($myWagerTier) : null;
+    $myWagerAmount = intval($playerLog['wager_amount'] ?? 0);
+
+    $answers = db_fetch_all("SELECT * FROM answers WHERE id_question = :qid ORDER BY id_answer ASC", [':qid' => $qId]);
+    $timeLimit = intval($currentQuestion['time_limit'] ?? 20);
+    if ($timeLimit <= 0) {
+        $timeLimit = 20;
+    }
+
+    $startTime = !empty($room['question_start_time']) ? intval($room['question_start_time']) : time();
+    $elapsed = max(0, time() - $startTime);
+    $remainingSeconds = max(0, $timeLimit - $elapsed);
+
+    $showOnDevice = !empty($room['show_questions_on_players']);
 }
-
-if (($room['game_type'] ?? 'classic') === 'obstacle' && $status === 'board') {
-    require __DIR__ . '/../../includes/player_obstacle_board.php';
-    exit;
-}
-
-if ($status === 'finished') {
-    $leaderboard = get_room_leaderboard($roomId);
-    $leaderboard = WagerCalculator::calculateFinalRanking($leaderboard);
-    $resultsPlayerId = $playerId;
-    require __DIR__ . '/../../includes/final_results.php';
-    exit;
-}
-
-$parsed = GameStateManager::parseStatus($status);
-$phase = $parsed['phase'];
-$qId = $parsed['question_id'];
-$isResultPhase = ($phase === 'result');
-
-$playerStatus = strtoupper((string)($player['status'] ?? 'ACTIVE'));
-$isEliminated = ($playerStatus === 'ELIMINATED');
-$isSpectator = ($playerStatus === 'SPECTATOR');
-$currentScore = intval($player['score'] ?? 0);
-$isObstacleMode = (($room['game_type'] ?? 'classic') === 'obstacle');
-$isBuzzerLocked = ($isObstacleMode && !empty($player['is_disqualified_obstacle']));
-$isDisqualified = false;
-
-$currentQuestion = db_fetch_one("SELECT * FROM questions WHERE id_question = :qid", [':qid' => $qId]);
-$questionMode = $currentQuestion['mode'] ?? 'normal';
-$modeConfig = !empty($currentQuestion['mode_config']) ? json_decode($currentQuestion['mode_config'], true) : [];
-
-$playerLog = db_fetch_one("SELECT * FROM player_question_logs WHERE id_room = :r AND id_question = :q AND id_player = :p", [
-    ':r' => $roomId,
-    ':q' => $qId,
-    ':p' => $playerId
-]);
-$isSittingOut = !empty($playerLog['is_sitting_out']);
-$myWagerTier = $playerLog['wager_tier'] ?? null;
-$myWagerTierLabel = $myWagerTier ? WagerCalculator::getTierLabel($myWagerTier) : null;
-$myWagerAmount = intval($playerLog['wager_amount'] ?? 0);
-
-$answers = db_fetch_all("SELECT * FROM answers WHERE id_question = :qid ORDER BY id_answer ASC", [':qid' => $qId]);
-$timeLimit = intval($currentQuestion['time_limit'] ?? 20);
-if ($timeLimit <= 0) {
-    $timeLimit = 20;
-}
-
-$startTime = !empty($room['question_start_time']) ? intval($room['question_start_time']) : time();
-$elapsed = max(0, time() - $startTime);
-$remainingSeconds = max(0, $timeLimit - $elapsed);
-
-$showOnDevice = !empty($room['show_questions_on_players']);
 
 $hasQuestionImage = false;
 $questionImageUrl = '';
@@ -233,6 +323,23 @@ if ($isResultPhase):
     <audio id="pointsSfx" preload="auto" src="<?= BASE_URL ?>assets/audio/<?= rawurlencode('points.mp3') ?>"></audio>
 
     <div class="container py-3" style="max-width: 650px;">
+        <?php if (!empty($isReviewMode)): ?>
+            <div class="card border-0 shadow-sm mb-3 text-center p-3" style="border-radius: 14px; background: #ffffff;">
+                <form method="POST">
+                    <?php if ($pIdx + 1 < $totalQuestions): ?>
+                        <input type="hidden" name="review_action" value="next_question">
+                        <button type="submit" class="btn btn-primary btn-lg font-weight-bold px-5 py-3 shadow" style="background:#46178f; border-color:#46178f; border-radius:30px;">
+                            Next Question (<?= ($pIdx + 2) ?>/<?= $totalQuestions ?>) <i class="fas fa-arrow-right ml-1"></i>
+                        </button>
+                    <?php else: ?>
+                        <input type="hidden" name="review_action" value="finish_review">
+                        <button type="submit" class="btn btn-success btn-lg font-weight-bold px-5 py-3 shadow" style="border-radius:30px;">
+                            <i class="fas fa-trophy mr-1"></i> View Final Results
+                        </button>
+                    <?php endif; ?>
+                </form>
+            </div>
+        <?php endif; ?>
 
         <?php if ($isDisqualified): ?>
             <div class="card border-0 shadow text-white text-center mb-3"
@@ -801,6 +908,22 @@ elseif ($phase === 'question'):
             </div>
         <?php endif; ?>
 
+        <?php if (!empty($isReviewMode) && !$isResultPhase): ?>
+            <div id="reviewTimeoutBox" class="text-center my-3" style="display: <?= ($remainingSeconds <= 0) ? 'block' : 'none' ?>;">
+                <div class="alert alert-warning font-weight-bold d-inline-block px-4 py-2 shadow-sm mb-2" style="border-radius: 20px;">
+                    <i class="far fa-clock mr-1"></i> Time is up!
+                </div>
+                <div>
+                    <form method="POST">
+                        <input type="hidden" name="review_action" value="<?= ($pIdx + 1 < $totalQuestions) ? 'next_question' : 'finish_review' ?>">
+                        <button type="submit" class="btn btn-primary btn-lg font-weight-bold px-5 py-3 shadow" style="background:#46178f; border-color:#46178f; border-radius:30px;">
+                            <?= ($pIdx + 1 < $totalQuestions) ? 'Next Question (' . ($pIdx + 2) . '/' . $totalQuestions . ')' : 'View Final Results' ?> <i class="fas fa-arrow-right ml-1"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        <?php endif; ?>
+
     <?php endif; ?>
 
     <?php if ($isObstacleMode): ?>
@@ -921,6 +1044,7 @@ if (playerSeconds <= 0) {
             clearInterval(playerCountdown);
             timerEl.textContent = '0';
             $('.answer-box, .player-btn').css('pointer-events', 'none').css('opacity', '0.6');
+            $('#reviewTimeoutBox').slideDown();
         } else {
             timerEl.textContent = playerSeconds;
             if (playerSeconds <= 5 && timerBox) {
@@ -938,7 +1062,10 @@ setInterval(function() {
             return;
         }
         if (res && res.success) {
-            if (res.status !== currentStatus) {
+            const isReview = <?= !empty($isReviewMode) ? 'true' : 'false' ?>;
+            if (!isReview && res.status !== currentStatus) {
+                refreshPlayerPage();
+            } else if (isReview && res.status === 'finished') {
                 refreshPlayerPage();
             }
         }

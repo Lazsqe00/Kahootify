@@ -32,7 +32,7 @@ if (!$room) {
 }
 
 $playerCheck = db_fetch_one(
-    "SELECT id_player, current_streak, status, score, eliminated_at_question, elimination_order, is_disqualified_obstacle 
+    "SELECT id_player, current_streak, status, score, eliminated_at_question, elimination_order, is_disqualified_obstacle, question_start_time 
      FROM players WHERE id_player = :p AND id_room = :r",
     [':p' => $playerId, ':r' => $roomId]
 );
@@ -50,7 +50,7 @@ try {
         }
 
         $ans = db_fetch_one(
-            "SELECT a.*, q.points, q.time_limit, q.mode, q.mode_config, q.piece_index, r.question_start_time, r.status, r.game_type
+            "SELECT a.*, q.points, q.time_limit, q.mode, q.mode_config, q.piece_index, r.question_start_time, r.status, r.game_type, r.is_review_mode, r.review_end_time
              FROM answers a
              JOIN questions q ON a.id_question = q.id_question
              JOIN room r ON r.id_room = :r
@@ -60,6 +60,14 @@ try {
 
         if (!$ans) {
             return ['success' => false, 'message' => 'Invalid answer or room'];
+        }
+
+        if ($ans['status'] === 'finished') {
+            return ['success' => false, 'message' => 'This game or review session has ended and is closed for submissions!'];
+        }
+
+        if (!empty($ans['is_review_mode']) && !empty($ans['review_end_time']) && strtotime($ans['review_end_time']) < time()) {
+            return ['success' => false, 'message' => 'Review timeframe has ended.'];
         }
 
         $qId = intval($ans['id_question']);
@@ -97,7 +105,7 @@ try {
 
         $isCorrect = ($ans['is_correct'] == 1);
         $timeLimit  = intval($ans['time_limit'] ?: 20);
-        $startTime  = intval($ans['question_start_time'] ?: time());
+        $startTime  = (!empty($room['is_review_mode']) && !empty($playerCheck['question_start_time'])) ? intval($playerCheck['question_start_time']) : intval($ans['question_start_time'] ?: time());
         $elapsed    = max(0, time() - $startTime);
 
         $pointsEarned = 0;
@@ -266,13 +274,15 @@ try {
             }
         }
 
-        // Check if all participants have answered -> auto-finalize question phase
-        $counts = room_question_counts($room, $qId, $state);
-        $totalPlayers = $counts['total_players'];
-        $votedCount   = $counts['voted_count'];
+        // Check if all participants have answered -> auto-finalize question phase (disabled for review mode)
+        if (empty($room['is_review_mode'])) {
+            $counts = room_question_counts($room, $qId, $state);
+            $totalPlayers = $counts['total_players'];
+            $votedCount   = $counts['voted_count'];
 
-        if ($totalPlayers > 0 && $votedCount >= $totalPlayers) {
-            GameStateManager::finalizeQuestionPhase($roomId, $qId);
+            if ($totalPlayers > 0 && $votedCount >= $totalPlayers) {
+                GameStateManager::finalizeQuestionPhase($roomId, $qId);
+            }
         }
 
         return [

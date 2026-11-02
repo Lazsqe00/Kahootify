@@ -15,8 +15,21 @@ if (!$room || $room['status'] === 'finished') {
     redirect('modules/quiz/list.php');
 }
 
-if ($room['status'] !== 'waiting') {
+$isReviewMode = !empty($room['is_review_mode']);
+
+if ($isReviewMode && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['end_review'])) {
+    db_execute("UPDATE room SET status = 'finished' WHERE id_room = :r AND id_creator = :c", [':r' => $roomId, ':c' => $creatorId]);
+    set_flash_message('success', 'Review room has ended successfully.');
+    redirect('modules/quiz/list.php');
+}
+
+if (!$isReviewMode && $room['status'] !== 'waiting') {
     redirect('modules/host/play.php');
+}
+
+if ($isReviewMode) {
+    redirect('modules/host/review_lobby.php?id_room=' . $roomId);
+    exit;
 }
 
 if (empty($_SESSION['room_lock_token'])) {

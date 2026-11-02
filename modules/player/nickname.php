@@ -37,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $canJoin) {
     $nickname = is_string($submittedNickname) ? trim($submittedNickname) : '';
 
     if ($isTeamMode && $selectedTeam <= 0) {
-        $error = 'Vui lòng chọn một đội tham gia!';
+        $error = 'Please select a team to join!';
     } elseif (!isset($characters[$selectedCharacter])) {
         $error = 'Please choose an available character.';
         $selectedCharacter = default_player_character();
@@ -61,6 +61,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $canJoin) {
                 $_SESSION['player_team_name'] = $result['team_name'] ?? '';
             }
 
+            if (!empty($room['is_review_mode'])) {
+                redirect('modules/player/play.php?pid=' . $playerId . '&token=' . $playerToken);
+            }
             redirect('modules/player/waiting.php?pid=' . $playerId . '&token=' . $playerToken);
         } else {
             $error = $result['message'];
@@ -97,7 +100,7 @@ require_once __DIR__ . '/../../includes/header.php';
             <?php if ($isTeamMode): ?>
                 <div id="teamStep" class="mb-3">
                     <p class="font-weight-bold text-dark mb-2" style="font-size: 0.95rem;">
-                        <i class="fas fa-users text-primary mr-1"></i> Chọn đội của bạn:
+                        <i class="fas fa-users text-primary mr-1"></i> Choose your team:
                     </p>
                     <input type="hidden" name="team_id" id="selectedTeamId" value="<?= $selectedTeam > 0 ? $selectedTeam : '' ?>" required>
                     <div class="team-selection-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; max-height: 280px; overflow-y: auto; padding: 4px;">
@@ -118,9 +121,9 @@ require_once __DIR__ . '/../../includes/header.php';
                                 </div>
                                 <div class="small text-muted mt-1" style="font-size: 0.75rem;">
                                     <?php if ($isFull): ?>
-                                        <span class="badge badge-danger">ĐÃ ĐẦY</span>
+                                        <span class="badge badge-danger">FULL</span>
                                     <?php else: ?>
-                                        <span class="font-weight-bold" style="color: <?= $t['color'] ?>;"><?= $t['member_count'] ?><?= $t['limit'] > 0 ? '/' . $t['limit'] : '' ?> người</span>
+                                        <span class="font-weight-bold" style="color: <?= $t['color'] ?>;"><?= $t['member_count'] ?><?= $t['limit'] > 0 ? '/' . $t['limit'] : '' ?> players</span>
                                     <?php endif; ?>
                                 </div>
                             </div>

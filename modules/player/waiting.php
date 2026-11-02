@@ -22,7 +22,7 @@ if ($playerId > 0) {
 if ($roomId <= 0 || $playerId <= 0 || !$player || !player_request_is_valid($playerId, $roomId, $token)) {
     redirect('modules/player/join.php');
 }
-$room = db_fetch_one('SELECT id_room, pin, status FROM room WHERE id_room = :r', [':r' => $roomId]);
+$room = db_fetch_one('SELECT id_room, pin, status, is_review_mode FROM room WHERE id_room = :r', [':r' => $roomId]);
 if (!$room) redirect('modules/player/join.php');
 if (player_is_kicked($room, $playerId)) redirect_removed_player($playerId);
 $characterRoom = $room;
@@ -30,7 +30,7 @@ $characterRoom = $room;
 $ownsPlayer = ((int) ($_SESSION['id_player'] ?? 0) === $playerId && (int) ($_SESSION['player_room_id'] ?? 0) === $roomId)
     || hash_equals(substr(md5($playerId . '_' . $roomId . '_kahoot_secret_2026'), 0, 16), $token);
 
-if ($characterRoom['status'] !== 'waiting') redirect('modules/player/play.php?pid=' . $playerId . '&token=' . urlencode($token));
+if (!empty($room['is_review_mode']) || $characterRoom['status'] !== 'waiting') redirect('modules/player/play.php?pid=' . $playerId . '&token=' . urlencode($token));
 $_SESSION['character_csrf'] ??= bin2hex(random_bytes(32));
 $characterError = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {

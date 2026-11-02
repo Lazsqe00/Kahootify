@@ -51,8 +51,97 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
         redirect('modules/quiz/edit.php?id=' . $quizId);
     }
 
+    if ($action === 'update_review_settings') {
+        $isClassic = (($quiz['game_type'] ?? 'classic') === 'classic') && (($quiz['mode'] ?? 'normal') === 'normal');
+        if (!$isClassic) {
+            set_flash_message('danger', 'Review Mode can only be enabled for Classic mode quizzes!');
+            redirect('modules/quiz/edit.php?id=' . $quizId);
+        }
+
+        $isReview = !empty($_POST['is_review_mode']) ? 1 : 0;
+        $startTime = !empty($_POST['review_start_time']) ? date('Y-m-d H:i:s', strtotime($_POST['review_start_time'])) : null;
+        $endTime   = !empty($_POST['review_end_time'])   ? date('Y-m-d H:i:s', strtotime($_POST['review_end_time']))   : null;
+
+        if ($isReview) {
+            // Khi bật Review Mode: tự động tắt Team Mode
+            db_execute(
+                "UPDATE quiz SET is_review_mode = 1, review_start_time = :st, review_end_time = :et, is_team_mode = 0 WHERE id_quiz = :q AND id_creator = :c",
+                [
+                    ':st' => $startTime,
+                    ':et' => $endTime,
+                    ':q'  => $quizId,
+                    ':c'  => $creatorId
+                ]
+            );
+
+            // Kiểm tra session ôn tập hiện tại của bộ quiz này
+            $activeRoom = db_fetch_one(
+                "SELECT * FROM room WHERE id_quiz = :q AND is_review_mode = 1 AND status = 'review_active' LIMIT 1",
+                [':q' => $quizId]
+            );
+
+            // Nếu phòng ôn tập cũ đã hết hạn, kết thúc phòng đó để tạo phiên mới
+            if ($activeRoom && !empty($activeRoom['review_end_time']) && strtotime($activeRoom['review_end_time']) < time()) {
+                db_execute("UPDATE room SET status = 'finished' WHERE id_room = :r", [':r' => $activeRoom['id_room']]);
+                $activeRoom = null;
+            }
+
+            if ($activeRoom) {
+                // Đang trong thời hạn mở -> Cập nhật thời gian vào chính instance phòng ôn tập này (báo cáo sẽ tiếp tục cập nhật)
+                db_execute(
+                    "UPDATE room SET review_start_time = :st, review_end_time = :et WHERE id_room = :r",
+                    [
+                        ':st' => $startTime,
+                        ':et' => $endTime,
+                        ':r'  => $activeRoom['id_room']
+                    ]
+                );
+                set_flash_message('success', 'Review Mode settings updated for this quiz (Game PIN: ' . $activeRoom['pin'] . '). Report will continue updating.');
+            } else {
+                // Chưa có phòng hoặc phòng trước đã đóng -> Tạo instance phòng ôn tập mới
+                do {
+                    $newPin = sprintf("%06d", mt_rand(100000, 999999));
+                    $existing = db_fetch_one("SELECT id_room FROM room WHERE pin = :pin AND status != 'finished'", [':pin' => $newPin]);
+                } while ($existing);
+
+                $newRoomId = db_insert(
+                    "INSERT INTO room (id_quiz, id_creator, pin, status, game_type, is_review_mode, review_start_time, review_end_time, is_team_mode) 
+                     VALUES (:q, :c, :pin, 'review_active', 'classic', 1, :st, :et, 0)",
+                    [
+                        ':q'   => $quizId,
+                        ':c'   => $creatorId,
+                        ':pin' => $newPin,
+                        ':st'  => $startTime,
+                        ':et'  => $endTime
+                    ]
+                );
+                set_flash_message('success', 'Review Mode enabled! New review session created (Game PIN: ' . $newPin . ') and listed in Reports.');
+            }
+        } else {
+            // Khi tắt Review Mode -> Đóng phiên phòng ôn tập đang chạy
+            db_execute(
+                "UPDATE room SET status = 'finished' WHERE id_quiz = :q AND is_review_mode = 1 AND status = 'review_active'",
+                [':q' => $quizId]
+            );
+            db_execute(
+                "UPDATE quiz SET is_review_mode = 0, review_start_time = NULL, review_end_time = NULL WHERE id_quiz = :q AND id_creator = :c",
+                [
+                    ':q'  => $quizId,
+                    ':c'  => $creatorId
+                ]
+            );
+            set_flash_message('success', 'Review Mode has been disabled. The review session has been ended and finalized in Reports.');
+        }
+        redirect('modules/quiz/edit.php?id=' . $quizId);
+    }
+
     if ($action === 'update_team_settings') {
         $isTeam = !empty($_POST['is_team_mode']) ? 1 : 0;
+        // Không cho bật Team Mode nếu Review Mode đang bật
+        if (!empty($quiz['is_review_mode']) && $isTeam) {
+            set_flash_message('danger', 'Cannot enable Team Mode while Review Mode is active. Please disable Review Mode first.');
+            redirect('modules/quiz/edit.php?id=' . $quizId);
+        }
         $teamCount = max(2, min(10, intval($_POST['team_count'] ?? 2)));
         $playerLimit = max(0, intval($_POST['team_player_limit'] ?? 0));
 
@@ -66,7 +155,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
                 ':c'   => $creatorId
             ]
         );
-        set_flash_message('success', 'Cài đặt Team Mode đã được lưu!');
+        set_flash_message('success', 'Team Mode settings saved successfully!');
         redirect('modules/quiz/edit.php?id=' . $quizId);
     }
 
@@ -310,7 +399,17 @@ require_once __DIR__ . '/../../includes/navbar.php';
 
 $flash = get_flash_message();
 $isObstacle = ($quiz['game_type'] ?? 'classic') === 'obstacle';
-$isTeamMode = !empty($quiz['is_team_mode']);
+$isClassicQuiz = (($quiz['game_type'] ?? 'classic') === 'classic') && (($quiz['mode'] ?? 'normal') === 'normal') && empty($hasWagerInQuiz);
+
+// Nếu không phải Classic quiz thì vô hiệu hóa hoàn toàn Review Mode
+if (!$isClassicQuiz && !empty($quiz['is_review_mode'])) {
+    db_execute("UPDATE quiz SET is_review_mode = 0, review_start_time = NULL, review_end_time = NULL WHERE id_quiz = :q", [':q' => $quizId]);
+    $quiz['is_review_mode'] = 0;
+}
+$isReviewMode = $isClassicQuiz && !empty($quiz['is_review_mode']);
+$reviewStartTime = !empty($quiz['review_start_time']) ? date('Y-m-d\TH:i', strtotime($quiz['review_start_time'])) : '';
+$reviewEndTime   = !empty($quiz['review_end_time'])   ? date('Y-m-d\TH:i', strtotime($quiz['review_end_time']))   : '';
+$isTeamMode = empty($isReviewMode) && !empty($quiz['is_team_mode']);
 $teamCount = TeamManager::getTeamCount($quiz);
 $teamLimit = TeamManager::getTeamPlayerLimit($quiz);
 $availableTeams = TeamManager::getTeamsForEntity($quiz);
@@ -365,9 +464,14 @@ $availableTeams = TeamManager::getTeamsForEntity($quiz);
             </div>
             <?php endif; ?>
 
+            <?php if ($isReviewMode): ?>
+                <span class="badge badge-warning text-dark px-2 py-1 font-weight-bold d-none d-md-inline-flex align-items-center shadow-sm" style="font-size: 0.8rem; border-radius: 8px;">
+                    <i class="fas fa-book-reader mr-1"></i> Review Mode (Active)
+                </span>
+            <?php endif; ?>
             <?php if ($isTeamMode): ?>
                 <span class="badge badge-success px-2 py-1 font-weight-bold d-none d-md-inline-flex align-items-center" style="font-size: 0.8rem; border-radius: 8px;">
-                    <i class="fas fa-users mr-1"></i> Team Mode (<?= $teamCount ?> Đội)
+                    <i class="fas fa-users mr-1"></i> Team Mode (<?= $teamCount ?> Teams)
                 </span>
             <?php endif; ?>
 
@@ -376,16 +480,29 @@ $availableTeams = TeamManager::getTeamsForEntity($quiz);
                     <i class="fas fa-cog mr-1"></i> Option
                 </button>
                 <div class="dropdown-menu dropdown-menu-right shadow border-0" aria-labelledby="quizOptionsDropdown" style="min-width: 220px; border-radius: 12px; padding: 8px;">
-                    <div class="dropdown-header text-uppercase font-weight-bold text-muted px-2 py-1" style="font-size: 0.72rem; letter-spacing: 0.5px;">Tùy chọn nâng cao</div>
+                    <div class="dropdown-header text-uppercase font-weight-bold text-muted px-2 py-1" style="font-size: 0.72rem; letter-spacing: 0.5px;">Advanced Settings</div>
                     <button class="dropdown-item d-flex align-items-center py-2 px-2 rounded" type="button" data-toggle="modal" data-target="#teamModeModal" onclick="$('#teamModeModal').modal('show')">
                         <i class="fas fa-users mr-2 text-primary"></i>
                         <span class="font-weight-bold">Team Mode</span>
-                        <?php if ($isTeamMode): ?>
+                        <?php if ($isReviewMode): ?>
+                            <span class="badge badge-light border ml-auto text-danger font-weight-bold" title="Locked due to Review Mode">Locked</span>
+                        <?php elseif ($isTeamMode): ?>
                             <span class="badge badge-success ml-auto font-weight-bold">ON (<?= $teamCount ?>)</span>
                         <?php else: ?>
                             <span class="badge badge-light border ml-auto text-muted font-weight-bold">OFF</span>
                         <?php endif; ?>
                     </button>
+                    <?php if ($isClassicQuiz): ?>
+                    <button class="dropdown-item d-flex align-items-center py-2 px-2 rounded mt-1" type="button" data-toggle="modal" data-target="#reviewModeModal" onclick="$('#reviewModeModal').modal('show')">
+                        <i class="fas fa-book-reader mr-2 text-warning"></i>
+                        <span class="font-weight-bold">Review Mode</span>
+                        <?php if ($isReviewMode): ?>
+                            <span class="badge badge-warning text-dark ml-auto font-weight-bold">ON</span>
+                        <?php else: ?>
+                            <span class="badge badge-light border ml-auto text-muted font-weight-bold">OFF</span>
+                        <?php endif; ?>
+                    </button>
+                    <?php endif; ?>
                 </div>
             </div>
 
@@ -717,13 +834,100 @@ $availableTeams = TeamManager::getTeamsForEntity($quiz);
 </div>
 <?php endif; ?>
 
+<?php if ($isClassicQuiz): ?>
+<!-- MODAL REVIEW MODE SETTINGS -->
+<div class="modal fade" id="reviewModeModal" tabindex="-1" role="dialog" aria-labelledby="reviewModeModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content border-0 shadow" style="border-radius: 16px; overflow: hidden;">
+            <div class="modal-header text-white" style="background: linear-gradient(135deg, #f59f00, #d9480f);">
+                <h5 class="modal-title font-weight-bold" id="reviewModeModalLabel">
+                    <i class="fas fa-book-reader mr-2"></i>Review Mode Settings (Self-Paced Study)
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form action="" method="POST">
+                <input type="hidden" name="action" value="update_review_settings">
+                <div class="modal-body p-4">
+                    <div class="d-flex align-items-center justify-content-between p-3 mb-3 rounded" style="background-color: #fff9db; border: 1px solid #ffe066; cursor: pointer;" onclick="toggleReviewModeCheckbox(event)">
+                        <div style="max-width: 75%;">
+                            <h6 class="font-weight-bold mb-1 text-dark">
+                                <i class="fas fa-toggle-on text-warning mr-1"></i> Enable review mode
+                            </h6>
+                            <p class="text-muted small mb-0">
+                                Allow players to study at their own pace without needing a live host.
+                            </p>
+                        </div>
+                        <div class="custom-control custom-switch pl-4" style="font-size: 1.25rem;">
+                            <input type="checkbox" class="custom-control-input" id="is_review_mode" name="is_review_mode" value="1" <?= $isReviewMode ? 'checked' : '' ?> onchange="toggleReviewModeInputs(this.checked)">
+                            <label class="custom-control-label" for="is_review_mode" style="cursor: pointer;"></label>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-warning py-2 px-3 small mb-3" style="border-radius: 8px; border-left: 4px solid #f59f00;">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        <strong>Note:</strong> Review Mode is only available for <strong>Classic</strong> quizzes. When Review Mode is enabled, <strong>Team Mode is automatically disabled</strong> and cannot be enabled until Review Mode is turned off.
+                    </div>
+
+                    <div id="reviewModeFields" style="<?= $isReviewMode ? '' : 'opacity: 0.45; pointer-events: none;' ?>">
+                        <div class="form-group mb-3">
+                            <label class="font-weight-bold text-dark">
+                                <i class="far fa-clock text-primary mr-1"></i> Start time (optional):
+                            </label>
+                            <input type="datetime-local" name="review_start_time" id="review_start_time" class="form-control font-weight-bold" value="<?= $reviewStartTime ?>">
+                            <small class="text-muted">Leave blank to open immediately when created.</small>
+                        </div>
+
+                        <div class="form-group mb-0">
+                            <label class="font-weight-bold text-dark">
+                                <i class="fas fa-hourglass-end text-danger mr-1"></i> End / Closing time (optional):
+                            </label>
+                            <input type="datetime-local" name="review_end_time" id="review_end_time" class="form-control font-weight-bold" value="<?= $reviewEndTime ?>">
+                            <small class="text-muted">Leave blank for no expiration.</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light py-2">
+                    <button type="button" class="btn btn-secondary font-weight-bold rounded-pill px-3" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning font-weight-bold rounded-pill px-4 text-dark" style="background-color: #ffd43b; border-color: #fcc419;">
+                        <i class="fas fa-save mr-1"></i> Save Settings
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleReviewModeCheckbox(e) {
+    if (e && e.target && (e.target.id === 'is_review_mode' || e.target.classList.contains('custom-control-label'))) {
+        return;
+    }
+    const chk = document.getElementById('is_review_mode');
+    if (chk) {
+        chk.checked = !chk.checked;
+        toggleReviewModeInputs(chk.checked);
+    }
+}
+
+function toggleReviewModeInputs(enabled) {
+    const fields = document.getElementById('reviewModeFields');
+    if (fields) {
+        fields.style.opacity = enabled ? '1' : '0.45';
+        fields.style.pointerEvents = enabled ? 'auto' : 'none';
+    }
+}
+</script>
+<?php endif; ?>
+
 <!-- MODAL TEAM MODE SETTINGS -->
 <div class="modal fade" id="teamModeModal" tabindex="-1" role="dialog" aria-labelledby="teamModeModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered" role="document">
         <div class="modal-content border-0 shadow" style="border-radius: 16px; overflow: hidden;">
             <div class="modal-header text-white" style="background: linear-gradient(135deg, #1368ce, #46178f);">
                 <h5 class="modal-title font-weight-bold" id="teamModeModalLabel">
-                    <i class="fas fa-users-cog mr-2"></i>Tùy chỉnh Team Mode
+                    <i class="fas fa-users-cog mr-2"></i>Team Mode Settings
                 </h5>
                 <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
                     <span aria-hidden="true">&times;</span>
@@ -732,46 +936,52 @@ $availableTeams = TeamManager::getTeamsForEntity($quiz);
             <form action="" method="POST">
                 <input type="hidden" name="action" value="update_team_settings">
                 <div class="modal-body p-4">
-                    <div class="d-flex align-items-center justify-content-between p-3 mb-3 rounded" style="background-color: #f3f0fb; border: 1px solid #e0d7f5; cursor: pointer;" onclick="toggleTeamModeCheckbox(event)">
+                    <?php if ($isReviewMode): ?>
+                        <div class="alert alert-warning py-2 px-3 small mb-3 shadow-sm" style="border-radius: 8px;">
+                            <i class="fas fa-exclamation-triangle mr-1"></i>
+                            <strong>Team Mode is locked:</strong> This quiz has <strong>Review Mode</strong> enabled. Team Mode is disabled until Review Mode is turned off.
+                        </div>
+                    <?php endif; ?>
+                    <div class="d-flex align-items-center justify-content-between p-3 mb-3 rounded" style="background-color: #f3f0fb; border: 1px solid #e0d7f5; <?= $isReviewMode ? 'opacity: 0.6; cursor: not-allowed;' : 'cursor: pointer;' ?>" <?= $isReviewMode ? '' : 'onclick="toggleTeamModeCheckbox(event)"' ?>>
                         <div style="max-width: 75%;">
                             <h6 class="font-weight-bold mb-1 text-dark">
-                                <i class="fas fa-users text-primary mr-1"></i> Bật chế độ Team Mode
+                                <i class="fas fa-users text-primary mr-1"></i> Enable Team Mode
                             </h6>
                             <p class="text-muted small mb-0">
-                                Khi bật, người tham gia sẽ chọn team trước khi đặt tên. Điểm cá nhân sẽ được cộng chung vào tổng điểm của team.
+                                When enabled, players choose a team before entering their nickname. Individual points contribute to team total.
                             </p>
                         </div>
                         <div class="custom-control custom-switch pl-4" style="font-size: 1.25rem;">
-                            <input type="checkbox" class="custom-control-input" id="is_team_mode" name="is_team_mode" value="1" <?= $isTeamMode ? 'checked' : '' ?> onchange="toggleTeamModeInputs(this.checked)">
-                            <label class="custom-control-label" for="is_team_mode" style="cursor: pointer;"></label>
+                            <input type="checkbox" class="custom-control-input" id="is_team_mode" name="is_team_mode" value="1" <?= ($isTeamMode && !$isReviewMode) ? 'checked' : '' ?> <?= $isReviewMode ? 'disabled' : '' ?> onchange="toggleTeamModeInputs(this.checked)">
+                            <label class="custom-control-label" for="is_team_mode" style="<?= $isReviewMode ? 'cursor: not-allowed;' : 'cursor: pointer;' ?>"></label>
                         </div>
                     </div>
 
                     <div id="teamModeFields" style="<?= $isTeamMode ? '' : 'opacity: 0.45; pointer-events: none;' ?>">
                         <div class="form-group mb-3">
                             <label class="font-weight-bold text-dark d-flex justify-content-between align-items-center">
-                                <span><i class="fas fa-flag text-primary mr-1"></i> Số lượng Team:</span>
+                                <span><i class="fas fa-flag text-primary mr-1"></i> Team Count:</span>
                                 <span class="badge badge-primary font-weight-bold px-2 py-1" id="teamCountBadge"><?= $teamCount ?> Teams</span>
                             </label>
                             <select name="team_count" id="team_count" class="form-control font-weight-bold" onchange="onTeamCountChange(this.value)">
                                 <?php for ($tc = 2; $tc <= 10; $tc++): ?>
-                                    <option value="<?= $tc ?>" <?= $teamCount == $tc ? 'selected' : '' ?>><?= $tc ?> Đội (Teams)</option>
+                                    <option value="<?= $tc ?>" <?= $teamCount == $tc ? 'selected' : '' ?>><?= $tc ?> Teams</option>
                                 <?php endfor; ?>
                             </select>
-                            <small class="text-muted">Chọn từ 2 đến 10 đội tham gia.</small>
+                            <small class="text-muted">Choose between 2 and 10 teams.</small>
                         </div>
 
                         <div class="form-group mb-3">
                             <label class="font-weight-bold text-dark d-flex justify-content-between align-items-center">
-                                <span><i class="fas fa-user-friends text-info mr-1"></i> Giới hạn người chơi mỗi team:</span>
-                                <span class="badge badge-info font-weight-bold px-2 py-1" id="teamLimitBadge"><?= $teamLimit > 0 ? $teamLimit . ' người/team' : 'Không giới hạn' ?></span>
+                                <span><i class="fas fa-user-friends text-info mr-1"></i> Player limit per team:</span>
+                                <span class="badge badge-info font-weight-bold px-2 py-1" id="teamLimitBadge"><?= $teamLimit > 0 ? $teamLimit . ' players/team' : 'Unlimited' ?></span>
                             </label>
-                            <input type="number" name="team_player_limit" id="team_player_limit" class="form-control font-weight-bold" min="0" max="100" value="<?= $teamLimit ?>" placeholder="0 = Không giới hạn" oninput="onTeamLimitChange(this.value)">
-                            <small class="text-muted">Đặt là <strong>0</strong> để không giới hạn số người mỗi đội.</small>
+                            <input type="number" name="team_player_limit" id="team_player_limit" class="form-control font-weight-bold" min="0" max="100" value="<?= $teamLimit ?>" placeholder="0 = Unlimited" oninput="onTeamLimitChange(this.value)">
+                            <small class="text-muted">Set to <strong>0</strong> for unlimited players per team.</small>
                         </div>
 
                         <div class="form-group mb-0">
-                            <label class="font-weight-bold text-dark mb-2">Xem trước danh sách Team:</label>
+                            <label class="font-weight-bold text-dark mb-2">Team Preview:</label>
                             <div class="d-flex flex-wrap" id="teamPreviewContainer" style="gap: 8px;">
                                 <?php foreach ($availableTeams as $t): ?>
                                     <span class="badge font-weight-bold shadow-sm" style="background: <?= $t['color'] ?>; color: <?= $t['text_color'] ?>; padding: 6px 12px; border-radius: 12px;">
@@ -783,9 +993,9 @@ $availableTeams = TeamManager::getTeamsForEntity($quiz);
                     </div>
                 </div>
                 <div class="modal-footer bg-light py-2">
-                    <button type="button" class="btn btn-secondary font-weight-bold rounded-pill px-3" data-dismiss="modal">Hủy</button>
+                    <button type="button" class="btn btn-secondary font-weight-bold rounded-pill px-3" data-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-primary font-weight-bold rounded-pill px-4" style="background-color: var(--kahoot-purple); border-color: var(--kahoot-purple);">
-                        <i class="fas fa-save mr-1"></i> Lưu cài đặt
+                        <i class="fas fa-save mr-1"></i> Save Settings
                     </button>
                 </div>
             </form>
@@ -797,6 +1007,10 @@ $availableTeams = TeamManager::getTeamsForEntity($quiz);
 const ALL_TEAMS_CATALOG = <?= json_encode(array_values(TeamManager::getTeamsForEntity(['team_count' => 10]))) ?>;
 
 function toggleTeamModeCheckbox(e) {
+    if (<?= $isReviewMode ? 'true' : 'false' ?>) {
+        alert('Cannot enable Team Mode while Review Mode is active. Please disable Review Mode first.');
+        return;
+    }
     if (e && e.target && (e.target.id === 'is_team_mode' || e.target.classList.contains('custom-control-label'))) {
         return;
     }
@@ -844,7 +1058,7 @@ function onTeamLimitChange(val) {
     const limit = parseInt(val) || 0;
     const badge = document.getElementById('teamLimitBadge');
     if (badge) {
-        badge.textContent = limit > 0 ? (limit + ' người/team') : 'Không giới hạn';
+        badge.textContent = limit > 0 ? (limit + ' players/team') : 'Unlimited';
     }
 }
 </script>
