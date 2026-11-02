@@ -4,6 +4,7 @@ header('Content-Type: application/json; charset=utf-8');
 require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../includes/room_access.php';
+require_once __DIR__ . '/../../includes/TeamManager.php';
 
 $rawInput = file_get_contents('php://input');
 $jsonData = json_decode($rawInput, true);
@@ -190,10 +191,15 @@ if ($action === 'buzz') {
     );
 
     if ($affected > 0) {
+        $tInfo = !empty($player['team_id']) ? TeamManager::getTeamInfo(intval($player['team_id'])) : null;
         echo json_encode([
             'success'     => true,
             'your_turn'   => true,
-            'player_name' => $player['nickname']
+            'player_name' => $player['nickname'],
+            'team_id'     => $player['team_id'] ? intval($player['team_id']) : null,
+            'team_name'   => $player['team_name'] ?? null,
+            'team_color'  => $tInfo['color'] ?? null,
+            'team_icon'   => $tInfo['icon'] ?? null
         ]);
     } else {
         echo json_encode(['success' => false, 'message' => 'Rất tiếc! Người chơi khác đã bấm chuông trước một tích tắc.']);
@@ -291,13 +297,17 @@ if ($action === 'host_confirm_guess') {
             [':p' => $playerId]
         );
 
+        $wTeam = !empty($player['team_id']) ? TeamManager::getTeamInfo(intval($player['team_id'])) : null;
         echo json_encode([
-            'success'     => true,
-            'correct'     => true,
-            'winner_id'   => $playerId,
-            'winner_name' => $player['nickname'] ?? 'Player',
-            'answer'      => $room['obstacle_answer'],
-            'message'     => 'Xác nhận ĐÚNG! Người chơi đã giành chiến thắng chung cuộc.'
+            'success'           => true,
+            'correct'           => true,
+            'winner_id'         => $playerId,
+            'winner_name'       => $player['nickname'] ?? 'Player',
+            'winner_team_id'    => $player['team_id'] ? intval($player['team_id']) : null,
+            'winner_team_name'  => $player['team_name'] ?? null,
+            'winner_team_color' => $wTeam['color'] ?? null,
+            'answer'            => $room['obstacle_answer'],
+            'message'           => 'Xác nhận ĐÚNG! Người chơi đã giành chiến thắng chung cuộc.'
         ]);
         exit;
     } else {
@@ -399,15 +409,37 @@ if ($action === 'get_obstacle_state') {
     $allPiecesOpened = (count($openedPieces) >= $totalPieces);
 
     $buzzerPlayerName = '';
+    $buzzerTeamId = null;
+    $buzzerTeamName = '';
+    $buzzerTeamColor = '';
+    $buzzerTeamIcon = '';
     if (!empty($room['buzzer_player_id'])) {
-        $bp = db_fetch_one("SELECT nickname FROM players WHERE id_player = :p", [':p' => $room['buzzer_player_id']]);
+        $bp = db_fetch_one("SELECT nickname, team_id, team_name FROM players WHERE id_player = :p", [':p' => $room['buzzer_player_id']]);
         $buzzerPlayerName = $bp['nickname'] ?? '';
+        $buzzerTeamId = !empty($bp['team_id']) ? intval($bp['team_id']) : null;
+        $buzzerTeamName = $bp['team_name'] ?? '';
+        if ($buzzerTeamId) {
+            $tInfo = TeamManager::getTeamInfo($buzzerTeamId);
+            $buzzerTeamColor = $tInfo['color'] ?? '';
+            $buzzerTeamIcon = $tInfo['icon'] ?? '';
+        }
     }
 
     $winnerPlayerName = '';
+    $winnerTeamId = null;
+    $winnerTeamName = '';
+    $winnerTeamColor = '';
+    $winnerTeamIcon = '';
     if (!empty($room['winner_player_id'])) {
-        $wp = db_fetch_one("SELECT nickname FROM players WHERE id_player = :p", [':p' => $room['winner_player_id']]);
+        $wp = db_fetch_one("SELECT nickname, team_id, team_name FROM players WHERE id_player = :p", [':p' => $room['winner_player_id']]);
         $winnerPlayerName = $wp['nickname'] ?? '';
+        $winnerTeamId = !empty($wp['team_id']) ? intval($wp['team_id']) : null;
+        $winnerTeamName = $wp['team_name'] ?? '';
+        if ($winnerTeamId) {
+            $wtInfo = TeamManager::getTeamInfo($winnerTeamId);
+            $winnerTeamColor = $wtInfo['color'] ?? '';
+            $winnerTeamIcon = $wtInfo['icon'] ?? '';
+        }
     }
 
     $myUnlockedPieces = [];
@@ -457,24 +489,36 @@ if ($action === 'get_obstacle_state') {
         ? BASE_URL . $room['obstacle_image'] 
         : null;
 
+    $liveTeams = !empty($room['is_team_mode']) ? TeamManager::getTeamLeaderboard($roomId) : [];
+
     echo json_encode([
         'success'             => true,
         'status'              => $room['status'],
+        'is_team_mode'        => intval($room['is_team_mode'] ?? 0),
         'total_pieces'        => $totalPieces,
         'opened_pieces'       => $openedPieces,
         'all_pieces_opened'   => $allPiecesOpened,
         'buzzer_status'       => $room['buzzer_status'],
         'buzzer_player_id'    => $room['buzzer_player_id'] ? intval($room['buzzer_player_id']) : null,
         'buzzer_player_name'  => $buzzerPlayerName,
+        'buzzer_team_id'      => $buzzerTeamId,
+        'buzzer_team_name'    => $buzzerTeamName,
+        'buzzer_team_color'   => $buzzerTeamColor,
+        'buzzer_team_icon'    => $buzzerTeamIcon,
         'buzzer_guess'        => $room['buzzer_guess'] ?? '',
         'winner_player_id'    => $room['winner_player_id'] ? intval($room['winner_player_id']) : null,
         'winner_player_name'  => $winnerPlayerName,
+        'winner_team_id'      => $winnerTeamId,
+        'winner_team_name'    => $winnerTeamName,
+        'winner_team_color'   => $winnerTeamColor,
+        'winner_team_icon'    => $winnerTeamIcon,
         'obstacle_answer'     => ($isRevealed || !empty($_SESSION['id_creator'])) ? $room['obstacle_answer'] : null,
         'obstacle_image'      => $obstacleImage,
         'is_revealed'         => $isRevealed,
         'all_disqualified'    => $allDisqualified,
         'my_unlocked_pieces'  => $allPiecesOpened ? range(1, $totalPieces) : $myUnlockedPieces,
-        'my_is_disqualified'  => $isDisqualified
+        'my_is_disqualified'  => $isDisqualified,
+        'live_teams'          => $liveTeams
     ]);
     exit;
 }

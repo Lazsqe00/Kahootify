@@ -2,6 +2,8 @@
 // Player Obstacle Puzzle Board
 // Included by modules/player/play.php when room.game_type === 'obstacle' and status === 'board'
 
+require_once __DIR__ . '/TeamManager.php';
+
 $quiz = db_fetch_one("SELECT * FROM quiz WHERE id_quiz = :q", [':q' => $room['id_quiz']]);
 $totalPieces = intval($quiz['total_pieces'] ?? 4);
 if (!in_array($totalPieces, [4, 6, 8, 9, 10, 12, 15, 16, 20, 25])) $totalPieces = 4;
@@ -242,6 +244,13 @@ require_once __DIR__ . '/header.php';
                 <i class="fas fa-puzzle-piece mr-1"></i> VƯỢT CHƯỚNG NGẠI VẬT
             </span>
             <span class="font-weight-bold d-none d-sm-inline"><?= htmlspecialchars($nickname) ?></span>
+            <?php if (!empty($room['is_team_mode']) && !empty($player['team_id'])): 
+                $myTeam = TeamManager::getTeamInfo((int)$player['team_id']);
+            ?>
+                <span class="badge ml-2 font-weight-bold shadow-sm" style="background: <?= $myTeam['color'] ?>; color: <?= $myTeam['text_color'] ?>; border-radius: 8px; padding: 4px 9px; font-size: 0.8rem;">
+                    <i class="<?= $myTeam['icon'] ?> mr-1"></i><?= htmlspecialchars($myTeam['short_name']) ?>
+                </span>
+            <?php endif; ?>
         </div>
         <div class="d-flex align-items-center">
             <span class="badge badge-light text-dark font-weight-bold px-3 py-1" style="font-size: 1rem;">
@@ -503,11 +512,13 @@ const pollInterval = setInterval(function() {
             clearInterval(pollInterval);
             $('#guessModal').hide();
             $('#roomLockedModal').hide();
-            revealEntirePuzzle(data.winner_player_name, data.obstacle_answer);
+            const winnerLabel = data.winner_player_name + (data.winner_team_name ? ' (' + data.winner_team_name + ')' : '');
+            revealEntirePuzzle(winnerLabel, data.obstacle_answer);
             return;
         }
 
         // 4. Xử lý Buzzer
+        const otherBuzzerLabel = (data.buzzer_player_name || 'Người chơi') + (data.buzzer_team_name ? ' (' + data.buzzer_team_name + ')' : '');
         if (data.buzzer_status === 'buzzing') {
             if (data.buzzer_player_id === playerId) {
                 // Đây là lượt của chính mình
@@ -516,7 +527,7 @@ const pollInterval = setInterval(function() {
                 }
             } else {
                 // Người chơi khác bấm chuông: Khóa màn hình
-                $('#lockedPlayerNotice').text('🔔 ' + (data.buzzer_player_name || 'Người chơi') + ' ĐANG BẤM CHUÔNG!');
+                $('#lockedPlayerNotice').text('🔔 ' + otherBuzzerLabel + ' ĐANG BẤM CHUÔNG!');
                 $('#lockedPlayerSubtext').text('Người chơi đang nhập câu trả lời...');
                 if (!$('#roomLockedModal').is(':visible')) {
                     playBuzzerSound();
@@ -536,7 +547,7 @@ const pollInterval = setInterval(function() {
                 $('#guessWaitingHost').show();
             } else {
                 // Người chơi khác đã gửi đáp án, đang chờ Host xác nhận
-                $('#lockedPlayerNotice').text('🔔 ' + (data.buzzer_player_name || 'Người chơi') + ' ĐÃ GỬI CÂU TRẢ LỜI!');
+                $('#lockedPlayerNotice').text('🔔 ' + otherBuzzerLabel + ' ĐÃ GỬI CÂU TRẢ LỜI!');
                 $('#lockedPlayerSubtext').text('Đang chờ Host xác nhận đáp án...');
                 if (!$('#roomLockedModal').is(':visible')) {
                     playBuzzerSound();

@@ -2,6 +2,8 @@
 // Host Obstacle Puzzle Board
 // Included by modules/host/play.php when room.game_type === 'obstacle' and status === 'board'
 
+require_once __DIR__ . '/TeamManager.php';
+
 $quiz = db_fetch_one("SELECT * FROM quiz WHERE id_quiz = :q", [':q' => $room['id_quiz']]);
 $totalPieces = intval($quiz['total_pieces'] ?? 4);
 if (!in_array($totalPieces, [4, 6, 8, 9, 10, 12, 15, 16, 20, 25])) $totalPieces = 4;
@@ -181,6 +183,11 @@ require_once __DIR__ . '/header.php';
         <span class="badge badge-warning text-dark font-weight-bold mr-3 vcnv-badge">
             <i class="fas fa-puzzle-piece mr-1"></i> VƯỢT CHƯỚNG NGẠI VẬT
         </span>
+        <?php if (!empty($room['is_team_mode'])): ?>
+            <span class="badge text-white font-weight-bold mr-3 shadow-sm" style="background: linear-gradient(135deg, #1368ce, #46178f); border-radius: 20px; font-size: 0.85rem; padding: 5px 12px;">
+                <i class="fas fa-users mr-1"></i> TEAM MODE (<?= intval($room['team_count'] ?? 2) ?> TEAMS)
+            </span>
+        <?php endif; ?>
         <span class="text-white font-weight-bold d-none d-md-inline"><?= htmlspecialchars($quiz['name']) ?></span>
     </div>
     <div class="d-flex align-items-center">
@@ -212,6 +219,30 @@ require_once __DIR__ . '/header.php';
             </div>
         </div>
     </div>
+
+    <?php if (!empty($room['is_team_mode'])): 
+        $hostTeamScores = TeamManager::getTeamLeaderboard($roomId);
+    ?>
+        <div class="card border-0 shadow-sm p-3 mb-3" style="border-radius: 16px; background: rgba(30, 17, 54, 0.95); border: 1px solid rgba(255,255,255,0.15);">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+                <span class="font-weight-bold text-white small"><i class="fas fa-users text-primary mr-1"></i> BẢNG ĐIỂM CÁC ĐỘI</span>
+                <span class="badge badge-primary font-weight-bold"><?= count($hostTeamScores) ?> Đội</span>
+            </div>
+            <div class="d-flex flex-wrap" id="hostTeamScoresContainer" style="gap: 10px;">
+                <?php foreach ($hostTeamScores as $ht): ?>
+                    <div class="flex-grow-1 p-2 rounded text-center shadow-sm" style="background: rgba(255,255,255,0.08); border-top: 4px solid <?= $ht['color'] ?>; min-width: 120px;">
+                        <div class="small font-weight-bold text-white">
+                            <i class="<?= $ht['icon'] ?> mr-1" style="color: <?= $ht['color'] ?>;"></i><?= htmlspecialchars($ht['short_name']) ?>
+                        </div>
+                        <div class="font-weight-bold" style="font-size: 1.2rem; color: #ffca28;" id="team_score_<?= $ht['id'] ?>">
+                            <?= number_format($ht['total_score']) ?>
+                        </div>
+                        <small class="text-white-50"><?= $ht['member_count'] ?> người</small>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+    <?php endif; ?>
 
     <!-- PUZZLE BOARD CARD -->
     <div class="obstacle-board-card">
@@ -448,6 +479,14 @@ const pollInterval = setInterval(function() {
             return;
         }
 
+        // Cập nhật điểm các đội theo realtime nếu đang bật Team Mode
+        if (data.live_teams && data.live_teams.length) {
+            data.live_teams.forEach(function(t) {
+                const el = document.getElementById('team_score_' + t.id);
+                if (el) el.textContent = Number(t.total_score).toLocaleString();
+            });
+        }
+
         // 1. Kiểm tra Người chiến thắng chung cuộc hoặc Tất cả trả lời sai
         if (data.status === 'finished' || (data.is_revealed && !winnerDeclared)) {
             winnerDeclared = true;
@@ -460,7 +499,8 @@ const pollInterval = setInterval(function() {
                 return;
             }
             if (data.winner_player_name) {
-                $('#winnerNickDisplay').text('Chúc mừng Quán quân: ' + data.winner_player_name + '!');
+                const winnerLabel = data.winner_player_name + (data.winner_team_name ? ' (' + data.winner_team_name + ')' : '');
+                $('#winnerNickDisplay').text('Chúc mừng Quán quân: ' + winnerLabel + '!');
                 $('#winnerAnswerDisplay').text('TỪ KHÓA CHÍNH XÁC: ' + (data.obstacle_answer || ''));
                 if (data.obstacle_image) {
                     $('#winnerSecretImg').attr('src', data.obstacle_image);
@@ -476,12 +516,13 @@ const pollInterval = setInterval(function() {
         }
 
         // 2. Kiểm tra Buzzer
+        const buzzerLabel = (data.buzzer_player_name || 'Người chơi') + (data.buzzer_team_name ? ' (' + data.buzzer_team_name + ')' : '');
         if (data.buzzer_status === 'buzzing') {
             if (!isBuzzingActive) {
                 isBuzzingActive = true;
                 playBuzzerAlarmSound();
             }
-            $('#buzzerTitle').text('🔔 ' + (data.buzzer_player_name || 'Người chơi') + ' ĐANG BẤM CHUÔNG ĐOÁN TỪ KHÓA!');
+            $('#buzzerTitle').text('🔔 ' + buzzerLabel + ' ĐANG BẤM CHUÔNG ĐOÁN TỪ KHÓA!');
             $('#buzzerDesc').text('Đang chờ người chơi nhập câu trả lời...');
             $('#buzzerTimerBadge').html('<i class="fas fa-edit mr-1"></i> Đang nhập...');
             $('#buzzerAlert').slideDown(200);
@@ -491,12 +532,12 @@ const pollInterval = setInterval(function() {
                 isBuzzingActive = true;
                 playBuzzerAlarmSound();
             }
-            $('#buzzerTitle').text('🔔 ' + (data.buzzer_player_name || 'Người chơi') + ' ĐÃ GỬI CÂU TRẢ LỜI!');
+            $('#buzzerTitle').text('🔔 ' + buzzerLabel + ' ĐÃ GỬI CÂU TRẢ LỜI!');
             $('#buzzerDesc').text('Vui lòng xem và xác nhận câu trả lời là ĐÚNG hay SAI.');
             $('#buzzerTimerBadge').html('<i class="fas fa-hourglass-half mr-1"></i> Chờ duyệt');
             $('#buzzerAlert').slideDown(200);
 
-            $('#reviewPlayerName').text(data.buzzer_player_name || 'Người chơi');
+            $('#reviewPlayerName').text(buzzerLabel);
             $('#reviewPlayerGuess').text(data.buzzer_guess || '...');
             if (data.obstacle_answer) {
                 $('#reviewTargetAnswer').text(data.obstacle_answer);
