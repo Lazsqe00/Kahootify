@@ -225,7 +225,11 @@ $flash = get_flash_message();
             </div>
         <?php else: ?>
             <?php foreach ($quizzes as $q): 
-                $isObstacle = (($q['game_type'] ?? 'classic') === 'obstacle');
+                $gameType = $q['game_type'] ?? 'classic';
+                $quizMode = $q['mode'] ?? 'normal';
+                $isObstacle = ($gameType === 'obstacle');
+                $isWager = ($quizMode === 'wager');
+
                 $totalPieces = intval($q['total_pieces'] ?? 4);
                 if (!in_array($totalPieces, [4, 6, 8, 9, 10, 12, 15, 16, 20, 25])) $totalPieces = 4;
 
@@ -292,6 +296,30 @@ $flash = get_flash_message();
                                         </span>
                                         <span class="badge badge-light text-dark font-weight-bold px-2 py-1 shadow-sm" style="font-size: 0.8rem;">
                                             <i class="fas fa-th mr-1 text-primary"></i> <?= $totalPieces ?> mảnh ghép
+                                        </span>
+                                    </div>
+                                </div>
+
+                            <?php elseif ($isWager): ?>
+                                <!-- CHẾ ĐỘ CÁ CƯỢC (WAGER) -->
+                                <div class="classic-cover-bg" style="background-color: #7c2d12;"></div>
+                                <img src="<?= BASE_URL ?>assets/img/mode-wager.jpg" alt="Cược điểm" style="max-height: 100%; object-fit: cover; opacity: 0.85; width: 100%; position: absolute; top:0; left:0;">
+                                <div class="classic-cover-overlay" style="background: linear-gradient(180deg, rgba(124, 45, 18, 0.25) 0%, rgba(124, 45, 18, 0.75) 100%);"></div>
+                                <div class="quiz-cover-content">
+                                    <div>
+                                        <span class="badge badge-warning text-dark font-weight-bold px-2 py-1 shadow-sm mb-1" style="font-size: 0.72rem; letter-spacing: 0.5px; background-color: #ffedd5; border: 1px solid #fdba74;">
+                                            <i class="fas fa-coins mr-1 text-warning"></i> WAGER MODE
+                                        </span>
+                                    </div>
+                                    <?php if (!empty($q['active_review_room_id'])): ?>
+                                        <div class="mb-1"><span class="badge badge-warning text-dark font-weight-bold px-2 py-1 shadow-sm"><i class="fas fa-book-reader mr-1"></i> Review Active</span></div>
+                                    <?php endif; ?>
+                                    <h5 class="quiz-card-title text-truncate" title="<?= htmlspecialchars($q['name']) ?>">
+                                        <?= htmlspecialchars($q['name']) ?>
+                                    </h5>
+                                    <div class="d-flex justify-content-center flex-wrap">
+                                        <span class="badge badge-warning text-dark font-weight-bold px-2 py-1 shadow-sm" style="font-size: 0.8rem;">
+                                            <i class="fas fa-question-circle mr-1"></i> <?= $q['question_count'] ?> questions
                                         </span>
                                     </div>
                                 </div>

@@ -77,9 +77,9 @@ CREATE TABLE `questions` (
   `question_type` ENUM('multiple_choice','text') NOT NULL DEFAULT 'multiple_choice',
   `media_type` ENUM('image','video') DEFAULT NULL,
   `sort_order` int(11) NOT NULL DEFAULT 0,
-  `piece_index` int(11) NOT NULL DEFAULT 0,
   `mode` varchar(50) NOT NULL DEFAULT 'normal',
   `mode_config` text DEFAULT NULL,
+  `piece_index` int(11) NOT NULL DEFAULT 0,
   `questionadd` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `questionupdate` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `timestart` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -131,6 +131,11 @@ CREATE TABLE `room` (
   `show_questions_on_players` tinyint(1) NOT NULL DEFAULT 0,
   `question_limit` int(11) DEFAULT NULL,
   `question_order` text DEFAULT NULL,
+  `starting_score` int(11) NOT NULL DEFAULT 0,
+  `max_missed_wagers` int(11) NOT NULL DEFAULT 0,
+  `allow_late_join` tinyint(1) NOT NULL DEFAULT 0,
+  `eliminated_can_play_normal` tinyint(1) NOT NULL DEFAULT 0,
+  `game_config` text DEFAULT NULL,
   `game_type` enum('classic','obstacle') NOT NULL DEFAULT 'classic',
   `opened_pieces` text DEFAULT NULL,
   `buzzer_player_id` bigint(20) DEFAULT NULL,
@@ -220,7 +225,6 @@ CREATE TABLE `saved_review_questions` (
   CONSTRAINT `fk_saved_review_question` FOREIGN KEY (`id_question`) REFERENCES `questions` (`id_question`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-
 DROP TABLE IF EXISTS `player_question_logs`;
 CREATE TABLE `player_question_logs` (
   `id_log` bigint(20) NOT NULL AUTO_INCREMENT,
@@ -246,4 +250,21 @@ CREATE TABLE `player_question_logs` (
   CONSTRAINT `fk_log_player` FOREIGN KEY (`id_player`) REFERENCES `players` (`id_player`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+DROP TABLE IF EXISTS `schema_migrations`;
+CREATE TABLE `schema_migrations` (
+  `version` varchar(191) NOT NULL,
+  `applied_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`version`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO `schema_migrations` (`version`) VALUES
+('2026_10_23_add_room_lock_and_player_characters.sql'),
+('2026_10_29_add_question_settings_and_streak_columns.sql'),
+('2026_10_29_add_saved_review_questions.sql'),
+('2026_11_01_add_obstacle_puzzle_columns.sql'),
+('2026_11_01_add_question_mode_and_wager_system.sql'),
+('2026_11_02_add_obstacle_buzzer_review_columns.sql'),
+('2026_11_02_fix_votes_cascade_delete.sql'),
+('2026_11_02_add_team_mode.sql'),
+('2026_11_02_add_review_mode.sql');
 SET FOREIGN_KEY_CHECKS = 1;
