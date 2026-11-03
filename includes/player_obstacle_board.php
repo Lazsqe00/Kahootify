@@ -48,7 +48,7 @@ elseif ($totalPieces === 16) { $cols = 4; $rows = 4; }
 elseif ($totalPieces === 20) { $cols = 5; $rows = 4; }
 elseif ($totalPieces === 25) { $cols = 5; $rows = 5; }
 
-$pageTitle = "Vượt Chướng Ngại Vật - " . htmlspecialchars($nickname);
+$pageTitle = "Obstacle Puzzle - " . htmlspecialchars($nickname);
 $bodyClass = "backgroundColorChanges";
 require_once __DIR__ . '/header.php';
 ?>
@@ -254,7 +254,7 @@ require_once __DIR__ . '/header.php';
     <div class="player-top-bar">
         <div class="d-flex align-items-center">
             <span class="badge badge-warning text-dark font-weight-bold px-3 py-1 mr-2 vcnv-badge" style="font-size: 0.9rem;">
-                <i class="fas fa-puzzle-piece mr-1"></i> VƯỢT CHƯỚNG NGẠI VẬT
+                <i class="fas fa-puzzle-piece mr-1"></i> OBSTACLE PUZZLE
             </span>
             <span class="font-weight-bold d-none d-sm-inline"><?= htmlspecialchars($nickname) ?></span>
             <?php if (!empty($room['is_team_mode']) && !empty($player['team_id'])): 
@@ -275,31 +275,31 @@ require_once __DIR__ . '/header.php';
     <!-- PUZZLE CONTAINER -->
     <?php if ($isDisqualified && !$allOpened): ?>
         <div class="alert alert-warning font-weight-bold text-center py-2 px-3 shadow-sm mb-3" style="border-radius: 14px; font-size: 0.9rem; background: #fff3cd; color: #856404; border: 1px solid #ffeeba;">
-            <i class="fas fa-info-circle mr-1 text-warning"></i> Bạn đã đoán sai từ khóa nên bị tạm khóa quyền bấm chuông trong các mảnh này. Bạn vẫn được tham gia trả lời câu hỏi và cộng điểm bình thường. Chuông sẽ được mở lại cho bạn khi mở hết các mảnh ghép!
+            <i class="fas fa-info-circle mr-1 text-warning"></i> You guessed the keyword incorrectly and your buzzer is temporarily locked for these pieces. You can still answer questions and earn points normally. Buzzer will be unlocked once all pieces are revealed!
         </div>
     <?php elseif ($isDisqualified && $allOpened): ?>
         <div class="alert alert-danger font-weight-bold text-center py-2 px-3 shadow-sm mb-3" style="border-radius: 14px; font-size: 0.95rem; background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb;">
-            <i class="fas fa-ban mr-1 text-danger"></i> Bạn đã sử dụng hết lượt đoán từ khóa ở vòng cuối này. Vui lòng chờ kết quả chung cuộc!
+            <i class="fas fa-ban mr-1 text-danger"></i> You have used your guess attempt in this final round. Please wait for the final results!
         </div>
     <?php elseif ($allOpened): ?>
         <div class="alert alert-success font-weight-bold text-center py-2 px-3 shadow-sm mb-3" style="border-radius: 14px; font-size: 0.95rem; background: #d4edda; color: #155724; border: 1px solid #c3e6cb;">
-            <i class="fas fa-unlock-alt mr-1 text-success"></i> TẤT CẢ MẢNH GHÉP ĐÃ ĐƯỢC MỞ! Bức tranh bí mật đã lộ diện hoàn toàn. Chuông đoán từ khóa đã được mở lại cho TẤT CẢ người chơi. Hãy nhanh tay bấm chuông giành quyền trả lời!
+            <i class="fas fa-unlock-alt mr-1 text-success"></i> ALL PIECES REVEALED! The secret picture is fully revealed. Keyword guessing buzzer has been re-enabled for ALL players. Buzz in quickly to claim your chance!
         </div>
     <?php endif; ?>
 
     <div class="puzzle-main-card">
         <div class="d-flex justify-content-between align-items-center mb-3 text-white">
             <h5 class="font-weight-bold mb-0">
-                <i class="fas fa-image text-warning mr-2"></i>Bức Tranh Bí Mật
+                <i class="fas fa-image text-warning mr-2"></i>Secret Picture
             </h5>
             <span class="badge badge-success px-3 py-1 font-weight-bold" id="unlockedCountBadge">
-                <?= count($myUnlocked) ?> / <?= $totalPieces ?> Mảnh đã mở
+                <?= count($myUnlocked) ?> / <?= $totalPieces ?> Pieces Unlocked
             </span>
         </div>
 
         <div class="obstacle-puzzle-container">
             <?php if ($secretImageUrl): ?>
-                <img src="<?= htmlspecialchars($secretImageUrl) ?>" class="obstacle-secret-img" alt="Bức tranh bí mật">
+                <img src="<?= htmlspecialchars($secretImageUrl) ?>" class="obstacle-secret-img" alt="Secret picture">
             <?php endif; ?>
 
             <div class="obstacle-grid-overlay grid-cols-<?= $cols ?> grid-rows-<?= $rows ?>" id="playerPiecesGrid">
@@ -311,7 +311,7 @@ require_once __DIR__ . '/header.php';
                          data-piece="<?= $p ?>">
                         <div class="piece-label">
                             <span>🧩 <?= $p ?></span>
-                            <span class="piece-badge"><i class="fas fa-lock mr-1"></i> BÍ MẬT</span>
+                            <span class="piece-badge"><i class="fas fa-lock mr-1"></i> SECRET</span>
                         </div>
                     </div>
                 <?php endfor; ?>
@@ -320,90 +320,90 @@ require_once __DIR__ . '/header.php';
 
         <div class="mt-3 text-center text-white-50 small">
             <i class="fas fa-lightbulb text-warning mr-1"></i>
-            Trả lời đúng các câu hỏi để mở từng mảnh ghép của riêng bạn, hoặc bấm chuông bên dưới để đoán từ khóa bức tranh!
+            Answer questions correctly to reveal your own pieces, or ring the buzzer below to guess the secret keyword!
         </div>
     </div>
 </div>
 
-<!-- NÚT BẤM CHUÔNG STICKY Ở ĐÁY MÀN HÌNH -->
+<!-- STICKY BUZZER BUTTON AT BOTTOM -->
 <div class="bottom-buzz-bar">
     <?php if ($isDisqualified && !$allOpened): ?>
         <button type="button" class="btn btn-buzz btn-buzz-disabled" disabled id="btnBuzz">
-            <i class="fas fa-lock mr-2"></i> TẠM KHÓA CHUÔNG (CHỜ MỞ HẾT MẢNH)
+            <i class="fas fa-lock mr-2"></i> BUZZER LOCKED (WAIT FOR ALL PIECES)
         </button>
     <?php elseif ($isDisqualified && $allOpened): ?>
         <button type="button" class="btn btn-buzz btn-buzz-disabled" disabled id="btnBuzz">
-            <i class="fas fa-ban mr-2"></i> ĐÃ HẾT LƯỢT ĐOÁN
+            <i class="fas fa-ban mr-2"></i> OUT OF GUESSES
         </button>
     <?php else: ?>
         <button type="button" class="btn btn-buzz" id="btnBuzz" onclick="claimBuzzer()">
-            <i class="fas fa-bell mr-2"></i> ĐOÁN BỨC TRANH
+            <i class="fas fa-bell mr-2"></i> GUESS SECRET PICTURE
         </button>
     <?php endif; ?>
 </div>
 
-<!-- MODAL NHẬP TỪ KHÓA CHO NGƯỜI BẤM CHUÔNG THÀNH CÔNG -->
+<!-- MODAL KEYWORD INPUT FOR BUZZER WINNER -->
 <div class="player-modal-backdrop" id="guessModal">
     <div class="player-modal-card">
         <h3 class="font-weight-bold text-warning mb-1">
-            🔔 LƯỢT ĐOÁN CỦA BẠN!
+            🔔 YOUR TURN TO GUESS!
         </h3>
-        <p class="text-white-50 small mb-3">Nhập từ khóa bức tranh bí mật:</p>
+        <p class="text-white-50 small mb-3">Enter the secret picture keyword:</p>
 
-        <!-- FORM NHẬP CÂU TRẢ LỜI (KHÔNG CÒN ĐẾM NGƯỢC THỜI GIAN) -->
+        <!-- KEYWORD INPUT FORM -->
         <form id="guessForm" onsubmit="submitGuess(event)">
             <div class="form-group mb-3">
                 <input type="text" id="guessInput" class="form-control form-control-lg text-center font-weight-bold" 
-                       placeholder="Nhập từ khóa đáp án..." autocomplete="off" required>
+                       placeholder="Enter answer keyword..." autocomplete="off" required>
             </div>
             <button type="submit" class="btn btn-kahoot btn-kahoot-green btn-lg btn-block font-weight-bold shadow mb-2" id="btnSubmitGuess">
-                <i class="fas fa-paper-plane mr-1"></i> XÁC NHẬN ĐÁP ÁN
+                <i class="fas fa-paper-plane mr-1"></i> CONFIRM ANSWER
             </button>
             <button type="button" class="btn btn-sm btn-link text-white-50 font-weight-bold" onclick="cancelGuess()" style="text-decoration: underline;">
-                <i class="fas fa-times-circle mr-1"></i> Không nhập đáp án (Mất quyền đoán)
+                <i class="fas fa-times-circle mr-1"></i> Skip answering (Forfeit guess)
             </button>
         </form>
 
-        <!-- TRẠNG THÁI ĐÃ GỬI VÀ CHỜ HOST XÁC NHẬN -->
+        <!-- SUBMITTED AND WAITING FOR HOST VERIFICATION -->
         <div id="guessWaitingHost" style="display: none;" class="py-3">
             <div class="spinner-border text-warning mb-3" style="width: 3.2rem; height: 3.2rem;" role="status"></div>
-            <h4 class="font-weight-bold text-white mb-2">ĐÃ GỬI CÂU TRẢ LỜI!</h4>
+            <h4 class="font-weight-bold text-white mb-2">ANSWER SUBMITTED!</h4>
             <div class="p-2 mb-2 rounded bg-dark border border-secondary text-warning font-weight-bold" id="submittedGuessDisplay" style="font-size: 1.3rem; word-break: break-word;">
                 ...
             </div>
-            <p class="text-white-50 small mb-0">Đang chờ Host xác nhận đáp án của bạn...</p>
+            <p class="text-white-50 small mb-0">Waiting for Host to verify your answer...</p>
         </div>
     </div>
 </div>
 
-<!-- MODAL THÔNG BÁO PHÒNG BỊ KHÓA KHI NGƯỜI KHÁC BẤM CHUÔNG -->
+<!-- MODAL ROOM LOCKED WHEN ANOTHER PLAYER BUZZES -->
 <div class="player-modal-backdrop" id="roomLockedModal">
     <div class="player-modal-card" style="border-color: #e21b3c;">
         <i class="fas fa-bell fa-4x text-danger mb-3" style="animation: buzzPulse 1s infinite;"></i>
         <h4 class="font-weight-bold text-white mb-2" id="lockedPlayerNotice">
-            CÓ NGƯỜI CHƠI BẤM CHUÔNG!
+            A PLAYER HAS BUZZED IN!
         </h4>
         <p class="text-white-50 mb-4" id="lockedPlayerSubtext">
-            Phòng chơi đang tạm khóa để người chơi trả lời và Host xác nhận. Vui lòng chờ...
+            The game is paused for the player to answer and Host to verify. Please wait...
         </p>
         <div class="spinner-border text-danger" role="status"></div>
     </div>
 </div>
 
-<!-- MODAL CHIẾN THẮNG CHUNG CUỘC KHI CÓ NGƯỜI ĐOÁN ĐÚNG -->
+<!-- FINAL VICTORY MODAL WHEN KEYWORD GUESSED -->
 <div class="player-modal-backdrop" id="victoryModal">
     <div class="player-modal-card" style="border-color: #f2994a; max-width: 640px;">
-        <h2 class="display-4 font-weight-bold text-warning mb-2">🏆 KẾT THÚC! 🏆</h2>
+        <h2 class="display-4 font-weight-bold text-warning mb-2">🏆 GAME OVER! 🏆</h2>
         <h4 class="font-weight-bold text-white mb-3" id="victoryWinnerDisplay">
-            Chúc mừng Quán quân!
+            Congratulations to the Champion!
         </h4>
         <div class="alert alert-warning py-2 mb-3 font-weight-bold text-dark" style="font-size: 1.2rem;" id="victoryAnswerDisplay">
-            TỪ KHÓA: ...
+            KEYWORD: ...
         </div>
-        <p class="text-muted small">Bức tranh bí mật đã được mở hoàn toàn 100%!</p>
+        <p class="text-muted small">The secret picture has been 100% revealed!</p>
         <div class="mt-4">
             <a href="<?= BASE_URL ?>modules/player/play.php?pid=<?= $playerId ?>&token=<?= urlencode($token) ?>" class="btn btn-warning btn-lg font-weight-bold px-4 rounded-pill">
-                <i class="fas fa-trophy mr-1"></i> Xem Bảng Vinh Danh &raquo;
+                <i class="fas fa-trophy mr-1"></i> View Final Podium &raquo;
             </a>
         </div>
     </div>
@@ -448,10 +448,10 @@ function claimBuzzer() {
         if (res && res.success && res.your_turn) {
             openGuessModal();
         } else {
-            alert(res.message || 'Không thể bấm chuông lúc này');
+            alert(res.message || 'Cannot buzz in at this time');
         }
     }, 'json').fail(function() {
-        alert('Lỗi kết nối máy chủ');
+        alert('Server connection error');
     });
 }
 
@@ -460,7 +460,7 @@ function openGuessModal() {
     $('#guessForm').show();
     $('#guessWaitingHost').hide();
     $('#guessInput').val('').focus();
-    $('#btnSubmitGuess').prop('disabled', false).html('<i class="fas fa-paper-plane mr-1"></i> XÁC NHẬN ĐÁP ÁN');
+    $('#btnSubmitGuess').prop('disabled', false).html('<i class="fas fa-paper-plane mr-1"></i> CONFIRM ANSWER');
     $('#guessModal').css('display', 'flex');
 }
 
@@ -469,7 +469,7 @@ function cancelGuess() {
         id_player: playerId,
         token: playerToken
     }, function() {
-        alert('Bạn không đưa ra câu trả lời nên bị mất quyền bấm chuông cho tới khi mở hết các mảnh ghép!');
+        alert('You did not provide an answer and lost buzzer rights until all pieces are revealed!');
         window.location.reload();
     }, 'json').fail(function() {
         window.location.reload();
@@ -481,7 +481,7 @@ function submitGuess(e) {
     const guessText = $('#guessInput').val().trim();
     if (!guessText) return;
 
-    $('#btnSubmitGuess').prop('disabled', true).html('<i class="fas fa-spinner fa-spin mr-1"></i> Đang gửi...');
+    $('#btnSubmitGuess').prop('disabled', true).html('<i class="fas fa-spinner fa-spin mr-1"></i> Sending...');
 
     $.post('<?= BASE_URL ?>modules/api/obstacle_action.php?action=submit_guess&id_room=' + roomId, {
         id_player: playerId,
@@ -489,25 +489,25 @@ function submitGuess(e) {
         guess: guessText
     }, function(res) {
         if (res && res.success) {
-            // Chuyển modal sang trạng thái chờ Host xác nhận
+            // Switch modal to waiting for Host verification
             $('#guessForm').hide();
             $('#submittedGuessDisplay').text('"' + guessText + '"');
             $('#guessWaitingHost').show();
         } else {
-            $('#btnSubmitGuess').prop('disabled', false).html('<i class="fas fa-paper-plane mr-1"></i> XÁC NHẬN ĐÁP ÁN');
-            alert(res.message || 'Lỗi gửi đáp án');
+            $('#btnSubmitGuess').prop('disabled', false).html('<i class="fas fa-paper-plane mr-1"></i> CONFIRM ANSWER');
+            alert(res.message || 'Failed to submit answer');
         }
     }, 'json').fail(function() {
-        alert('Lỗi kết nối máy chủ');
-        $('#btnSubmitGuess').prop('disabled', false).html('<i class="fas fa-paper-plane mr-1"></i> XÁC NHẬN ĐÁP ÁN');
+        alert('Server connection error');
+        $('#btnSubmitGuess').prop('disabled', false).html('<i class="fas fa-paper-plane mr-1"></i> CONFIRM ANSWER');
     });
 }
 
 function revealEntirePuzzle(winnerName, answer) {
-    // Mở toàn bộ 100% các mảnh ghép: gỡ bỏ che phủ
+    // Reveal 100% of pieces: remove overlay
     $('.obstacle-piece-tile').removeClass('piece-locked').addClass('piece-unlocked');
-    $('#victoryWinnerDisplay').text('🏆 ' + (winnerName || 'Người chơi') + ' đã xuất sắc đoán đúng từ khóa!');
-    $('#victoryAnswerDisplay').text('TỪ KHÓA CHÍNH XÁC: ' + (answer || ''));
+    $('#victoryWinnerDisplay').text('🏆 ' + (winnerName || 'Player') + ' successfully guessed the keyword!');
+    $('#victoryAnswerDisplay').text('CORRECT KEYWORD: ' + (answer || ''));
     $('#victoryModal').css('display', 'flex');
     try {
         document.getElementById('fanfareAudio').play();
@@ -519,26 +519,26 @@ const pollInterval = setInterval(function() {
     $.getJSON('<?= BASE_URL ?>modules/api/obstacle_action.php?action=get_obstacle_state&id_room=' + roomId + '&pid=' + playerId, function(data) {
         if (!data || !data.success) return;
 
-        // 1. Nếu trò chơi đã kết thúc
+        // 1. If game ended
         if (data.status === "finished") {
             clearInterval(pollInterval);
             $('#guessModal').hide();
             $('#roomLockedModal').hide();
             if (data.all_disqualified) {
-                alert('Tất cả người chơi đều đã trả lời sai từ khóa bức tranh! Trò chơi kết thúc, người chiến thắng được xếp hạng theo số điểm.');
+                alert('All players guessed the secret keyword incorrectly! Game ended, winners ranked by score.');
             }
             window.location.href = '<?= BASE_URL ?>modules/player/play.php?pid=' + playerId + '&token=' + encodeURIComponent(playerToken);
             return;
         }
 
-        // 2. Nếu Host đã chuyển sang câu hỏi (numeric status), chuyển ngay sang màn hình câu hỏi
+        // 2. If Host switched to question (numeric status), redirect to question screen
         if (data.status && data.status !== 'board' && data.status !== 'waiting') {
             clearInterval(pollInterval);
             window.location.href = '<?= BASE_URL ?>modules/player/play.php?pid=' + playerId + '&token=' + encodeURIComponent(playerToken);
             return;
         }
 
-        // 3. Nếu có người chiến thắng chung cuộc
+        // 3. If there is a winner
         if (data.is_revealed && data.winner_player_name && !winnerDeclared) {
             winnerDeclared = true;
             clearInterval(pollInterval);
@@ -549,18 +549,18 @@ const pollInterval = setInterval(function() {
             return;
         }
 
-        // 4. Xử lý Buzzer
-        const otherBuzzerLabel = (data.buzzer_player_name || 'Người chơi') + (data.buzzer_team_name ? ' (' + data.buzzer_team_name + ')' : '');
+        // 4. Handle Buzzer
+        const otherBuzzerLabel = (data.buzzer_player_name || 'Player') + (data.buzzer_team_name ? ' (' + data.buzzer_team_name + ')' : '');
         if (data.buzzer_status === 'buzzing') {
             if (data.buzzer_player_id === playerId) {
-                // Đây là lượt của chính mình
+                // This is current player's turn
                 if (!isMyTurnToGuess) {
                     openGuessModal();
                 }
             } else {
-                // Người chơi khác bấm chuông: Khóa màn hình
-                $('#lockedPlayerNotice').text('🔔 ' + otherBuzzerLabel + ' ĐANG BẤM CHUÔNG!');
-                $('#lockedPlayerSubtext').text('Người chơi đang nhập câu trả lời...');
+                // Another player buzzed in: lock screen
+                $('#lockedPlayerNotice').text('🔔 ' + otherBuzzerLabel + ' IS BUZZING IN!');
+                $('#lockedPlayerSubtext').text('Player is entering their answer...');
                 if (!$('#roomLockedModal').is(':visible')) {
                     playBuzzerSound();
                     $('#roomLockedModal').css('display', 'flex');
@@ -568,7 +568,7 @@ const pollInterval = setInterval(function() {
             }
         } else if (data.buzzer_status === 'pending_review') {
             if (data.buzzer_player_id === playerId) {
-                // Mình đã gửi đáp án, đang chờ Host duyệt
+                // Submitted answer, waiting for Host review
                 if (!$('#guessModal').is(':visible')) {
                     $('#guessModal').css('display', 'flex');
                 }
@@ -578,16 +578,16 @@ const pollInterval = setInterval(function() {
                 }
                 $('#guessWaitingHost').show();
             } else {
-                // Người chơi khác đã gửi đáp án, đang chờ Host xác nhận
-                $('#lockedPlayerNotice').text('🔔 ' + otherBuzzerLabel + ' ĐÃ GỬI CÂU TRẢ LỜI!');
-                $('#lockedPlayerSubtext').text('Đang chờ Host xác nhận đáp án...');
+                // Another player submitted answer, waiting for Host review
+                $('#lockedPlayerNotice').text('🔔 ' + otherBuzzerLabel + ' HAS SUBMITTED AN ANSWER!');
+                $('#lockedPlayerSubtext').text('Waiting for Host to verify answer...');
                 if (!$('#roomLockedModal').is(':visible')) {
                     playBuzzerSound();
                     $('#roomLockedModal').css('display', 'flex');
                 }
             }
         } else {
-            // Idle: Đóng khóa phòng
+            // Idle: Close room lock
             if ($('#roomLockedModal').is(':visible')) {
                 $('#roomLockedModal').hide();
             }
@@ -597,57 +597,57 @@ const pollInterval = setInterval(function() {
                 $('#guessForm').show();
                 $('#guessWaitingHost').hide();
 
-                // Kiểm tra nếu mình vừa bị Host đánh dấu là SAI
+                // Check if Host marked answer as incorrect
                 if (data.my_is_disqualified) {
                     isDisqualified = true;
                     if (data.all_pieces_opened) {
-                        $('#btnBuzz').replaceWith('<button type="button" class="btn btn-buzz btn-buzz-disabled" disabled id="btnBuzz"><i class="fas fa-ban mr-2"></i> ĐÃ HẾT LƯỢT ĐOÁN</button>');
-                        alert('Host đã xác nhận đáp án chưa chính xác! Bạn đã mất quyền đoán từ khóa bức tranh.');
+                        $('#btnBuzz').replaceWith('<button type="button" class="btn btn-buzz btn-buzz-disabled" disabled id="btnBuzz"><i class="fas fa-ban mr-2"></i> OUT OF GUESSES</button>');
+                        alert('Host confirmed your answer is incorrect! You have forfeited keyword guessing rights.');
                     } else {
-                        $('#btnBuzz').replaceWith('<button type="button" class="btn btn-buzz btn-buzz-disabled" disabled id="btnBuzz"><i class="fas fa-lock mr-2"></i> TẠM KHÓA CHUÔNG (CHỜ MỞ HẾT MẢNH)</button>');
-                        alert('Host đã xác nhận đáp án chưa chính xác! Bạn bị tạm khóa quyền bấm chuông. Bạn vẫn được tham gia trả lời các câu hỏi tiếp theo và chuông sẽ được mở lại khi mở hết các mảnh ghép.');
+                        $('#btnBuzz').replaceWith('<button type="button" class="btn btn-buzz btn-buzz-disabled" disabled id="btnBuzz"><i class="fas fa-lock mr-2"></i> BUZZER LOCKED (WAIT FOR ALL PIECES)</button>');
+                        alert('Host confirmed your answer is incorrect! Your buzzer is temporarily locked. You can still answer upcoming questions and buzzer will unlock when all pieces are opened.');
                     }
                 }
             }
         }
 
-        // 5. Đồng bộ khi mở hết mảnh ghép (all_pieces_opened)
+        // 5. Sync when all pieces opened (all_pieces_opened)
         if (data.all_pieces_opened) {
             isAllOpened = true;
             if (data.obstacle_image) {
                 if (!$('.obstacle-secret-img').length) {
-                    $('.obstacle-puzzle-container').prepend('<img src="' + data.obstacle_image + '" class="obstacle-secret-img" alt="Bức tranh bí mật">');
+                    $('.obstacle-puzzle-container').prepend('<img src="' + data.obstacle_image + '" class="obstacle-secret-img" alt="Secret picture">');
                 } else if (!$('.obstacle-secret-img').attr('src')) {
                     $('.obstacle-secret-img').attr('src', data.obstacle_image);
                 }
             }
             $('.obstacle-piece-tile').removeClass('piece-locked').addClass('piece-unlocked');
-            $('#unlockedCountBadge').text(data.total_pieces + ' / ' + data.total_pieces + ' Mảnh đã mở');
-            // Nếu người chơi chưa bấm chuông sai ở vòng cuối này: Mở nút chuông!
+            $('#unlockedCountBadge').text(data.total_pieces + ' / ' + data.total_pieces + ' Pieces Unlocked');
+            // If player has not guessed incorrectly in final round: open buzzer!
             if (!data.my_is_disqualified) {
                 isDisqualified = false;
                 if ($('#btnBuzz').hasClass('btn-buzz-disabled')) {
-                    $('#btnBuzz').replaceWith('<button type="button" class="btn btn-buzz" id="btnBuzz" onclick="claimBuzzer()"><i class="fas fa-bell mr-2"></i> ĐOÁN BỨC TRANH</button>');
+                    $('#btnBuzz').replaceWith('<button type="button" class="btn btn-buzz" id="btnBuzz" onclick="claimBuzzer()"><i class="fas fa-bell mr-2"></i> GUESS SECRET PICTURE</button>');
                 }
             } else {
                 isDisqualified = true;
                 if (!$('#btnBuzz').hasClass('btn-buzz-disabled')) {
-                    $('#btnBuzz').replaceWith('<button type="button" class="btn btn-buzz btn-buzz-disabled" disabled id="btnBuzz"><i class="fas fa-ban mr-2"></i> ĐÃ HẾT LƯỢT ĐOÁN</button>');
+                    $('#btnBuzz').replaceWith('<button type="button" class="btn btn-buzz btn-buzz-disabled" disabled id="btnBuzz"><i class="fas fa-ban mr-2"></i> OUT OF GUESSES</button>');
                 }
             }
         } else {
-            // Đồng bộ các mảnh ghép đã mở của cá nhân người chơi
+            // Sync personal unlocked pieces
             if (data.my_unlocked_pieces && Array.isArray(data.my_unlocked_pieces)) {
                 data.my_unlocked_pieces.forEach(function(pIdx) {
                     $('#pieceTile_' + pIdx).removeClass('piece-locked').addClass('piece-unlocked');
                 });
-                $('#unlockedCountBadge').text(data.my_unlocked_pieces.length + ' / ' + data.total_pieces + ' Mảnh đã mở');
+                $('#unlockedCountBadge').text(data.my_unlocked_pieces.length + ' / ' + data.total_pieces + ' Pieces Unlocked');
             }
 
-            // Đồng bộ trạng thái bị khóa chuông ở giai đoạn đang mở mảnh
+            // Sync buzzer locked status during piece reveal phase
             if (data.my_is_disqualified && !isDisqualified) {
                 isDisqualified = true;
-                $('#btnBuzz').replaceWith('<button type="button" class="btn btn-buzz btn-buzz-disabled" disabled id="btnBuzz"><i class="fas fa-lock mr-2"></i> TẠM KHÓA CHUÔNG (CHỜ MỞ HẾT MẢNH)</button>');
+                $('#btnBuzz').replaceWith('<button type="button" class="btn btn-buzz btn-buzz-disabled" disabled id="btnBuzz"><i class="fas fa-lock mr-2"></i> BUZZER LOCKED (WAIT FOR ALL PIECES)</button>');
             }
         }
     });

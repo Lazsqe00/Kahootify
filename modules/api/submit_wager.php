@@ -20,7 +20,7 @@ if (isset($data['wager_amount']) || isset($data['points']) || isset($data['score
     http_response_code(400);
     echo json_encode([
         'success' => false,
-        'message' => 'Lỗi: Client chỉ được gửi tier_id, không được gửi số điểm tự chế.',
+        'message' => 'Error: Client must only submit tier_id, not arbitrary points.',
     ]);
     exit;
 }
@@ -29,7 +29,7 @@ if ($playerId <= 0 || $roomId <= 0 || $questionId <= 0 || empty($tierId)) {
     http_response_code(400);
     echo json_encode([
         'success' => false,
-        'message' => 'Thiếu thông tin cược bắt buộc.',
+        'message' => 'Missing required wager information.',
     ]);
     exit;
 }
@@ -38,7 +38,7 @@ if (!player_request_is_valid($playerId, $roomId, $token)) {
     http_response_code(403);
     echo json_encode([
         'success' => false,
-        'message' => 'Phiên người chơi không hợp lệ.',
+        'message' => 'Invalid player session.',
     ]);
     exit;
 }
@@ -46,12 +46,12 @@ if (!player_request_is_valid($playerId, $roomId, $token)) {
 $room = db_fetch_one("SELECT id_room, pin FROM room WHERE id_room = :r", [':r' => $roomId]);
 if (!$room) {
     http_response_code(404);
-    echo json_encode(['success' => false, 'message' => 'Phòng không tồn tại.']);
+    echo json_encode(['success' => false, 'message' => 'Room does not exist.']);
     exit;
 }
 
 if (player_is_kicked($room, $playerId)) {
-    echo json_encode(['success' => false, 'kicked' => true, 'message' => 'Bạn đã bị đuổi khỏi phòng.']);
+    echo json_encode(['success' => false, 'kicked' => true, 'message' => 'You have been kicked from the room.']);
     exit;
 }
 

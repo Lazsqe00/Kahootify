@@ -23,20 +23,20 @@ if (!$room || empty($room['is_review_mode'])) {
     redirect('modules/player/play.php?pid=' . $playerId . '&token=' . urlencode($token));
 }
 
-// Kiểm tra token bảo mật
+// Check security token
 $expectedToken = substr(md5($playerId . '_' . $roomId . '_kahoot_secret_2026'), 0, 16);
 if (!hash_equals($expectedToken, $token)) {
     die('Invalid session token. Please join again.');
 }
 
-// Xử lý LÀM LẠI BÀI (Retake Quiz)
+// Handle Retake Quiz
 if (isset($_GET['retake'])) {
     db_execute("DELETE FROM votes WHERE id_player = :p", [':p' => $playerId]);
     db_execute("UPDATE players SET current_question_index = 0, is_finished = 0, answers_correct = 0 WHERE id_player = :p", [':p' => $playerId]);
     redirect('modules/player/review.php?pid=' . $playerId . '&token=' . urlencode($token));
 }
 
-// Kiểm tra hạn phòng ôn tập
+// Check review room expiry
 $now = time();
 $reviewEnd = !empty($room['review_end_time']) ? strtotime($room['review_end_time']) : PHP_INT_MAX;
 $isExpired = ($now > $reviewEnd);
@@ -51,7 +51,7 @@ if ($totalQuestions === 0) {
 
 $pIdx = intval($player['current_question_index'] ?? 0);
 
-// Xử lý POST (Nộp câu trả lời / Chuyển câu)
+// Handle POST (Submit answer / Next question)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
@@ -59,7 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $curQ = $questions[$pIdx];
         $qId = intval($curQ['id_question']);
 
-        // Kiểm tra xem đã nộp cho câu này chưa
+        // Check if answer already submitted for this question
         $alreadyVoted = db_fetch_one(
             "SELECT v.id_vote FROM votes v JOIN answers a ON v.id_answer = a.id_answer WHERE v.id_player = :p AND a.id_question = :q LIMIT 1",
             [':p' => $playerId, ':q' => $qId]
@@ -83,7 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $chosenAnswerId = intval($matched['id_answer']);
                     $isCorrect = intval($matched['is_correct']);
                 } elseif (!empty($allAnswers)) {
-                    // Chọn câu trả lời đầu tiên nhưng đánh dấu là sai
+                    // Pick first answer but mark as wrong
                     $chosenAnswerId = intval($allAnswers[0]['id_answer']);
                     $isCorrect = 0;
                 }
@@ -119,7 +119,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Nếu đã làm hết câu hỏi hoặc hết hạn: Hiển thị kết quả
+// If all questions answered or expired: Display results
 if (!empty($player['is_finished']) || $pIdx >= $totalQuestions || $isExpired) {
     $resultsPlayerId = $playerId;
     $leaderboard = db_fetch_all("
@@ -132,12 +132,12 @@ if (!empty($player['is_finished']) || $pIdx >= $totalQuestions || $isExpired) {
     exit;
 }
 
-// Đang ở câu hỏi hiện tại
+// Currently at current question
 $currentQuestion = $questions[$pIdx];
 $qId = intval($currentQuestion['id_question']);
 $answers = db_fetch_all("SELECT * FROM answers WHERE id_question = :qid ORDER BY id_answer ASC", [':qid' => $qId]);
 
-// Kiểm tra xem câu này đã trả lời chưa
+// Check if this question has been answered
 $myVote = db_fetch_one(
     "SELECT v.*, a.is_correct, a.text as answer_text, a.image_path as answer_image 
      FROM votes v 
@@ -328,7 +328,7 @@ require_once __DIR__ . '/../../includes/header.php';
 
         <!-- Form Answers -->
         <?php if ($currentQuestion['question_type'] === 'text'): ?>
-            <!-- Dạng Tự luận (Text) -->
+            <!-- Text Question -->
             <?php if (!$hasAnswered): ?>
                 <form method="POST">
                     <input type="hidden" name="action" value="submit_answer">
@@ -349,7 +349,7 @@ require_once __DIR__ . '/../../includes/header.php';
                 </div>
             <?php endif; ?>
         <?php else: ?>
-            <!-- Dạng Trắc nghiệm (Multiple Choice) -->
+            <!-- Multiple Choice Question -->
             <?php
             $colors = ['tile-red', 'tile-blue', 'tile-yellow', 'tile-green'];
             $shapes = ['▲', '◆', '●', '■'];
@@ -405,7 +405,7 @@ require_once __DIR__ . '/../../includes/header.php';
         <?php endif; ?>
 
         <?php if ($hasAnswered): ?>
-            <!-- Nút chuyển câu tiếp theo hoặc hoàn thành -->
+            <!-- Next question or finish button -->
             <form method="POST" class="mt-4">
                 <?php if ($pIdx + 1 < $totalQuestions): ?>
                     <input type="hidden" name="action" value="next_question">

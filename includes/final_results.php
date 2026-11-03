@@ -620,9 +620,9 @@ require __DIR__ . '/header.php';
                                                     <?= htmlspecialchars($entry['nickname']) ?>
                                                     <?php if ($isMe): ?> <span class="results-you">YOU</span><?php endif; ?>
                                                     <?php if ($st === 'ELIMINATED'): ?>
-                                                        <span class="badge badge-dark ml-1 text-white" style="font-size: 0.75rem; font-weight: normal;">Bị loại</span>
+                                                        <span class="badge badge-dark ml-1 text-white" style="font-size: 0.75rem; font-weight: normal;">Eliminated</span>
                                                     <?php elseif ($st === 'SPECTATOR'): ?>
-                                                        <span class="badge badge-secondary ml-1 text-white" style="font-size: 0.75rem; font-weight: normal;">Khán giả</span>
+                                                        <span class="badge badge-secondary ml-1 text-white" style="font-size: 0.75rem; font-weight: normal;">Spectator</span>
                                                     <?php endif; ?>
                                                 </span>
                                             </div>
@@ -638,7 +638,7 @@ require __DIR__ . '/header.php';
                         <?php
                         $hasWagerQuestions = db_count('questions', "id_quiz = :q AND mode = 'wager'", [':q' => $room['id_quiz']]) > 0;
                         if ($hasWagerQuestions) {
-                            echo 'Người chơi còn sống xếp hạng theo điểm. Người bị loại xếp sau theo vòng bị loại.';
+                            echo 'Surviving players ranked by score. Eliminated players ranked by round of elimination.';
                         } else {
                             echo 'Equal scores are ordered by joining time.';
                         }

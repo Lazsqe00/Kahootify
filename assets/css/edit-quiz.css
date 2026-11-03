@@ -221,7 +221,7 @@
     color: #64748b !important;
 }
 
-/* Correct answer: TÔ MÀU XANH LÁ ĐẬM NỔI BẬT CHUẨN KAHOOT */
+/* Correct answer: Highlighted dark green */
 .q-mini-ans.is-correct {
     background: #16a34a !important;
     color: #ffffff !important;

@@ -237,7 +237,7 @@ require_once __DIR__ . '/../../includes/header.php';
         <span class="text-white font-weight-bold mr-2">LEADERBOARD</span>
         <span class="badge badge-primary font-weight-bold mr-2">Question <?= $questionNumber ?> / <?= $totalQuestions ?></span>
         <?php if ($isWagerQuestion): ?>
-            <span class="badge badge-warning text-dark font-weight-bold"><i class="fas fa-dice mr-1"></i> CƯỢC ĐIỂM</span>
+            <span class="badge badge-warning text-dark font-weight-bold"><i class="fas fa-dice mr-1"></i> WAGER</span>
         <?php endif; ?>
     </div>
 </nav>
@@ -259,25 +259,25 @@ require_once __DIR__ . '/../../includes/header.php';
             <div class="col-md-3 col-6 mb-2">
                 <div class="bg-white rounded p-3 text-center shadow-sm" style="border-radius: 14px;">
                     <div class="text-danger font-weight-bold" style="font-size: 1.8rem;">🔥 <?= $allInCount ?></div>
-                    <div class="text-muted small font-weight-bold text-uppercase">Cược ALL-IN</div>
+                    <div class="text-muted small font-weight-bold text-uppercase">ALL-IN Wagers</div>
                 </div>
             </div>
             <div class="col-md-3 col-6 mb-2">
                 <div class="bg-white rounded p-3 text-center shadow-sm" style="border-radius: 14px;">
                     <div class="text-success font-weight-bold" style="font-size: 1.8rem;">🏆 <?= $wagerWinnersCount ?></div>
-                    <div class="text-muted small font-weight-bold text-uppercase">Thắng cược</div>
+                    <div class="text-muted small font-weight-bold text-uppercase">Wager Winners</div>
                 </div>
             </div>
             <div class="col-md-3 col-6 mb-2">
                 <div class="bg-white rounded p-3 text-center shadow-sm" style="border-radius: 14px;">
                     <div class="text-dark font-weight-bold" style="font-size: 1.8rem;">💀 <?= $justEliminatedCount ?></div>
-                    <div class="text-muted small font-weight-bold text-uppercase">Vừa bị loại</div>
+                    <div class="text-muted small font-weight-bold text-uppercase">Just Eliminated</div>
                 </div>
             </div>
             <div class="col-md-3 col-6 mb-2">
                 <div class="bg-white rounded p-3 text-center shadow-sm" style="border-radius: 14px;">
                     <div class="text-primary font-weight-bold" style="font-size: 1.8rem;">🛡️ <?= $activeRemainingCount ?></div>
-                    <div class="text-muted small font-weight-bold text-uppercase">Còn sống sót</div>
+                    <div class="text-muted small font-weight-bold text-uppercase">Still Surviving</div>
                 </div>
             </div>
         </div>
@@ -307,7 +307,7 @@ require_once __DIR__ . '/../../includes/header.php';
         </div>
     <?php endif; ?>
 
-    <!-- Player Standings List (Bảng điểm hiện tại) -->
+    <!-- Player Standings List -->
     <div class="card border-0 leaderboard-card p-3 p-md-4 mb-4">
         <?php if (empty($leaderboard)): ?>
             <div class="text-center py-5 text-muted font-weight-bold">
@@ -369,11 +369,11 @@ require_once __DIR__ . '/../../includes/header.php';
 
                                 <?php if ($pStatus === 'ELIMINATED'): ?>
                                     <span class="badge badge-dark text-white font-weight-bold mr-2 shadow-sm" style="font-size: 0.8rem;">
-                                        <i class="fas fa-skull mr-1"></i> Bị loại
+                                        <i class="fas fa-skull mr-1"></i> Eliminated
                                     </span>
                                 <?php elseif ($pStatus === 'SPECTATOR'): ?>
                                     <span class="badge badge-secondary font-weight-bold mr-2 shadow-sm" style="font-size: 0.8rem;">
-                                        <i class="fas fa-eye mr-1"></i> Khán giả
+                                        <i class="fas fa-eye mr-1"></i> Spectator
                                     </span>
                                 <?php endif; ?>
 
@@ -425,7 +425,7 @@ require_once __DIR__ . '/../../includes/header.php';
     <div class="text-center my-4">
         <?php if (($room['game_type'] ?? 'classic') === 'obstacle'): ?>
             <a href="<?= BASE_URL ?>modules/host/play.php?action=return_to_board" class="btn btn-kahoot btn-kahoot-green btn-lg shadow font-weight-bold px-5 py-3" style="font-size: 1.25rem; border-radius: 12px;" onclick="stopAllAudio()">
-                <i class="fas fa-th mr-2"></i> Quay về Bảng Mảnh Ghép &raquo;
+                <i class="fas fa-th mr-2"></i> Return to Puzzle Board &raquo;
             </a>
         <?php else: ?>
             <a href="<?= BASE_URL ?>modules/host/play.php?action=next_question&qid=<?= $currentQId ?>" class="btn btn-kahoot btn-kahoot-green btn-lg shadow font-weight-bold px-5 py-3" style="font-size: 1.25rem; border-radius: 12px;" onclick="stopAllAudio()">
