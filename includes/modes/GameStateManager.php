@@ -96,12 +96,12 @@ class GameStateManager
     ): array {
         $room = db_fetch_one("SELECT * FROM room WHERE id_room = :r", [':r' => $roomId]);
         if (!$room) {
-            return ['success' => false, 'message' => 'Phòng không tồn tại.'];
+            return ['success' => false, 'message' => 'Room does not exist.'];
         }
 
         $parsed = self::parseRoomStatus($room['status'] ?? '');
         if ($parsed['phase'] !== 'wager' || $parsed['qid'] !== $questionId) {
-            return ['success' => false, 'message' => 'Giai đoạn đặt cược đã kết thúc hoặc không hợp lệ.'];
+            return ['success' => false, 'message' => 'Wager phase has ended or is invalid.'];
         }
 
         $player = db_fetch_one("SELECT * FROM players WHERE id_player = :p AND id_room = :r", [
@@ -109,22 +109,22 @@ class GameStateManager
             ':r' => $roomId,
         ]);
         if (!$player) {
-            return ['success' => false, 'message' => 'Người chơi không tồn tại.'];
+            return ['success' => false, 'message' => 'Player does not exist.'];
         }
 
         $playerStatus = strtoupper((string)($player['status'] ?? 'ACTIVE'));
         if ($playerStatus !== 'ACTIVE') {
-            return ['success' => false, 'message' => 'Người chơi đã bị loại hoặc là khán giả không thể đặt cược.'];
+            return ['success' => false, 'message' => 'Eliminated or spectator players cannot place a wager.'];
         }
 
         $tierPercent = WagerCalculator::getTierPercent($tierId);
         if ($tierPercent === null) {
-            return ['success' => false, 'message' => 'Mức cược không hợp lệ.'];
+            return ['success' => false, 'message' => 'Invalid wager tier.'];
         }
 
         $question = db_fetch_one("SELECT * FROM questions WHERE id_question = :q", [':q' => $questionId]);
         if (!$question) {
-            return ['success' => false, 'message' => 'Câu hỏi không tồn tại.'];
+            return ['success' => false, 'message' => 'Question does not exist.'];
         }
 
         $qConfig = !empty($question['mode_config']) ? json_decode($question['mode_config'], true) : [];
@@ -135,7 +135,7 @@ class GameStateManager
         $elapsed = time() - $startTime;
 
         if ($elapsed > ($wagerTimeSec + 2)) { // Grace buffer 2s for network jitter
-            return ['success' => false, 'message' => 'Thời gian đặt cược đã hết.'];
+            return ['success' => false, 'message' => 'Wager time has expired.'];
         }
 
         $currentScore = max(0, intval($player['score'] ?? 0));
@@ -183,7 +183,7 @@ class GameStateManager
             'tier_label'   => $tierLabel,
             'tier_percent' => $tierPercent,
             'wager_amount' => $wagerAmount,
-            'message'      => 'Đặt cược thành công!',
+            'message'      => 'Wager placed successfully!',
         ];
     }
 
@@ -194,7 +194,7 @@ class GameStateManager
     {
         $room = db_fetch_one("SELECT * FROM room WHERE id_room = :r", [':r' => $roomId]);
         if (!$room) {
-            return ['success' => false, 'message' => 'Phòng không tồn tại.'];
+            return ['success' => false, 'message' => 'Room does not exist.'];
         }
 
         $question = db_fetch_one("SELECT * FROM questions WHERE id_question = :q", [':q' => $questionId]);
@@ -247,7 +247,7 @@ class GameStateManager
     {
         $room = db_fetch_one("SELECT * FROM room WHERE id_room = :r", [':r' => $roomId]);
         if (!$room) {
-            return ['success' => false, 'message' => 'Phòng không tồn tại.'];
+            return ['success' => false, 'message' => 'Room does not exist.'];
         }
 
         $activePlayers = db_fetch_all(
@@ -364,7 +364,7 @@ class GameStateManager
     {
         $room = db_fetch_one("SELECT * FROM room WHERE id_room = :r", [':r' => $roomId]);
         if (!$room) {
-            return ['success' => false, 'message' => 'Phòng không tồn tại.'];
+            return ['success' => false, 'message' => 'Room does not exist.'];
         }
 
         $question = db_fetch_one("SELECT * FROM questions WHERE id_question = :q", [':q' => $questionId]);
@@ -522,7 +522,7 @@ class GameStateManager
     {
         $room = db_fetch_one("SELECT * FROM room WHERE id_room = :r", [':r' => $roomId]);
         if (!$room) {
-            return ['success' => false, 'message' => 'Phòng không tồn tại.'];
+            return ['success' => false, 'message' => 'Room does not exist.'];
         }
 
         $selectedQIds = !empty($room['question_order']) ? json_decode($room['question_order'], true) : [];

@@ -21,12 +21,12 @@ class NormalMode extends BaseQuestionMode
 
     public function getLabel(): string
     {
-        return 'Chế độ thường';
+        return 'Classic Quiz';
     }
 
     public function getDescription(): string
     {
-        return 'Chế độ trắc nghiệm tiêu chuẩn, tính điểm theo tốc độ và chuỗi câu đúng.';
+        return 'Standard quiz mode, scoring based on response speed and answer streak.';
     }
 
     public function getIcon(): string

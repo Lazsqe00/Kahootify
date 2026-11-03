@@ -73,7 +73,7 @@ class ServerEngineTest
 
             $res = GameStateManager::submitPlayerWager($rId, $pId, $qId, 'tier_25');
             $this->assertEquals(false, $res['success']);
-            $this->assert(str_contains($res['message'], 'loại') || str_contains($res['message'], 'khán giả'));
+            $this->assert(str_contains($res['message'], 'loại') || str_contains($res['message'], 'khán giả') || str_contains(strtolower($res['message']), 'eliminated') || str_contains(strtolower($res['message']), 'spectator'));
 
             $pdo->rollBack();
         } catch (Throwable $e) {

@@ -256,7 +256,7 @@ $flash = get_flash_message();
                     <div class="card h-100 border-0 shadow-sm quiz-card">
                         <div class="quiz-cover-box">
                             <?php if ($isObstacle): ?>
-                                <!-- NỀN TRÒ CHƠI VƯỢT CHƯỚNG NGẠI VẬT -->
+                                <!-- OBSTACLE PUZZLE BACKGROUND -->
                                 <?php if ($hasObstacleImg): ?>
                                     <div class="obstacle-cover-bg" style="background-image: url('<?= htmlspecialchars($obstacleImgUrl) ?>');"></div>
                                 <?php else: ?>
@@ -265,10 +265,10 @@ $flash = get_flash_message();
                                     </div>
                                 <?php endif; ?>
 
-                                <!-- LỚP PHỦ GRADIENT TỐI TẠO ĐỘ SÂU & RÕ CHỮ -->
+                                <!-- DARK GRADIENT OVERLAY -->
                                 <div class="obstacle-cover-overlay"></div>
 
-                                <!-- LƯỚI MẢNH GHÉP (TÍNH CHẤT TRÒ CHƠI) -->
+                                <!-- PUZZLE PIECES GRID -->
                                 <div class="obstacle-card-grid <?= $gridClass ?>">
                                     <?php for ($p = 1; $p <= $totalPieces; $p++): ?>
                                         <div class="obstacle-card-cell">
@@ -277,11 +277,11 @@ $flash = get_flash_message();
                                     <?php endfor; ?>
                                 </div>
 
-                                <!-- NỘI DUNG THÔNG TIN TRÊN NỀN -->
+                                <!-- CARD CONTENT -->
                                 <div class="quiz-cover-content">
                                     <div>
                                         <span class="vcnv-card-tag">
-                                            <i class="fas fa-puzzle-piece mr-1"></i> Chướng ngại vật
+                                            <i class="fas fa-puzzle-piece mr-1"></i> Obstacle Puzzle
                                         </span>
                                     </div>
                                     <?php if (!empty($q['active_review_room_id'])): ?>
@@ -292,18 +292,18 @@ $flash = get_flash_message();
                                     </h5>
                                     <div class="d-flex justify-content-center flex-wrap" style="gap: 6px;">
                                         <span class="badge badge-warning text-dark font-weight-bold px-2 py-1 shadow-sm" style="font-size: 0.8rem;">
-                                            <i class="fas fa-question-circle mr-1"></i> <?= $q['question_count'] ?> câu hỏi
+                                            <i class="fas fa-question-circle mr-1"></i> <?= $q['question_count'] ?> <?= $q['question_count'] == 1 ? 'question' : 'questions' ?>
                                         </span>
                                         <span class="badge badge-light text-dark font-weight-bold px-2 py-1 shadow-sm" style="font-size: 0.8rem;">
-                                            <i class="fas fa-th mr-1 text-primary"></i> <?= $totalPieces ?> mảnh ghép
+                                            <i class="fas fa-th mr-1 text-primary"></i> <?= $totalPieces ?> <?= $totalPieces == 1 ? 'piece' : 'pieces' ?>
                                         </span>
                                     </div>
                                 </div>
 
                             <?php elseif ($isWager): ?>
-                                <!-- CHẾ ĐỘ CÁ CƯỢC (WAGER) -->
+                                <!-- WAGER MODE -->
                                 <div class="classic-cover-bg" style="background-color: #7c2d12;"></div>
-                                <img src="<?= BASE_URL ?>assets/img/mode-wager.jpg" alt="Cược điểm" style="max-height: 100%; object-fit: cover; opacity: 0.85; width: 100%; position: absolute; top:0; left:0;">
+                                <img src="<?= BASE_URL ?>assets/img/mode-wager.jpg" alt="Wager Mode" style="max-height: 100%; object-fit: cover; opacity: 0.85; width: 100%; position: absolute; top:0; left:0;">
                                 <div class="classic-cover-overlay" style="background: linear-gradient(180deg, rgba(124, 45, 18, 0.25) 0%, rgba(124, 45, 18, 0.75) 100%);"></div>
                                 <div class="quiz-cover-content">
                                     <div>

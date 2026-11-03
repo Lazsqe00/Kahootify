@@ -157,14 +157,14 @@ if ($phase === 'wager') {
             <img src="<?= BASE_URL ?>assets/img/logo.png" alt="Logo" style="max-height: 32px; filter: brightness(100);" class="mr-3">
             <span class="badge badge-light font-weight-bold mr-2">PIN: <?= htmlspecialchars($room['pin']) ?></span>
             <span class="text-white font-weight-bold mr-2">Question <?= $questionNumber ?> / <?= $totalQuestions ?></span>
-            <span class="badge badge-warning text-dark font-weight-bold"><i class="fas fa-dice mr-1"></i> CƯỢC ĐIỂM</span>
+            <span class="badge badge-warning text-dark font-weight-bold"><i class="fas fa-dice mr-1"></i> WAGER</span>
         </div>
         <div class="d-flex align-items-center">
             <a href="play.php?action=lock_wager" class="btn btn-warning font-weight-bold mr-2 shadow-sm">
-                <i class="fas fa-arrow-right mr-1"></i> Bắt đầu câu hỏi ngay &raquo;
+                <i class="fas fa-arrow-right mr-1"></i> Start Question Now &raquo;
             </a>
-            <a href="play.php?action=skip_question" class="btn btn-outline-light font-weight-bold" onclick="return confirm('Bỏ qua câu hỏi này? Điểm người chơi sẽ không thay đổi.');">
-                Bỏ qua câu hỏi &raquo;
+            <a href="play.php?action=skip_question" class="btn btn-outline-light font-weight-bold" onclick="return confirm('Skip this question? Player scores will not change.');">
+                Skip Question &raquo;
             </a>
         </div>
     </nav>
@@ -177,9 +177,9 @@ if ($phase === 'wager') {
 
         <div class="question-card-banner text-center py-4 shadow-sm" style="background: rgba(255, 255, 255, 0.96); border-radius: 20px;">
             <div style="font-size: 3.8rem; line-height: 1;" class="mb-2">🎲</div>
-            <h2 class="font-weight-bold text-dark mb-1">CHẾ ĐỘ CƯỢC ĐIỂM (WAGER)</h2>
+            <h2 class="font-weight-bold text-dark mb-1">WAGER MODE</h2>
             <p class="text-muted font-weight-bold mb-0" style="font-size: 1.15rem;">
-                Người chơi đang bí mật lựa chọn mức cược (10%, 25%, 50%, ALL-IN). Mức cược của từng người được giữ kín.
+                Players are secretly placing their wagers (10%, 25%, 50%, ALL-IN). Each player's wager is kept private.
             </p>
         </div>
 
@@ -193,10 +193,10 @@ if ($phase === 'wager') {
             <div class="text-center">
                 <div class="bg-white rounded-pill px-5 py-3 shadow font-weight-bold text-dark" style="font-size: 1.35rem;">
                     <i class="fas fa-coins text-warning mr-2"></i>
-                    Đã đặt cược: <span id="wagerCount" class="text-primary font-weight-bold"><?= $wageredCount ?></span> / <span id="activeCount"><?= $activeCount ?></span>
+                    Wagers placed: <span id="wagerCount" class="text-primary font-weight-bold"><?= $wageredCount ?></span> / <span id="activeCount"><?= $activeCount ?></span>
                 </div>
                 <div class="text-white mt-2 small font-weight-bold" style="text-shadow: 1px 1px 2px rgba(0,0,0,0.4);">
-                    Hệ thống sẽ tự động chuyển sang câu hỏi khi tất cả đã cược hoặc hết giờ.
+                    The game will automatically advance to the question when all players have wagered or time expires.
                 </div>
             </div>
         </div>
@@ -322,7 +322,7 @@ require_once __DIR__ . '/../../includes/header.php';
         <span class="badge badge-light font-weight-bold mr-2">PIN: <?= htmlspecialchars($room['pin']) ?></span>
         <span class="text-white font-weight-bold mr-2">Question <?= $questionNumber ?> / <?= $totalQuestions ?></span>
         <?php if ($questionMode === 'wager'): ?>
-            <span class="badge badge-warning text-dark font-weight-bold"><i class="fas fa-dice mr-1"></i> CƯỢC ĐIỂM</span>
+            <span class="badge badge-warning text-dark font-weight-bold"><i class="fas fa-dice mr-1"></i> WAGER</span>
         <?php endif; ?>
     </div>
     <div class="d-flex align-items-center">
@@ -355,52 +355,52 @@ require_once __DIR__ . '/../../includes/header.php';
 </nav>
 
 <?php if (($room['game_type'] ?? 'classic') === 'obstacle'): ?>
-    <!-- BUZZER ALERT BANNER TRONG CÂU HỎI -->
+    <!-- BUZZER ALERT BANNER IN QUESTION -->
     <div class="buzzer-alert-banner" id="hostQuestionBuzzerBanner" style="display: none; position: fixed; top: 15px; left: 50%; transform: translateX(-50%); z-index: 99999; max-width: 820px; width: 95%; background: linear-gradient(135deg, #e21b3c 0%, #b3122c 100%); border: 3px solid #ffcc00; border-radius: 20px; padding: 16px 24px; box-shadow: 0 16px 40px rgba(0,0,0,0.6); color: #fff;">
         <div class="d-flex align-items-center justify-content-between flex-wrap">
             <div class="d-flex align-items-center mb-2 mb-sm-0">
                 <i class="fas fa-bell fa-2x mr-3 text-warning"></i>
                 <div>
-                    <h5 class="font-weight-bold mb-0" id="hostQBuzzTitle">🔔 CÓ NGƯỜI BẤM CHUÔNG!</h5>
-                    <span id="hostQBuzzDesc" style="opacity: 0.95;">Người chơi đang trả lời từ khóa bức tranh bí mật...</span>
+                    <h5 class="font-weight-bold mb-0" id="hostQBuzzTitle">🔔 A PLAYER BUZZED IN!</h5>
+                    <span id="hostQBuzzDesc" style="opacity: 0.95;">Player is answering the secret picture keyword...</span>
                 </div>
             </div>
             <div class="d-flex align-items-center">
                 <span class="badge badge-light font-weight-bold py-2 px-3 mr-2 text-danger" style="font-size: 1rem;" id="hostQBuzzStatus">
-                    Tạm dừng câu hỏi
+                    Question Paused
                 </span>
                 <button type="button" class="btn btn-sm btn-outline-light font-weight-bold rounded-pill px-3" onclick="hostCancelBuzzFromQuestion()">
-                    <i class="fas fa-times mr-1"></i> Hủy chuông
+                    <i class="fas fa-times mr-1"></i> Cancel Buzzer
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- HOST REVIEW MODAL TRONG CÂU HỎI -->
+    <!-- HOST REVIEW MODAL IN QUESTION -->
     <div class="host-modal-backdrop" id="hostQReviewModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); z-index: 999999; align-items: center; justify-content: center; padding: 20px;">
         <div class="host-modal-card" style="background: #1e1136; border: 3px solid #f2994a; border-radius: 24px; max-width: 580px; width: 100%; padding: 30px; color: #fff; text-align: center; box-shadow: 0 24px 60px rgba(0,0,0,0.7);">
             <h3 class="font-weight-bold text-warning mb-2" style="color: #f2994a !important;">
-                <i class="fas fa-gavel mr-2"></i> XÁC NHẬN CÂU TRẢ LỜI
+                <i class="fas fa-gavel mr-2"></i> CONFIRM ANSWER
             </h3>
-            <p class="text-white-50 small mb-3">Người chơi đã gửi từ khóa dự đoán bức tranh bí mật:</p>
+            <p class="text-white-50 small mb-3">Player has submitted the secret picture keyword guess:</p>
             <div class="p-3 rounded mb-3" style="background: rgba(255,255,255,0.08); border: 2px dashed rgba(255,255,255,0.25);">
-                <div class="small text-white-50">NGƯỜI BẤM CHUÔNG:</div>
+                <div class="small text-white-50">PLAYER:</div>
                 <div class="h4 font-weight-bold text-info mb-3" id="hostQReviewPlayerName">...</div>
-                <div class="small text-white-50">TỪ KHÓA DỰ ĐOÁN:</div>
+                <div class="small text-white-50">PREDICTED KEYWORD:</div>
                 <div class="h3 font-weight-bold text-warning mb-0" id="hostQReviewPlayerGuess" style="letter-spacing: 1px; word-break: break-word;">...</div>
             </div>
             <?php if (!empty($room['obstacle_answer'])): ?>
                 <div class="alert alert-dark border border-secondary text-left py-2 px-3 mb-3 small" style="background: #120924;">
-                    <span class="text-white-50">Đáp án chuẩn của bức tranh:</span> 
+                    <span class="text-white-50">Secret picture keyword:</span>
                     <span class="font-weight-bold text-success ml-1"><?= htmlspecialchars($room['obstacle_answer']) ?></span>
                 </div>
             <?php endif; ?>
             <div class="d-flex justify-content-between mt-4">
                 <button type="button" class="btn btn-danger btn-lg font-weight-bold px-4 py-3 shadow" style="border-radius: 14px; width: 48%; font-size: 1.15rem;" onclick="hostConfirmQGuess(false)">
-                    <i class="fas fa-times-circle mr-2"></i> SAI (FALSE)
+                    <i class="fas fa-times-circle mr-2"></i> INCORRECT (FALSE)
                 </button>
                 <button type="button" class="btn btn-success btn-lg font-weight-bold px-4 py-3 shadow" style="border-radius: 14px; width: 48%; font-size: 1.15rem;" onclick="hostConfirmQGuess(true)">
-                    <i class="fas fa-check-circle mr-2"></i> ĐÚNG (TRUE)
+                    <i class="fas fa-check-circle mr-2"></i> CORRECT (TRUE)
                 </button>
             </div>
         </div>
@@ -569,7 +569,7 @@ let isPausedByBuzzer = false;
 
 // Countdown timer: when time runs out, auto-transition immediately to leaderboard
 const timerInterval = setInterval(function() {
-    if (isPausedByBuzzer) return; // Đóng băng countdown khi có người bấm chuông
+    if (isPausedByBuzzer) return; // Freeze countdown during buzzer
 
     remaining--;
     if (remaining <= 0) {
@@ -587,14 +587,14 @@ const timerInterval = setInterval(function() {
     }
 }, 1000);
 
-// Polling: đồng bộ số người trả lời và trạng thái chuông chướng ngại vật
+// Polling: sync answer counts and obstacle buzzer status
 const pollInterval = setInterval(function() {
     $.getJSON('<?= BASE_URL ?>modules/api/game_state.php?action=get_question_status&id_room=' + roomId + '&id_question=' + qId, function(data) {
         if (data && data.success) {
             $('#voteCount').text(data.voted_count);
             $('#totalPlayerCount').text(data.total_players);
 
-            // Kiểm tra trạng thái Buzzer trong câu hỏi
+            // Check buzzer status in question
             if (isObstacleGame && data.buzzer_status) {
                 if (data.buzzer_status === 'buzzing' || data.buzzer_status === 'pending_review') {
                     if (!isPausedByBuzzer) {
@@ -605,13 +605,13 @@ const pollInterval = setInterval(function() {
                     $('#hostQuestionBuzzerBanner').slideDown(200);
 
                     if (data.buzzer_status === 'buzzing') {
-                        $('#hostQBuzzTitle').text('🔔 ' + (data.buzzer_player_name || 'Người chơi') + ' ĐANG BẤM CHUÔNG ĐOÁN TỪ KHÓA!');
-                        $('#hostQBuzzDesc').text('Trò chơi và thời gian đếm ngược đang tạm dừng. Đang chờ người chơi nhập câu trả lời...');
+                        $('#hostQBuzzTitle').text('🔔 ' + (data.buzzer_player_name || 'Player') + ' IS BUZZING IN TO GUESS KEYWORD!');
+                        $('#hostQBuzzDesc').text('Game and countdown are paused. Waiting for player to enter answer...');
                         $('#hostQReviewModal').hide();
                     } else if (data.buzzer_status === 'pending_review') {
-                        $('#hostQBuzzTitle').text('🔔 ' + (data.buzzer_player_name || 'Người chơi') + ' ĐÃ GỬI CÂU TRẢ LỜI!');
-                        $('#hostQBuzzDesc').text('Vui lòng xem và xác nhận câu trả lời là ĐÚNG hay SAI.');
-                        $('#hostQReviewPlayerName').text(data.buzzer_player_name || 'Người chơi');
+                        $('#hostQBuzzTitle').text('🔔 ' + (data.buzzer_player_name || 'Player') + ' HAS SUBMITTED AN ANSWER!');
+                        $('#hostQBuzzDesc').text('Please review and confirm if the answer is CORRECT or INCORRECT.');
+                        $('#hostQReviewPlayerName').text(data.buzzer_player_name || 'Player');
                         $('#hostQReviewPlayerGuess').text(data.buzzer_guess || '...');
                         $('#hostQReviewModal').css('display', 'flex');
                     }
@@ -667,7 +667,7 @@ function hostConfirmQGuess(isCorrect) {
 }
 
 function hostCancelBuzzFromQuestion() {
-    if (!confirm('Bạn có chắc muốn hủy lượt chuông này? Người chơi sẽ bị mất quyền bấm chuông.')) return;
+    if (!confirm('Are you sure you want to cancel this buzzer turn? The player will forfeit buzzer rights.')) return;
     $.post('<?= BASE_URL ?>modules/api/obstacle_action.php?action=host_cancel_buzz&id_room=' + roomId, function(res) {
         isPausedByBuzzer = false;
         $('#hostQReviewModal').hide();

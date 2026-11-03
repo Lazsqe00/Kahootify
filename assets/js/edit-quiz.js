@@ -87,7 +87,7 @@ function initPropertiesPanel() {
             if (curModeId !== 'normal') {
                 var curMode = (EQ.modes || []).find(function (m) { return m.id === curModeId; });
                 if (curMode && curMode.supportedQuestionTypes && !curMode.supportedQuestionTypes.includes(qTypeEl.value)) {
-                    alert("Chế độ '" + curMode.label + "' không hỗ trợ loại câu hỏi này. Tự động chuyển về Multiple Choice.");
+                    alert("Mode '" + curMode.label + "' does not support this question type. Automatically switched to Multiple Choice.");
                     qTypeEl.value = 'multiple_choice';
                     syncPropsToForm();
                 }
@@ -107,7 +107,7 @@ function initPropertiesPanel() {
             var modeMeta = (EQ.modes || []).find(function (m) { return m.id === selectedMode; });
 
             if (modeMeta && modeMeta.supportedQuestionTypes && !modeMeta.supportedQuestionTypes.includes(curType)) {
-                alert("Chế độ '" + modeMeta.label + "' không hỗ trợ loại câu hỏi hiện tại (" + curType + "). Vui lòng chọn loại câu hỏi khác trước.");
+                alert("Mode '" + modeMeta.label + "' does not support the current question type (" + curType + "). Please choose a different question type first.");
                 this.value = 'normal';
                 EQ.defaultMode = 'normal';
             }
@@ -115,7 +115,7 @@ function initPropertiesPanel() {
         });
     }
 
-    ['propQuestionType', 'propTimeLimit', 'propPoints', 'propQuestionMode', 'propWagerTimeSec', 'propWagerSpeedBonus'].forEach(function (id) {
+    ['propQuestionType', 'propTimeLimit', 'propPoints', 'propQuestionMode', 'propWagerTimeSec'].forEach(function (id) {
         var el = document.getElementById(id);
         if (el) el.addEventListener('change', syncPropsToForm);
     });
@@ -136,8 +136,7 @@ function syncPropsToForm() {
     var pointsEl = document.getElementById('propPoints');
     var modeEl = document.getElementById('propQuestionMode');
     var wagerTimeEl = document.getElementById('propWagerTimeSec');
-    var wagerSpeedEl = document.getElementById('propWagerSpeedBonus');
-    var modeSettingsPanel = document.getElementById('modeSettingsPanel');
+        var modeSettingsPanel = document.getElementById('modeSettingsPanel');
     var descText = document.getElementById('modeDescriptionText');
     var piEl = document.getElementById('propPieceIndex');
     var hPi = document.getElementById('hiddenPieceIndex');
@@ -174,9 +173,7 @@ function syncPropsToForm() {
     if (wagerTimeEl && document.getElementById('hiddenWagerTimeSec')) {
         document.getElementById('hiddenWagerTimeSec').value = wagerTimeEl.value;
     }
-    if (wagerSpeedEl && document.getElementById('hiddenWagerSpeedBonus')) {
-        document.getElementById('hiddenWagerSpeedBonus').value = wagerSpeedEl.checked ? '1' : '0';
-    }
+
 }
 
 function applyQuestionTypeUI(type) {
@@ -502,8 +499,6 @@ function resetToNewMode() {
     if (modeEl) modeEl.value = EQ.defaultMode || 'normal';
     var wagerTimeEl = document.getElementById('propWagerTimeSec');
     if (wagerTimeEl) wagerTimeEl.value = '10';
-    var wagerSpeedEl = document.getElementById('propWagerSpeedBonus');
-    if (wagerSpeedEl) wagerSpeedEl.checked = false;
 
     if (EQ.gameType === 'obstacle') {
         var nextPiece = 1;
@@ -568,15 +563,14 @@ window.loadQuestionForEdit = function (questionId) {
     }
 
     var wagerTimeEl = document.getElementById('propWagerTimeSec');
-    var wagerSpeedEl = document.getElementById('propWagerSpeedBonus');
-    var cfg = {};
+        var cfg = {};
     if (q.mode_config) {
         try {
             cfg = (typeof q.mode_config === 'string') ? JSON.parse(q.mode_config) : q.mode_config;
         } catch(e) {}
     }
     if (wagerTimeEl) wagerTimeEl.value = cfg.wagerTimeSec || 10;
-    if (wagerSpeedEl) wagerSpeedEl.checked = !!cfg.speedBonusEnabled;
+    // Speed bonus feature removed
 
     if (EQ.gameType === 'obstacle') {
         var piVal = q.piece_index || qIdx || 1;

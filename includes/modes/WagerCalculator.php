@@ -2,7 +2,7 @@
 
 /**
  * Class WagerCalculator
- * Pure calculation functions for the Wager (Cược điểm) question mode.
+ * Pure calculation functions for the Wager question mode.
  * Contains 100% deterministic logic, strictly isolated for testing.
  */
 class WagerCalculator

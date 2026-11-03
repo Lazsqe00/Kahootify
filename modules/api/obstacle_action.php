@@ -13,7 +13,7 @@ $action = $_GET['action'] ?? ($_POST['action'] ?? ($jsonData['action'] ?? ''));
 $roomId = intval($_GET['id_room'] ?? ($_POST['id_room'] ?? ($jsonData['id_room'] ?? 0)));
 
 if ($roomId <= 0) {
-    echo json_encode(['success' => false, 'message' => 'Mã phòng không hợp lệ']);
+    echo json_encode(['success' => false, 'message' => 'Invalid room PIN']);
     exit;
 }
 
@@ -23,32 +23,32 @@ $room = db_fetch_one("SELECT r.*, q.obstacle_image, q.obstacle_answer, q.total_p
                       WHERE r.id_room = :r", [':r' => $roomId]);
 
 if (!$room) {
-    echo json_encode(['success' => false, 'message' => 'Phòng chơi không tồn tại']);
+    echo json_encode(['success' => false, 'message' => 'Game room does not exist']);
     exit;
 }
 
-// 1. HOST CHỌN MẢNH GHÉP ĐỂ MỞ CÂU HỎI
+// 1. HOST SELECTS PUZZLE PIECE TO OPEN QUESTION
 if ($action === 'select_piece') {
     $creatorId = intval($_SESSION['id_creator'] ?? 0);
     if ($creatorId !== intval($room['id_creator'])) {
         http_response_code(403);
-        echo json_encode(['success' => false, 'message' => 'Bạn không phải Host của phòng này']);
+        echo json_encode(['success' => false, 'message' => 'You are not the host of this room']);
         exit;
     }
 
     $pieceIndex = intval($_POST['piece_index'] ?? ($jsonData['piece_index'] ?? 0));
     if ($pieceIndex <= 0) {
-        echo json_encode(['success' => false, 'message' => 'Mảnh ghép không hợp lệ']);
+        echo json_encode(['success' => false, 'message' => 'Invalid puzzle piece']);
         exit;
     }
 
-    // Tìm câu hỏi tương ứng với piece_index
+    // Find question corresponding to piece_index
     $question = db_fetch_one("SELECT * FROM questions WHERE id_quiz = :qz AND piece_index = :pi ORDER BY id_question ASC LIMIT 1", [
         ':qz' => $room['id_quiz'],
         ':pi' => $pieceIndex
     ]);
 
-    // Fallback nếu không có câu hỏi gắn piece_index: lấy câu hỏi thứ K theo sort_order
+    // Fallback if no question tied to piece_index
     if (!$question) {
         $allQ = db_fetch_all("SELECT * FROM questions WHERE id_quiz = :qz ORDER BY sort_order ASC, id_question ASC", [':qz' => $room['id_quiz']]);
         if (isset($allQ[$pieceIndex - 1])) {
@@ -59,11 +59,11 @@ if ($action === 'select_piece') {
     }
 
     if (!$question) {
-        echo json_encode(['success' => false, 'message' => 'Không tìm thấy câu hỏi cho mảnh ghép này']);
+        echo json_encode(['success' => false, 'message' => 'No question found for this puzzle piece']);
         exit;
     }
 
-    // Cập nhật opened_pieces
+    // Update opened_pieces
     $openedPieces = !empty($room['opened_pieces']) ? json_decode($room['opened_pieces'], true) : [];
     if (!is_array($openedPieces)) $openedPieces = [];
     if (!in_array($pieceIndex, $openedPieces)) {
@@ -112,12 +112,12 @@ if ($action === 'select_piece') {
     exit;
 }
 
-// 2. HOST QUAY VỀ BẢNG GHÉP (SAU KHI CÂU HỎI KẾT THÚC)
+// 2. HOST RETURNS TO BOARD (AFTER QUESTION FINISHES)
 if ($action === 'return_to_board') {
     $creatorId = intval($_SESSION['id_creator'] ?? 0);
     if ($creatorId !== intval($room['id_creator'])) {
         http_response_code(403);
-        echo json_encode(['success' => false, 'message' => 'Bạn không phải Host']);
+        echo json_encode(['success' => false, 'message' => 'You are not the host']);
         exit;
     }
 
@@ -128,7 +128,7 @@ if ($action === 'return_to_board') {
     $gameConfig = !empty($room['game_config']) ? json_decode($room['game_config'], true) : [];
     if (!is_array($gameConfig)) $gameConfig = [];
 
-    // Nếu đã mở hết tất cả các mảnh ghép, reset lại quyền bấm chuông cho TẤT CẢ người chơi!
+    // If all pieces opened, reset buzzer rights for ALL players!
     if (count($openedPieces) >= $totalPieces) {
         $gameConfig['final_round_reset'] = true;
         db_execute("UPDATE players SET is_disqualified_obstacle = 0 WHERE id_room = :r", [':r' => $roomId]);
@@ -153,20 +153,20 @@ if ($action === 'return_to_board') {
     exit;
 }
 
-// 3. NGƯỜI CHƠI BẤM CHUÔNG ĐOÁN TỪ KHÓA
+// 3. PLAYER BUZZES IN TO GUESS KEYWORD
 if ($action === 'buzz') {
     $playerId = intval($_POST['id_player'] ?? ($jsonData['id_player'] ?? 0));
     $token    = trim($_POST['token'] ?? ($jsonData['token'] ?? ''));
 
     if ($playerId <= 0 || !player_request_is_valid($playerId, $roomId, $token)) {
         http_response_code(403);
-        echo json_encode(['success' => false, 'message' => 'Phiên người chơi không hợp lệ']);
+        echo json_encode(['success' => false, 'message' => 'Invalid player session']);
         exit;
     }
 
     $player = db_fetch_one("SELECT * FROM players WHERE id_player = :p AND id_room = :r", [':p' => $playerId, ':r' => $roomId]);
     if (!$player) {
-        echo json_encode(['success' => false, 'message' => 'Người chơi không tồn tại trong phòng']);
+        echo json_encode(['success' => false, 'message' => 'Player does not exist in room']);
         exit;
     }
 
@@ -177,32 +177,32 @@ if ($action === 'buzz') {
 
     if (!empty($player['is_disqualified_obstacle'])) {
         if (!$allPiecesOpened) {
-            echo json_encode(['success' => false, 'message' => 'Bạn đã tạm mất quyền bấm chuông trong lúc mở các mảnh ghép. Chuông sẽ được mở lại khi mở hết các mảnh ghép!']);
+            echo json_encode(['success' => false, 'message' => 'Your buzzer is temporarily locked during piece reveals. Buzzer will unlock once all pieces are opened!']);
         } else {
-            echo json_encode(['success' => false, 'message' => 'Bạn đã hết quyền bấm chuông đoán từ khóa!']);
+            echo json_encode(['success' => false, 'message' => 'You have used up all your keyword guesses!']);
         }
         exit;
     }
 
-    // Atomic claim chuông
+    // Atomic buzzer claim
     if ($room['buzzer_status'] === 'buzzing' || $room['buzzer_status'] === 'pending_review') {
         if (intval($room['buzzer_player_id']) === $playerId) {
             echo json_encode(['success' => true, 'your_turn' => true]);
             exit;
         }
-        echo json_encode(['success' => false, 'message' => 'Người chơi khác đã nhanh tay bấm chuông trước!']);
+        echo json_encode(['success' => false, 'message' => 'Another player buzzed in first!']);
         exit;
     }
 
     if ($room['buzzer_status'] === 'finished') {
-        echo json_encode(['success' => false, 'message' => 'Trò chơi đã có người chiến thắng chung cuộc!']);
+        echo json_encode(['success' => false, 'message' => 'The game already has a champion!']);
         exit;
     }
 
     $gameConfig = !empty($room['game_config']) ? json_decode($room['game_config'], true) : [];
     if (!is_array($gameConfig)) $gameConfig = [];
 
-    // Nếu đang trong câu hỏi (status là id câu hỏi), lưu số giây còn lại để đóng băng timer của host và người chơi
+    // Freeze question timer during buzzer
     if (is_numeric($room['status']) && intval($room['status']) > 0) {
         $qId = intval($room['status']);
         $qRow = db_fetch_one("SELECT time_limit FROM questions WHERE id_question = :q", [':q' => $qId]);
@@ -240,12 +240,12 @@ if ($action === 'buzz') {
             'team_icon'   => $tInfo['icon'] ?? null
         ]);
     } else {
-        echo json_encode(['success' => false, 'message' => 'Rất tiếc! Người chơi khác đã bấm chuông trước một tích tắc.']);
+        echo json_encode(['success' => false, 'message' => 'Oops! Another player buzzed in just a moment before you.']);
     }
     exit;
 }
 
-// 4. NGƯỜI BẤM CHUÔNG GỬI TỪ KHÓA DỰ ĐOÁN ĐỂ HOST XÁC NHẬN
+// 4. BUZZER PLAYER SUBMITS KEYWORD FOR HOST REVIEW
 if ($action === 'submit_guess') {
     $playerId = intval($_POST['id_player'] ?? ($jsonData['id_player'] ?? 0));
     $token    = trim($_POST['token'] ?? ($jsonData['token'] ?? ''));
@@ -253,16 +253,16 @@ if ($action === 'submit_guess') {
 
     if ($playerId <= 0 || !player_request_is_valid($playerId, $roomId, $token)) {
         http_response_code(403);
-        echo json_encode(['success' => false, 'message' => 'Phiên người chơi không hợp lệ']);
+        echo json_encode(['success' => false, 'message' => 'Invalid player session']);
         exit;
     }
 
     if ($room['buzzer_status'] !== 'buzzing' || intval($room['buzzer_player_id']) !== $playerId) {
-        echo json_encode(['success' => false, 'message' => 'Không phải lượt trả lời của bạn!']);
+        echo json_encode(['success' => false, 'message' => 'It is not your turn to answer!']);
         exit;
     }
 
-    // Nếu người chơi nhấn chuông nhưng không nhập đáp án: MẤT QUYỀN BẤM CHUÔNG!
+    // Forfeited buzzer rights if no answer provided
     if ($guess === '') {
         db_execute("UPDATE players SET is_disqualified_obstacle = 1 WHERE id_player = :p", [':p' => $playerId]);
 
@@ -285,14 +285,14 @@ if ($action === 'submit_guess') {
         echo json_encode([
             'success'      => false,
             'disqualified' => true,
-            'message'      => 'Bạn không nhập câu trả lời nên bị mất quyền bấm chuông!'
+            'message'      => 'You did not provide an answer and forfeited buzzer rights!'
         ]);
         exit;
     }
 
     $player = db_fetch_one("SELECT * FROM players WHERE id_player = :p AND id_room = :r", [':p' => $playerId, ':r' => $roomId]);
 
-    // Lưu câu trả lời của người chơi và chuyển sang pending_review để Host xác nhận True / False
+    // Save player answer and set to pending_review
     db_execute(
         "UPDATE room 
          SET buzzer_status = 'pending_review', 
@@ -309,19 +309,19 @@ if ($action === 'submit_guess') {
         'success'        => true,
         'pending_review' => true,
         'guess'          => $guess,
-        'message'        => 'Câu trả lời đã được gửi tới Host! Vui lòng chờ Host xác nhận.'
+        'message'        => 'Answer submitted to Host! Please wait for confirmation.'
     ]);
     exit;
 }
 
-// 4b. NGƯỜI BẤM CHUÔNG HỦY HOẶC HẾT THỜI GIAN NHẬP ĐÁP ÁN (BỊ MẤT QUYỀN ĐOÁN)
+// 4b. BUZZER CANCEL OR TIMEOUT
 if ($action === 'cancel_or_timeout_guess') {
     $playerId = intval($_POST['id_player'] ?? ($jsonData['id_player'] ?? 0));
     $token    = trim($_POST['token'] ?? ($jsonData['token'] ?? ''));
 
     if ($playerId <= 0 || !player_request_is_valid($playerId, $roomId, $token)) {
         http_response_code(403);
-        echo json_encode(['success' => false, 'message' => 'Phiên người chơi không hợp lệ']);
+        echo json_encode(['success' => false, 'message' => 'Invalid player session']);
         exit;
     }
 
@@ -347,27 +347,27 @@ if ($action === 'cancel_or_timeout_guess') {
         echo json_encode([
             'success'      => true,
             'disqualified' => true,
-            'message'      => 'Bạn đã không đưa ra câu trả lời và bị mất quyền bấm chuông!'
+            'message'      => 'You did not provide an answer and forfeited buzzer rights!'
         ]);
         exit;
     }
 
-    echo json_encode(['success' => false, 'message' => 'Lượt chuông không hợp lệ']);
+    echo json_encode(['success' => false, 'message' => 'Invalid buzzer turn']);
     exit;
 }
 
-// 5. HOST XÁC NHẬN CÂU TRẢ LỜI CỦA NGƯỜI CHƠI LÀ TRUE HOẶC FALSE
+// 5. HOST CONFIRMS TRUE OR FALSE
 if ($action === 'host_confirm_guess') {
     $creatorId = intval($_SESSION['id_creator'] ?? 0);
     $creatorCheck = db_fetch_one("SELECT id_creator FROM room WHERE id_room = :r AND id_creator = :c", [':r' => $roomId, ':c' => $creatorId]);
     if (!$creatorCheck) {
         http_response_code(403);
-        echo json_encode(['success' => false, 'message' => 'Chỉ Host mới có quyền xác nhận câu trả lời']);
+        echo json_encode(['success' => false, 'message' => 'Only the host can confirm answers']);
         exit;
     }
 
     if ($room['buzzer_status'] !== 'pending_review' || empty($room['buzzer_player_id'])) {
-        echo json_encode(['success' => false, 'message' => 'Hiện không có câu trả lời nào đang chờ xác nhận']);
+        echo json_encode(['success' => false, 'message' => 'No answer currently pending confirmation']);
         exit;
     }
 
@@ -382,7 +382,7 @@ if ($action === 'host_confirm_guess') {
     $allPiecesOpened = (count($openedPieces) >= $totalPieces);
 
     if ($isCorrect) {
-        // ĐÚNG (TRUE): Người chơi giành chiến thắng và trò chơi kết thúc!
+        // TRUE: Player wins and game finishes!
         db_execute(
             "UPDATE room 
              SET buzzer_status = 'finished', 
@@ -392,7 +392,7 @@ if ($action === 'host_confirm_guess') {
             [':p' => $playerId, ':r' => $roomId]
         );
 
-        // Cộng 5000 điểm vinh danh cho người thắng cuộc
+        // Award 5000 points to winner
         db_execute(
             "UPDATE players 
              SET score = score + 5000 
@@ -410,11 +410,11 @@ if ($action === 'host_confirm_guess') {
             'winner_team_name'  => $player['team_name'] ?? null,
             'winner_team_color' => $wTeam['color'] ?? null,
             'answer'            => $room['obstacle_answer'],
-            'message'           => 'Xác nhận ĐÚNG! Người chơi đã giành chiến thắng chung cuộc.'
+            'message'           => 'Confirmed CORRECT! Player has won the game.'
         ]);
         exit;
     } else {
-        // SAI (FALSE): Người chơi tạm mất quyền bấm chuông
+        // FALSE: Player temporarily loses buzzer rights
         db_execute(
             "UPDATE players 
              SET is_disqualified_obstacle = 1 
@@ -443,14 +443,14 @@ if ($action === 'host_confirm_guess') {
         if (!is_array($gameConfig)) $gameConfig = [];
         $isFinalRound = !empty($gameConfig['final_round_reset']);
 
-        // KIỂM TRA ĐIỀU KIỆN KẾT THÚC KHI ĐÃ Ở VÒNG CUỐI (HIỂN THỊ CẢ BỨC TRANH):
-        // Chỉ kết thúc nếu đã ở vòng đoán cuối (isFinalRound) và TẤT CẢ người chơi đều đã trả lời sai ở vòng này:
+        // Check end condition when all pieces revealed
+        // End if all players guessed incorrectly in final round
         $activeRemaining = db_count('players', 'id_room = :r AND is_kicked = 0 AND is_disqualified_obstacle = 0', [':r' => $roomId]);
         $totalInRoom = db_count('players', 'id_room = :r AND is_kicked = 0', [':r' => $roomId]);
         $allDisqualifiedAtEnd = ($isFinalRound && $allPiecesOpened && $totalInRoom > 0 && $activeRemaining === 0);
 
         if ($allDisqualifiedAtEnd) {
-            // Tìm người có số điểm cao nhất để vinh danh quán quân theo điểm số
+            // Find top scoring player
             $topPlayer = db_fetch_one(
                 "SELECT id_player, nickname, score FROM players 
                  WHERE id_room = :r AND is_kicked = 0 
@@ -459,7 +459,7 @@ if ($action === 'host_confirm_guess') {
             );
             $topPid = $topPlayer ? intval($topPlayer['id_player']) : null;
 
-            // Kết thúc trò chơi
+            // Finish game
             db_execute(
                 "UPDATE room 
                  SET status = 'finished', 
@@ -480,7 +480,7 @@ if ($action === 'host_confirm_guess') {
                 'game_finished'     => true,
                 'winner_name'       => $topPlayer['nickname'] ?? '',
                 'winner_score'      => $topPlayer['score'] ?? 0,
-                'message'           => 'Tất cả người chơi đều đã trả lời sai từ khóa bức tranh! Trò chơi kết thúc, người chiến thắng được xếp hạng theo số điểm.'
+                'message'           => 'All players guessed the secret keyword incorrectly! Game ended, winners ranked by score.'
             ]);
             exit;
         }
@@ -490,13 +490,13 @@ if ($action === 'host_confirm_guess') {
             'correct'           => false,
             'all_pieces_opened' => $allPiecesOpened,
             'all_disqualified'  => false,
-            'message'           => $isFinalRound ? 'Đã xác nhận SAI! Các người chơi khác vẫn còn cơ hội bấm chuông đoán tiếp.' : 'Đã xác nhận SAI! Người chơi tạm khóa chuông cho đến khi mở hết các mảnh ghép.'
+            'message'           => $isFinalRound ? 'Confirmed INCORRECT! Other players still have a chance to buzz in.' : 'Confirmed INCORRECT! Player buzzer locked until all pieces are opened.'
         ]);
         exit;
     }
 }
 
-// 6. HOST HỦY LƯỢT CHUÔNG HIỆN TẠI (NẾU CẦN)
+// 6. HOST CANCELS CURRENT BUZZER (IF NEEDED)
 if ($action === 'host_cancel_buzz') {
     $creatorId = intval($_SESSION['id_creator'] ?? 0);
     $creatorCheck = db_fetch_one("SELECT id_creator FROM room WHERE id_room = :r AND id_creator = :c", [':r' => $roomId, ':c' => $creatorId]);
@@ -527,7 +527,7 @@ if ($action === 'host_cancel_buzz') {
     }
 }
 
-// 7. LẤY TRẠNG THÁI REALTIME CỦA PHÒNG CHƯỚNG NGẠI VẬT
+// 7. GET REALTIME OBSTACLE ROOM STATE
 if ($action === 'get_obstacle_state') {
     $openedPieces = !empty($room['opened_pieces']) ? json_decode($room['opened_pieces'], true) : [];
     if (!is_array($openedPieces)) $openedPieces = [];
@@ -537,8 +537,8 @@ if ($action === 'get_obstacle_state') {
     $gameConfig = !empty($room['game_config']) ? json_decode($room['game_config'], true) : [];
     if (!is_array($gameConfig)) $gameConfig = [];
 
-    // Nếu đã mở hết tất cả mảnh ghép và đang ở trạng thái 'board' (hoặc kết thúc câu hỏi cuối),
-    // mà chưa kích hoạt vòng đoán cuối (final_round_reset): Mở lại lượt cho tất cả người chơi!
+    // If all pieces opened and in board state,
+    // reset buzzer for all players in final round!
     if ($allPiecesOpened && empty($gameConfig['final_round_reset']) && ($room['status'] === 'board' || !is_numeric($room['status']))) {
         $gameConfig['final_round_reset'] = true;
         db_execute("UPDATE room SET game_config = :gc WHERE id_room = :r", [
@@ -604,7 +604,7 @@ if ($action === 'get_obstacle_state') {
 
     $isRevealed = ($room['buzzer_status'] === 'finished' || $room['status'] === 'finished' || !empty($room['winner_player_id']));
 
-    // Ảnh bí mật được trả về nếu đã có người chiến thắng HOẶC toàn bộ mảnh ghép đã mở hết!
+    // Secret image returned if winner exists OR all pieces opened
     $obstacleImage = (!empty($room['obstacle_image']) && ($isRevealed || $allPiecesOpened)) 
         ? BASE_URL . $room['obstacle_image'] 
         : null;
@@ -643,4 +643,4 @@ if ($action === 'get_obstacle_state') {
     exit;
 }
 
-echo json_encode(['success' => false, 'message' => 'Action không hợp lệ']);
+echo json_encode(['success' => false, 'message' => 'Invalid action']);

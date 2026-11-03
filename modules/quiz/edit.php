@@ -13,6 +13,7 @@ if (!$quiz) {
     set_flash_message('danger', 'Quiz not found or access denied.');
     redirect('modules/quiz/list.php');
 }
+$isObstacle = (($quiz['game_type'] ?? 'classic') === 'obstacle');
 
 $isObstacle = (($quiz['game_type'] ?? 'classic') === 'obstacle');
 
@@ -65,7 +66,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
         $endTime   = !empty($_POST['review_end_time'])   ? date('Y-m-d H:i:s', strtotime($_POST['review_end_time']))   : null;
 
         if ($isReview) {
-            // Khi bật Review Mode: tự động tắt Team Mode
+            // When Review Mode is enabled: automatically disable Team Mode
             db_execute(
                 "UPDATE quiz SET is_review_mode = 1, review_start_time = :st, review_end_time = :et, is_team_mode = 0 WHERE id_quiz = :q AND id_creator = :c",
                 [
@@ -76,20 +77,20 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
                 ]
             );
 
-            // Kiểm tra session ôn tập hiện tại của bộ quiz này
+            // Check active review session for this quiz
             $activeRoom = db_fetch_one(
                 "SELECT * FROM room WHERE id_quiz = :q AND is_review_mode = 1 AND status = 'review_active' LIMIT 1",
                 [':q' => $quizId]
             );
 
-            // Nếu phòng ôn tập cũ đã hết hạn, kết thúc phòng đó để tạo phiên mới
+            // If old review room has expired, finish it to create a new session
             if ($activeRoom && !empty($activeRoom['review_end_time']) && strtotime($activeRoom['review_end_time']) < time()) {
                 db_execute("UPDATE room SET status = 'finished' WHERE id_room = :r", [':r' => $activeRoom['id_room']]);
                 $activeRoom = null;
             }
 
             if ($activeRoom) {
-                // Đang trong thời hạn mở -> Cập nhật thời gian vào chính instance phòng ôn tập này (báo cáo sẽ tiếp tục cập nhật)
+                // Still active -> Update time in this review room instance
                 db_execute(
                     "UPDATE room SET review_start_time = :st, review_end_time = :et WHERE id_room = :r",
                     [
@@ -100,7 +101,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
                 );
                 set_flash_message('success', 'Review Mode settings updated for this quiz (Game PIN: ' . $activeRoom['pin'] . '). Report will continue updating.');
             } else {
-                // Chưa có phòng hoặc phòng trước đã đóng -> Tạo instance phòng ôn tập mới
+                // No room or previous room closed -> Create new review room instance
                 do {
                     $newPin = sprintf("%06d", mt_rand(100000, 999999));
                     $existing = db_fetch_one("SELECT id_room FROM room WHERE pin = :pin AND status != 'finished'", [':pin' => $newPin]);
@@ -120,7 +121,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
                 set_flash_message('success', 'Review Mode enabled! New review session created (Game PIN: ' . $newPin . ') and listed in Reports.');
             }
         } else {
-            // Khi tắt Review Mode -> Đóng phiên phòng ôn tập đang chạy
+            // When disabling Review Mode -> Close active review room
             db_execute(
                 "UPDATE room SET status = 'finished' WHERE id_quiz = :q AND is_review_mode = 1 AND status = 'review_active'",
                 [':q' => $quizId]
@@ -139,7 +140,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
 
     if ($action === 'update_team_settings') {
         $isTeam = !empty($_POST['is_team_mode']) ? 1 : 0;
-        // Không cho bật Team Mode nếu Review Mode đang bật
+        // Do not allow Team Mode if Review Mode is active
         if (!empty($quiz['is_review_mode']) && $isTeam) {
             set_flash_message('danger', 'Cannot enable Team Mode while Review Mode is active. Please disable Review Mode first.');
             redirect('modules/quiz/edit.php?id=' . $quizId);
@@ -218,10 +219,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
         $modeConfig = null;
         if ($qMode === 'wager') {
             $wTime = intval($_POST['wager_time_sec'] ?? 10);
-            $spBonus = !empty($_POST['wager_speed_bonus']);
             $modeConfig = json_encode($modeObj->validateConfig([
                 'wagerTimeSec' => $wTime,
-                'speedBonusEnabled' => $spBonus,
             ]));
         }
 
@@ -402,12 +401,13 @@ if (isset($_GET['initial_mode']) && QuestionModeRegistry::has($_GET['initial_mod
 
 $defaultQMode = $quizMode;
 $_SESSION['last_question_mode_' . $quizId] = $defaultQMode;
+$lastQ = !empty($questions) ? end($questions) : null;
 $defaultQType = $_SESSION['last_question_type_' . $quizId]
-    ?? (!empty($questions) ? end($questions)['question_type'] : 'multiple_choice');
+    ?? ($lastQ['question_type'] ?? 'multiple_choice');
 $defaultTimeLimit = $_SESSION['last_time_limit_' . $quizId]
-    ?? (!empty($questions) ? end($questions)['time_limit'] : 20);
+    ?? ($lastQ['time_limit'] ?? 20);
 $defaultPoints = $_SESSION['last_points_' . $quizId]
-    ?? (!empty($questions) ? end($questions)['points'] : 1000);
+    ?? ($lastQ['points'] ?? 1000);
 
 $pageTitle      = 'Edit Quiz: ' . htmlspecialchars($quiz['name']);
 $extraCss       = BASE_URL . 'assets/css/edit-quiz.css?v=' . (file_exists(__DIR__ . '/../../assets/css/edit-quiz.css') ? filemtime(__DIR__ . '/../../assets/css/edit-quiz.css') : time());
@@ -447,7 +447,7 @@ require_once __DIR__ . '/../../includes/navbar.php';
     flex-shrink: 0 !important;
     line-height: 1 !important;
 }
-/* Đáp án sai: tô màu xám */
+/* Incorrect answer: grayed out */
 .q-mini-ans.is-wrong {
     background: #f1f5f9 !important;
     color: #64748b !important;
@@ -458,7 +458,7 @@ require_once __DIR__ . '/../../includes/navbar.php';
 .q-mini-ans.is-wrong .q-mini-shape {
     color: #64748b !important;
 }
-/* Đáp án đúng: TÔ MÀU XANH LÁ ĐẬM NỔI BẬT CHUẨN KAHOOT */
+/* Correct answer: Highlighted dark green */
 .q-mini-ans.is-correct {
     background: #16a34a !important;
     color: #ffffff !important;
@@ -487,7 +487,7 @@ require_once __DIR__ . '/../../includes/navbar.php';
     font-size: 10px !important;
     flex-shrink: 0 !important;
 }
-/* Text question mode: 1 hàng full width màu xanh lá */
+/* Text question mode: 1 row full width green */
 .q-thumb-answers.text-mode .q-mini-ans {
     width: 100% !important;
     padding: 4px 8px !important;
@@ -499,7 +499,7 @@ $flash = get_flash_message();
 $isObstacle = ($quiz['game_type'] ?? 'classic') === 'obstacle';
 $isClassicQuiz = (($quiz['game_type'] ?? 'classic') === 'classic') && (($quiz['mode'] ?? 'normal') === 'normal') && empty($hasWagerInQuiz);
 
-// Nếu không phải Classic quiz thì vô hiệu hóa hoàn toàn Review Mode
+// If not Classic quiz, disable Review Mode completely
 if (!$isClassicQuiz && !empty($quiz['is_review_mode'])) {
     db_execute("UPDATE quiz SET is_review_mode = 0, review_start_time = NULL, review_end_time = NULL WHERE id_quiz = :q", [':q' => $quizId]);
     $quiz['is_review_mode'] = 0;
@@ -693,13 +693,13 @@ $availableTeams = TeamManager::getTeamsForEntity($quiz);
                                             $hasImg = !empty($a['image_path']);
                                             $ansText = trim($a['text'] ?? '');
                                             $statusClass = $isCorrect ? 'is-correct' : 'is-wrong';
-                                            $titleText = $hasImg ? ('[Ảnh]' . ($ansText !== '' ? ': ' . $ansText : '')) : $ansText;
+                                            $titleText = $hasImg ? ('[Image]' . ($ansText !== '' ? ': ' . $ansText : '')) : $ansText;
                                             ?>
                                             <div class="q-mini-ans <?= $statusClass ?>" title="<?= htmlspecialchars($titleText) ?>">
                                                 <span class="q-mini-shape"><?= $shape ?></span>
                                                 <?php if ($hasImg): ?>
                                                     <i class="fas fa-image q-mini-icon q-mini-icon-img"></i>
-                                                    <span class="q-mini-ans-text"><?= htmlspecialchars($ansText !== '' ? $ansText : 'Ảnh') ?></span>
+                                                    <span class="q-mini-ans-text"><?= htmlspecialchars($ansText !== '' ? $ansText : 'Image') ?></span>
                                                 <?php else: ?>
                                                     <span class="q-mini-ans-text"><?= htmlspecialchars(mb_strimwidth($ansText, 0, 11, '…')) ?></span>
                                                 <?php endif; ?>
@@ -760,7 +760,6 @@ $availableTeams = TeamManager::getTeamsForEntity($quiz);
                 <input type="hidden" name="question_type"        id="hiddenQuestionType"      value="<?= htmlspecialchars($defaultQType) ?>">
                 <input type="hidden" name="question_mode"        id="hiddenQuestionMode"      value="normal">
                 <input type="hidden" name="wager_time_sec"       id="hiddenWagerTimeSec"       value="10">
-                <input type="hidden" name="wager_speed_bonus"    id="hiddenWagerSpeedBonus"    value="0">
                 <input type="hidden" name="time_limit"           id="hiddenTimeLimit"         value="<?= htmlspecialchars($defaultTimeLimit) ?>">
                 <input type="hidden" name="points"               id="hiddenPoints"            value="<?= htmlspecialchars($defaultPoints) ?>">
                 <input type="hidden" name="question_media_remove" id="questionMediaRemoveFlag" value="0">
@@ -865,12 +864,6 @@ $availableTeams = TeamManager::getTeamsForEntity($quiz);
                         <option value="20">20s</option>
                         <option value="30">30s</option>
                     </select>
-                </div>
-                <div class="custom-control custom-switch mt-2">
-                    <input type="checkbox" class="custom-control-input" id="propWagerSpeedBonus">
-                    <label class="custom-control-label small font-weight-bold text-dark" for="propWagerSpeedBonus" style="font-size: 11px;">
-                        Enable Speed Bonus
-                    </label>
                 </div>
             </div>
 

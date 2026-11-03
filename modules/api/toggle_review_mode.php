@@ -32,7 +32,7 @@ if (!$quiz) {
     review_api_response(404, ['success' => false, 'message' => 'Quiz not found or permission denied.']);
 }
 
-// 1. DỪNG PHÒNG ÔN TẬP
+// 1. STOP REVIEW ROOM
 if ($action === 'stop') {
     db_execute("UPDATE quiz SET is_review_mode = 0 WHERE id_quiz = :q", [':q' => $quizId]);
     db_execute("UPDATE room SET status = 'finished' WHERE id_quiz = :q AND is_review_mode = 1 AND status != 'finished'", [':q' => $quizId]);
@@ -44,7 +44,7 @@ if ($action === 'stop') {
     ]);
 }
 
-// 2. BẬT HOẶC CẬP NHẬT THỜI GIAN ÔN TẬP
+// 2. ENABLE OR UPDATE REVIEW DURATION
 $startTime   = !empty($data['review_start_time']) ? date('Y-m-d H:i:s', strtotime($data['review_start_time'])) : null;
 $endTime     = !empty($data['review_end_time'])   ? date('Y-m-d H:i:s', strtotime($data['review_end_time']))   : null;
 
@@ -55,7 +55,7 @@ if (!empty($startTime) && !empty($endTime) && strtotime($startTime) >= strtotime
     ]);
 }
 
-// Cập nhật quiz
+// Update quiz
 db_execute(
     "UPDATE quiz SET is_review_mode = 1, review_start_time = :st, review_end_time = :et WHERE id_quiz = :q",
     [
@@ -65,14 +65,14 @@ db_execute(
     ]
 );
 
-// Tìm phòng ôn tập đang mở của quiz này
+// Find active review room for this quiz
 $activeRoom = db_fetch_one(
     "SELECT * FROM room WHERE id_quiz = :q AND is_review_mode = 1 AND status = 'review_active' LIMIT 1",
     [':q' => $quizId]
 );
 
 if (!$activeRoom) {
-    // Tạo mã PIN 6 chữ số duy nhất
+    // Generate unique 6-digit PIN
     do {
         $pin = sprintf("%06d", mt_rand(100000, 999999));
         $existing = db_fetch_one("SELECT id_room FROM room WHERE pin = :pin AND status != 'finished'", [':pin' => $pin]);
@@ -91,7 +91,7 @@ if (!$activeRoom) {
     );
     $activeRoom = db_fetch_one("SELECT * FROM room WHERE id_room = :r", [':r' => $roomId]);
 } else {
-    // Cập nhật lại thời hạn vào room đang mở
+    // Update duration for active room
     db_execute(
         "UPDATE room SET review_start_time = :st, review_end_time = :et WHERE id_room = :r",
         [

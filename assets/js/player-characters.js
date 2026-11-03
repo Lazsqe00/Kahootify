@@ -93,18 +93,18 @@
             submit.hidden = (stepIndex !== 2);
 
             if (stepIndex === 0) {
-                heading.textContent = 'Chọn đội của bạn';
-                description.textContent = 'Chọn một đội để gia nhập trước khi đặt tên.';
-                steps.textContent = '1 / 3 · Chọn đội';
+                heading.textContent = 'Choose your team';
+                description.textContent = 'Choose a team to join before entering your name.';
+                steps.textContent = '1 / 3 · Choose team';
             } else if (stepIndex === 1) {
                 heading.textContent = 'Enter your nickname';
                 description.textContent = 'This is how you will appear on the big screen.';
-                steps.textContent = '2 / 3 · Tên người chơi';
+                steps.textContent = '2 / 3 · Your nickname';
                 if (focus && nickname) nickname.focus();
             } else if (stepIndex === 2) {
                 heading.textContent = 'Make it yours!';
                 description.textContent = 'Pick a character, add an accessory, and get ready to play.';
-                steps.textContent = '3 / 3 · Nhân vật';
+                steps.textContent = '3 / 3 · Your character';
                 if (focus) {
                     const tab = document.getElementById('charactersTab');
                     if (tab) tab.focus();
@@ -166,7 +166,7 @@
     next.addEventListener('click', () => {
         if (hasTeamStep && currentStep === 0) {
             if (!selectedTeamInput || !selectedTeamInput.value) {
-                alert('Vui lòng chọn một đội tham gia!');
+                alert('Please choose a team to join!');
                 return;
             }
             updateStepUI(1, true);

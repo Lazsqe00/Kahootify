@@ -5,7 +5,7 @@ require_once __DIR__ . '/WagerCalculator.php';
 
 /**
  * Class WagerMode
- * Implements the Wager (Cược điểm) question mode.
+ * Implements the Wager question mode.
  */
 class WagerMode extends BaseQuestionMode
 {
@@ -18,12 +18,12 @@ class WagerMode extends BaseQuestionMode
 
     public function getLabel(): string
     {
-        return 'Cược điểm (Wager)';
+        return 'Wager Mode';
     }
 
     public function getDescription(): string
     {
-        return 'Cược số điểm của bạn trước khi xem câu hỏi. Thua cược bị trừ điểm, hết điểm bị loại!';
+        return 'Wager your points before viewing the question. Lose wager to lose points, reach zero to be eliminated!';
     }
 
     public function getIcon(): string
@@ -48,8 +48,7 @@ class WagerMode extends BaseQuestionMode
                 ['id' => 'tier_100', 'percent' => 1.00, 'label' => 'ALL-IN'],
             ],
             'minWagerAmount'    => 10,
-            'speedBonusEnabled' => false,
-        ];
+                    ];
     }
 
     public function validateConfig(array $config): array
@@ -66,13 +65,11 @@ class WagerMode extends BaseQuestionMode
             $minWagerAmount = 10;
         }
 
-        $speedBonusEnabled = !empty($config['speedBonusEnabled'] ?? ($config['speed_bonus_enabled'] ?? false));
-
         return [
             'wagerTimeSec'      => $wagerTimeSec,
             'wagerTiers'        => $defaults['wagerTiers'],
             'minWagerAmount'    => $minWagerAmount,
-            'speedBonusEnabled' => (bool)$speedBonusEnabled,
+            'speedBonusEnabled' => false,
         ];
     }
 

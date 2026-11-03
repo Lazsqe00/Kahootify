@@ -90,7 +90,7 @@ try {
         if (!$mode->canParticipate($playerCheck, $room, $ans, $context)) {
             return [
                 'success' => false,
-                'message' => 'Bạn không thể tham gia trả lời câu hỏi này (do bị loại, là khán giả hoặc không đặt cược).'
+                'message' => 'You cannot participate in this question (eliminated, spectator, or did not place a wager).'
             ];
         }
 
@@ -121,11 +121,7 @@ try {
             $qConfig = !empty($ans['mode_config']) ? json_decode($ans['mode_config'], true) : [];
             if (!is_array($qConfig)) $qConfig = [];
 
-            $speedBonus = 0;
-            if ($isCorrect && !empty($qConfig['speedBonusEnabled'])) {
-                $ratio = min(1.0, $elapsed / max(1, $timeLimit));
-                $speedBonus = intval(round(500 * (1.0 - ($ratio / 2.0))));
-            }
+            $speedBonus = 0; // Speed bonus feature removed from wager mode
 
             $scoreResult = $mode->scoreQuestion([
                 'currentScore' => intval($playerCheck['score']),

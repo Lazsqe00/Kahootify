@@ -84,18 +84,18 @@ if (isset($_GET['start_game'])) {
         $selectedQIds = $allQIds;
         $savedLimit = null;
 
-        // Nếu Host chọn bốc N câu hợp lệ (1 <= N < Tổng số câu)
+        // If Host chooses N questions (1 <= N < Total questions)
         if ($mode === 'random' && $n > 0 && $n < $totalQuizQuestions) {
             shuffle($allQIds);
             $selectedQIds = array_slice($allQIds, 0, $n);
             $savedLimit = $n;
         } elseif ($mode === 'random' && $n >= $totalQuizQuestions) {
-            // N >= tổng số câu: bốc tất cả các câu xáo trộn
+            // N >= total questions: shuffle all questions
             shuffle($allQIds);
             $selectedQIds = $allQIds;
             $savedLimit = $totalQuizQuestions;
         } else {
-            // Chế độ 'all' hoặc N <= 0: Chơi toàn bộ câu hỏi (mặc định)
+            // Mode 'all' or N <= 0: Play all questions (default)
             $selectedQIds = $allQIds;
             $savedLimit = null;
         }
@@ -338,6 +338,110 @@ require_once __DIR__ . '/../../includes/header.php';
         margin-right: -6px;
     }
 }
+
+/* ==========================================================
+   Kahoot Modern Toggle Switch & Settings Controls
+   ========================================================== */
+.setting-toggle-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    user-select: none;
+    flex-shrink: 0;
+}
+
+.setting-status-pill {
+    display: inline-block;
+    min-width: 48px;
+    text-align: center;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.82rem;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    padding: 5px 12px;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.2, 0.8, 0.4, 1);
+    user-select: none;
+    border: none;
+    line-height: 1.2;
+}
+
+.setting-status-pill.badge-success {
+    background-color: #26890c !important;
+    color: #ffffff !important;
+    box-shadow: 0 2px 6px rgba(38, 137, 12, 0.35);
+}
+
+.setting-status-pill.badge-secondary {
+    background-color: #64748b !important;
+    color: #ffffff !important;
+    box-shadow: 0 2px 6px rgba(100, 116, 139, 0.25);
+}
+
+.setting-status-pill:hover {
+    transform: scale(1.05);
+    filter: brightness(1.08);
+}
+
+.kahoot-toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 52px;
+    height: 30px;
+    margin: 0;
+    cursor: pointer;
+    vertical-align: middle;
+    flex-shrink: 0;
+}
+
+.kahoot-toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+    position: absolute;
+    pointer-events: none;
+}
+
+.kahoot-toggle-slider {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #cbd5e1;
+    border-radius: 30px;
+    transition: background-color 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s ease;
+}
+
+.kahoot-toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 24px;
+    width: 24px;
+    left: 3px;
+    top: 3px;
+    background-color: #ffffff;
+    border-radius: 50%;
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+
+.kahoot-toggle-switch input:checked + .kahoot-toggle-slider {
+    background-color: #26890c;
+}
+
+.kahoot-toggle-switch input:focus-visible + .kahoot-toggle-slider {
+    box-shadow: 0 0 0 3px rgba(38, 137, 12, 0.35);
+}
+
+.kahoot-toggle-switch input:checked + .kahoot-toggle-slider:before {
+    transform: translateX(22px);
+}
+
+.kahoot-toggle-switch:hover .kahoot-toggle-slider {
+    filter: brightness(0.97);
+}
 </style>
 
 <div class="container-fluid text-center text-white py-4">
@@ -478,14 +582,14 @@ require_once __DIR__ . '/../../includes/header.php';
                                 Useful for remote learning or large screens. When enabled, player devices show full question text, media, and button labels.
                             </p>
                         </div>
-                        <div class="d-flex align-items-center">
-                            <span id="modalSettingStatusLabel" class="badge <?= $showOnPlayers ? 'badge-success' : 'badge-secondary' ?> font-weight-bold mr-2 px-2 py-1" style="font-size: 0.85rem; cursor: pointer;" onclick="$('#modalToggleShowQuestions').click()" title="Click to toggle">
+                        <div class="setting-toggle-group">
+                            <span id="modalSettingStatusLabel" class="badge setting-status-pill <?= $showOnPlayers ? 'badge-success' : 'badge-secondary' ?>" onclick="$('#modalToggleShowQuestions').click()" title="Click to toggle">
                                 <?= $showOnPlayers ? 'ON' : 'OFF' ?>
                             </span>
-                            <div class="custom-control custom-switch pl-4" style="transform: scale(1.3); transform-origin: right center;">
-                                <input type="checkbox" class="custom-control-input" id="modalToggleShowQuestions" <?= $showOnPlayers ? 'checked' : '' ?> onchange="updateShowQuestions(this.checked)">
-                                <label class="custom-control-label" for="modalToggleShowQuestions" style="cursor: pointer;"></label>
-                            </div>
+                            <label class="kahoot-toggle-switch" for="modalToggleShowQuestions" title="Toggle show questions on player devices">
+                                <input type="checkbox" id="modalToggleShowQuestions" <?= $showOnPlayers ? 'checked' : '' ?> onchange="updateShowQuestions(this.checked)">
+                                <span class="kahoot-toggle-slider"></span>
+                            </label>
                         </div>
                     </div>
                 </div>
@@ -544,7 +648,7 @@ function toggleAudio() {
         audio.play().then(function() {
             updateAudioUI(true);
         }).catch(function(e) {
-            console.log('Không thể phát nhạc:', e);
+            console.log('Cannot play audio:', e);
         });
     } else {
         audio.pause();

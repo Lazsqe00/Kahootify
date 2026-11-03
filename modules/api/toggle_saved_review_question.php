@@ -13,15 +13,15 @@ function saved_review_response(int $status, array $payload): void {
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Allow: POST');
-    saved_review_response(405, ['success' => false, 'message' => 'Yêu cầu phương thức POST để lưu câu hỏi.']);
+    saved_review_response(405, ['success' => false, 'message' => 'POST method required to save question.']);
 }
 
-// Bắt buộc phải đăng nhập thì mới có thể lưu câu hỏi vào Dashboard
+// Must be logged in to save question to Dashboard
 $creatorId = (int)($_SESSION['id_creator'] ?? 0);
 if ($creatorId <= 0) {
     saved_review_response(401, [
         'success' => false,
-        'message' => 'Bạn cần đăng nhập để lưu câu hỏi vào Dashboard.'
+        'message' => 'You need to be logged in to save questions to Dashboard.'
     ]);
 }
 
@@ -33,20 +33,20 @@ $shouldSave = filter_var($data['saved'] ?? null, FILTER_VALIDATE_BOOLEAN, FILTER
 $token = $data['token'] ?? '';
 
 if ($questionId <= 0 || $shouldSave === null) {
-    saved_review_response(400, ['success' => false, 'message' => 'Thông tin câu hỏi hoặc trạng thái lưu không hợp lệ.']);
+    saved_review_response(400, ['success' => false, 'message' => 'Invalid question info or save state.']);
 }
 
-// Kiểm tra phiên người chơi nếu gọi từ trang kết quả game
+// Verify player session if called from game results
 if ($playerId > 0 && $roomId > 0) {
     if (!player_request_is_valid($playerId, $roomId, $token)) {
-        saved_review_response(403, ['success' => false, 'message' => 'Phiên người chơi không hợp lệ.']);
+        saved_review_response(403, ['success' => false, 'message' => 'Invalid player session.']);
     }
 }
 
-// Kiểm tra câu hỏi có tồn tại không
+// Check if question exists
 $question = db_fetch_one("SELECT id_question FROM questions WHERE id_question = :qid LIMIT 1", [':qid' => $questionId]);
 if (!$question) {
-    saved_review_response(404, ['success' => false, 'message' => 'Câu hỏi không tồn tại.']);
+    saved_review_response(404, ['success' => false, 'message' => 'Question does not exist.']);
 }
 
 if ($shouldSave) {
@@ -67,12 +67,12 @@ if ($shouldSave) {
     );
 }
 
-// Đếm tổng số câu hỏi đã lưu hiện tại của tài khoản
+// Count total saved questions for account
 $totalSaved = db_count('saved_review_questions', 'id_creator = :c', [':c' => $creatorId]);
 
 saved_review_response(200, [
     'success' => true,
     'saved' => $shouldSave,
     'total_saved' => $totalSaved,
-    'message' => $shouldSave ? 'Đã lưu câu hỏi vào Dashboard.' : 'Đã bỏ lưu câu hỏi.'
+    'message' => $shouldSave ? 'Question saved to Dashboard.' : 'Question removed from saved.'
 ]);

@@ -266,12 +266,12 @@ require_once __DIR__ . '/../../includes/header.php';
         <?php endif; ?>
         <?php if ($isObstacleMode && !empty($currentQuestion['piece_index'])): ?>
             <span class="badge badge-warning text-dark font-weight-bold ml-2 px-2 py-1 shadow-sm vcnv-badge" style="font-size: 0.85rem;">
-                <i class="fas fa-puzzle-piece mr-1"></i> Mảnh <?= intval($currentQuestion['piece_index']) ?>
+                <i class="fas fa-puzzle-piece mr-1"></i> Piece <?= intval($currentQuestion['piece_index']) ?>
             </span>
         <?php endif; ?>
         <?php if ($isBuzzerLocked): ?>
-            <span class="badge badge-warning text-dark font-weight-bold ml-2 px-2 py-1 shadow-sm" style="font-size: 0.85rem;" title="Tạm khóa chuông trong các mảnh ghép">
-                <i class="fas fa-lock mr-1"></i> Tạm khóa chuông
+            <span class="badge badge-warning text-dark font-weight-bold ml-2 px-2 py-1 shadow-sm" style="font-size: 0.85rem;" title="Buzzer temporarily locked during pieces">
+                <i class="fas fa-lock mr-1"></i> Buzzer Locked
             </span>
         <?php elseif ($isEliminated): ?>
             <span class="badge badge-danger ml-1 px-2 py-1 font-weight-bold shadow-sm" style="font-size: 0.85rem;">
@@ -287,8 +287,8 @@ require_once __DIR__ . '/../../includes/header.php';
         <div class="font-weight-bold badge badge-light text-dark px-3 py-2" style="font-size: 0.95rem;">
             Score: <?= number_format($player['score']) ?>
         </div>
-        <a href="<?= BASE_URL ?>index.php" class="btn btn-sm btn-outline-light font-weight-bold rounded-pill px-3" onclick="return confirm('Bạn có chắc muốn rời phòng và quay về trang chủ không?');" title="Rời phòng về trang chủ">
-            <i class="fas fa-home mr-1"></i> Trang chủ
+        <a href="<?= BASE_URL ?>index.php" class="btn btn-sm btn-outline-light font-weight-bold rounded-pill px-3" onclick="return confirm('Are you sure you want to leave the room and return home?');" title="Return to Home">
+            <i class="fas fa-home mr-1"></i> Home
         </a>
     </div>
 </div>
@@ -366,7 +366,7 @@ if ($isResultPhase):
                         <?= number_format($wagerPointsChange) ?> pts
                     </p>
                     <p class="mb-0" style="font-size: 1rem; opacity: 0.9;">
-                        Điểm số của bạn đã về 0 sau khi thua cược. Bạn sẽ theo dõi các câu hỏi còn lại với tư cách khán giả.
+                        Your score reached 0 after losing the wager. You will spectate the remaining questions.
                     </p>
                 </div>
             </div>
@@ -378,9 +378,9 @@ if ($isResultPhase):
                     <div class="d-flex align-items-center justify-content-center" style="gap: 15px;">
                         <div style="font-size: 3rem; line-height: 1;">⏸️</div>
                         <div class="text-left">
-                            <h3 class="font-weight-bold mb-0">Bỏ qua câu này</h3>
+                            <h3 class="font-weight-bold mb-0">Skipped Question</h3>
                             <p class="mb-0 font-weight-bold" style="font-size: 1.15rem; color: #fff;">
-                                +0 pts (Không đặt cược - Điểm số giữ nguyên)
+                                +0 pts (No wager placed - Score unchanged)
                             </p>
                         </div>
                     </div>
@@ -398,13 +398,13 @@ if ($isResultPhase):
                         </div>
                         <div class="text-left">
                             <h3 class="font-weight-bold mb-0">
-                                <?= $wagerWon ? 'Thắng Cược!' : 'Thua Cược!' ?>
+                                <?= $wagerWon ? 'Wager Won!' : 'Wager Lost!' ?>
                             </h3>
                             <p class="mb-0 font-weight-bold" style="font-size: 1.25rem; color: #fff;">
                                 <?= $wagerWon ? '+' : '' ?><?= number_format($wagerPointsChange) ?> pts
                             </p>
                             <small style="opacity: 0.9;" class="font-weight-bold">
-                                Mức cược: <?= htmlspecialchars($myWagerTierLabel ?? ($myWagerTier ?? '')) ?> (<?= number_format($myWagerAmount) ?> pts)
+                                Wager: <?= htmlspecialchars($myWagerTierLabel ?? ($myWagerTier ?? '')) ?> (<?= number_format($myWagerAmount) ?> pts)
                             </small>
                         </div>
                     </div>
@@ -416,8 +416,8 @@ if ($isResultPhase):
                  style="background: linear-gradient(135deg, #495057, #343a40); border-radius: 16px;">
                 <div class="card-body py-3 px-4">
                     <div style="font-size: 2.5rem;" class="mb-1">👀</div>
-                    <h4 class="font-weight-bold mb-0">Chế độ khán giả</h4>
-                    <small>Bạn đang theo dõi kết quả của các người chơi khác.</small>
+                    <h4 class="font-weight-bold mb-0">Spectator Mode</h4>
+                    <small>You are spectating the other players' results.</small>
                 </div>
             </div>
 
@@ -930,57 +930,57 @@ elseif ($phase === 'question'):
         <div class="text-center my-4">
             <?php if ($isBuzzerLocked): ?>
                 <button type="button" class="btn btn-secondary font-weight-bold shadow-sm rounded-pill px-4 py-2" disabled id="btnBuzzQuestion">
-                    <i class="fas fa-lock mr-1"></i> TẠM KHÓA CHUÔNG (CHỜ MỞ HẾT MẢNH)
+                    <i class="fas fa-lock mr-1"></i> BUZZER LOCKED (WAIT FOR ALL PIECES)
                 </button>
             <?php else: ?>
                 <button type="button" class="btn btn-danger font-weight-bold shadow rounded-pill px-4 py-3" style="font-size: 1.2rem; font-family: 'Montserrat', sans-serif;" onclick="claimBuzzerFromQuestion()" id="btnBuzzQuestion">
-                    <i class="fas fa-bell mr-2"></i> ĐOÁN BỨC TRANH
+                    <i class="fas fa-bell mr-2"></i> GUESS SECRET PICTURE
                 </button>
             <?php endif; ?>
         </div>
 
-        <!-- GAMIFIED GUESS MODAL CHO CÂU HỎI (ĐẸP GIỐNG BẢNG CHƯỚNG NGẠI VẬT) -->
+        <!-- GUESS MODAL IN QUESTION -->
         <div class="player-modal-backdrop" id="obstacleGuessModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px); z-index: 99999; align-items: center; justify-content: center; padding: 20px;">
             <div class="player-modal-card" style="background: #1e1136; border-radius: 24px; border: 3px solid #794bc4; max-width: 520px; width: 100%; padding: 30px; color: #fff; text-align: center; box-shadow: 0 24px 60px rgba(0,0,0,0.7);">
                 <h3 class="font-weight-bold text-warning mb-1" style="color: #f2994a !important;">
-                    🔔 LƯỢT ĐOÁN CỦA BẠN!
+                    🔔 YOUR TURN TO GUESS!
                 </h3>
-                <p class="text-white-50 small mb-2">Nhập từ khóa bức tranh bí mật:</p>
+                <p class="text-white-50 small mb-2">Enter the secret picture keyword:</p>
 
 
                 <form id="obstacleGuessForm" onsubmit="submitObstacleGuess(event)">
                     <div class="form-group mb-3">
                         <input type="text" id="obstacleGuessInput" class="form-control form-control-lg text-center font-weight-bold" 
-                               placeholder="Nhập từ khóa đáp án..." autocomplete="off" required style="border-radius: 12px; height: 55px; font-size: 1.25rem; font-weight: bold;">
+                               placeholder="Enter answer keyword..." autocomplete="off" required style="border-radius: 12px; height: 55px; font-size: 1.25rem; font-weight: bold;">
                     </div>
                     <button type="submit" class="btn btn-success btn-lg btn-block font-weight-bold shadow mb-2" id="btnConfirmGuess" style="background: #28a745; border-bottom: 4px solid #1e7e34; border-radius: 12px; height: 55px; font-size: 1.25rem; font-weight: 800; color: #fff;">
-                        <i class="fas fa-paper-plane mr-2"></i> XÁC NHẬN ĐÁP ÁN
+                        <i class="fas fa-paper-plane mr-2"></i> CONFIRM ANSWER
                     </button>
                     <button type="button" class="btn btn-sm btn-link text-white-50 font-weight-bold" onclick="cancelObstacleGuess()" style="text-decoration: underline;">
-                        <i class="fas fa-times-circle mr-1"></i> Không nhập đáp án (Mất quyền đoán)
+                        <i class="fas fa-times-circle mr-1"></i> Skip answering (Forfeit guess)
                     </button>
                 </form>
 
                 <div id="guessWaitingHost" style="display: none;" class="py-3">
                     <div class="spinner-border text-warning mb-3" style="width: 3.2rem; height: 3.2rem;" role="status"></div>
-                    <h4 class="font-weight-bold text-white mb-2">ĐÃ GỬI CÂU TRẢ LỜI!</h4>
+                    <h4 class="font-weight-bold text-white mb-2">ANSWER SUBMITTED!</h4>
                     <div class="p-2 mb-2 rounded bg-dark border border-secondary text-warning font-weight-bold" id="submittedGuessDisplay" style="font-size: 1.3rem; word-break: break-word;">
                         ...
                     </div>
-                    <p class="text-white-50 small mb-0">Đang chờ Host xác nhận đáp án của bạn...</p>
+                    <p class="text-white-50 small mb-0">Waiting for Host to verify your answer...</p>
                 </div>
             </div>
         </div>
 
-        <!-- MODAL THÔNG BÁO TẠM DỪNG CHO CÁC NGƯỜI CHƠI KHÁC -->
+        <!-- MODAL NOTIFYING PAUSE TO OTHER PLAYERS -->
         <div class="player-modal-backdrop" id="obstacleRoomLockedModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px); z-index: 99999; align-items: center; justify-content: center; padding: 20px;">
             <div class="player-modal-card" style="background: #1e1136; border-radius: 24px; border: 3px solid #e21b3c; max-width: 520px; width: 100%; padding: 30px; color: #fff; text-align: center; box-shadow: 0 24px 60px rgba(0,0,0,0.7);">
                 <i class="fas fa-bell fa-4x text-danger mb-3"></i>
                 <h4 class="font-weight-bold text-white mb-2" id="lockedPlayerNotice">
-                    CÓ NGƯỜI CHƠI BẤM CHUÔNG!
+                    A PLAYER HAS BUZZED IN!
                 </h4>
                 <p class="text-white-50 mb-3" id="lockedPlayerSubtext">
-                    Phòng chơi và thời gian đang tạm dừng để người chơi trả lời và Host xác nhận. Vui lòng chờ...
+                    Game and timer are paused for the player to answer and Host to verify. Please wait...
                 </p>
                 <div class="spinner-border text-danger" role="status"></div>
             </div>
@@ -1008,7 +1008,7 @@ let isPausedByBuzzer = false;
 
 function claimBuzzerFromQuestion() {
     if (isBuzzerLocked) {
-        alert('Bạn đang bị tạm khóa chuông trong các mảnh ghép này!');
+        alert('Your buzzer is temporarily locked during these pieces!');
         return;
     }
     $.post('<?= BASE_URL ?>modules/api/obstacle_action.php?action=buzz&id_room=' + roomId, {
@@ -1018,10 +1018,10 @@ function claimBuzzerFromQuestion() {
         if (res && res.success && res.your_turn) {
             openObstacleGuessModal();
         } else {
-            alert(res.message || 'Không thể bấm chuông lúc này');
+            alert(res.message || 'Cannot buzz in at this time');
         }
     }, 'json').fail(function() {
-        alert('Lỗi kết nối máy chủ');
+        alert('Server connection error');
     });
 }
 
@@ -1030,7 +1030,7 @@ function openObstacleGuessModal() {
     $('#obstacleGuessForm').show();
     $('#guessWaitingHost').hide();
     $('#obstacleGuessInput').val('').focus();
-    $('#btnConfirmGuess').prop('disabled', false).html('<i class="fas fa-paper-plane mr-2"></i> XÁC NHẬN ĐÁP ÁN');
+    $('#btnConfirmGuess').prop('disabled', false).html('<i class="fas fa-paper-plane mr-2"></i> CONFIRM ANSWER');
     $('#obstacleGuessModal').css('display', 'flex');
 }
 
@@ -1039,7 +1039,7 @@ function submitObstacleGuess(e) {
     const guessText = $('#obstacleGuessInput').val().trim();
     if (!guessText) return;
 
-    $('#btnConfirmGuess').prop('disabled', true).html('<i class="fas fa-spinner fa-spin mr-1"></i> Đang gửi...');
+    $('#btnConfirmGuess').prop('disabled', true).html('<i class="fas fa-spinner fa-spin mr-1"></i> Sending...');
 
     $.post('<?= BASE_URL ?>modules/api/obstacle_action.php?action=submit_guess&id_room=' + roomId, {
         id_player: playerId,
@@ -1051,12 +1051,12 @@ function submitObstacleGuess(e) {
             $('#submittedGuessDisplay').text(guessText);
             $('#guessWaitingHost').show();
         } else {
-            alert(res.message || 'Lỗi gửi câu trả lời');
+            alert(res.message || 'Error submitting answer');
             $('#obstacleGuessModal').hide();
             refreshPlayerPage();
         }
     }, 'json').fail(function() {
-        alert('Lỗi kết nối máy chủ');
+        alert('Server connection error');
         $('#obstacleGuessModal').hide();
     });
 }
@@ -1066,7 +1066,7 @@ function cancelObstacleGuess() {
         id_player: playerId,
         token: playerToken
     }, function() {
-        alert('Bạn không đưa ra câu trả lời nên bị mất quyền bấm chuông cho tới khi mở hết các mảnh ghép!');
+        alert('You did not provide an answer and lost buzzer rights until all pieces are revealed!');
         refreshPlayerPage();
     }, 'json').fail(function() {
         refreshPlayerPage();
@@ -1116,7 +1116,7 @@ if (playerSeconds <= 0) {
     $('.answer-box, .player-btn').css('pointer-events', 'none').css('opacity', '0.6');
 } else if (timerEl) {
     const playerCountdown = setInterval(function() {
-        if (isPausedByBuzzer) return; // Đóng băng countdown người chơi khi có chuông
+        if (isPausedByBuzzer) return; // Freeze player countdown during buzzer
 
         playerSeconds--;
         if (playerSeconds <= 0) {
@@ -1142,13 +1142,13 @@ setInterval(function() {
             return;
         }
         if (res && res.success) {
-            // Kiểm tra trạng thái chuông tạm dừng trong chế độ chướng ngại vật
+            // Check buzzer paused status in obstacle mode
             if (res.game_type === 'obstacle' && res.buzzer_status) {
                 if (res.buzzer_status === 'buzzing' || res.buzzer_status === 'pending_review') {
                     if (res.buzzer_player_id !== playerId) {
                         isPausedByBuzzer = true;
                         $('.answer-box, .player-btn').css('pointer-events', 'none').css('opacity', '0.4');
-                        $('#lockedPlayerNotice').text((res.buzzer_player_name || 'NGƯỜI CHƠI KHÁC') + ' ĐANG BẤM CHUÔNG!');
+                        $('#lockedPlayerNotice').text((res.buzzer_player_name || 'ANOTHER PLAYER') + ' IS BUZZING IN!');
                         $('#obstacleRoomLockedModal').css('display', 'flex');
                     }
                 } else if (res.buzzer_status === 'idle') {
@@ -1162,7 +1162,7 @@ setInterval(function() {
                             timerEl.textContent = playerSeconds;
                         }
                         if (res.is_disqualified_obstacle) {
-                            $('#btnBuzzQuestion').replaceWith('<button type="button" class="btn btn-secondary font-weight-bold shadow-sm rounded-pill px-4 py-2" disabled id="btnBuzzQuestion"><i class="fas fa-lock mr-1"></i> TẠM KHÓA CHUÔNG (CHỜ MỞ HẾT MẢNH)</button>');
+                            $('#btnBuzzQuestion').replaceWith('<button type="button" class="btn btn-secondary font-weight-bold shadow-sm rounded-pill px-4 py-2" disabled id="btnBuzzQuestion"><i class="fas fa-lock mr-1"></i> BUZZER LOCKED (WAIT FOR ALL PIECES)</button>');
                         }
                     }
                 }
