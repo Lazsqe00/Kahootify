@@ -14,6 +14,8 @@ if (!$quiz) {
     redirect('modules/quiz/list.php');
 }
 
+$isObstacle = (($quiz['game_type'] ?? 'classic') === 'obstacle');
+
 function saveUploadedFile($fileKey) {
     if (!isset($_FILES[$fileKey]) || $_FILES[$fileKey]['error'] !== UPLOAD_ERR_OK) return null;
     $f = $_FILES[$fileKey];
@@ -1014,7 +1016,7 @@ $availableTeams = TeamManager::getTeamsForEntity($quiz);
                     <div class="d-flex align-items-center justify-content-between p-3 mb-3 rounded" style="background-color: #fff9db; border: 1px solid #ffe066; cursor: pointer;" onclick="toggleReviewModeCheckbox(event)">
                         <div style="max-width: 75%;">
                             <h6 class="font-weight-bold mb-1 text-dark">
-                                <i class="fas fa-toggle-on text-warning mr-1"></i> Enable review mode
+                                Enable review mode
                             </h6>
                             <p class="text-muted small mb-0">
                                 Allow players to study at their own pace without needing a live host.
