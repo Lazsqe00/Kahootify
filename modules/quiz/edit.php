@@ -15,8 +15,6 @@ if (!$quiz) {
 }
 $isObstacle = (($quiz['game_type'] ?? 'classic') === 'obstacle');
 
-$isObstacle = (($quiz['game_type'] ?? 'classic') === 'obstacle');
-
 function saveUploadedFile($fileKey) {
     if (!isset($_FILES[$fileKey]) || $_FILES[$fileKey]['error'] !== UPLOAD_ERR_OK) return null;
     $f = $_FILES[$fileKey];
