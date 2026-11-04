@@ -285,12 +285,13 @@ try {
             }
         }
 
-        // Check if all participants have answered -> auto-finalize question phase
+        // Check if all participants have answered or all players are eliminated -> auto-finalize question phase
         $counts = room_question_counts($room, $qId, $state);
         $totalPlayers = $counts['total_players'];
         $votedCount   = $counts['voted_count'];
+        $activePlayersCount = (int)db_count('players', "id_room = :r AND status = 'ACTIVE' AND is_kicked = 0", [':r' => $roomId]);
 
-        if ($totalPlayers > 0 && $votedCount >= $totalPlayers) {
+        if (($totalPlayers > 0 && $votedCount >= $totalPlayers) || $activePlayersCount === 0) {
             GameStateManager::finalizeQuestionPhase($roomId, $qId);
         }
 

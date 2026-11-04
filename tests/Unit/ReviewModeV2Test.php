@@ -19,6 +19,8 @@ class ReviewModeV2Test {
         self::testPracticeViewDomContracts();
         self::testQuizListDomContracts();
         self::testQuizEditDomContracts();
+        self::testEditQrCodeGenerationAndUrlContract();
+        self::testWagerModeEliminationAutoSkipContracts();
 
         echo "\n========================================================\n";
         echo sprintf("Summary: %d Passed | %d Failed | Total: %d\n", self::$passed, self::$failed, self::$passed + self::$failed);
@@ -46,6 +48,9 @@ class ReviewModeV2Test {
             __DIR__ . '/../../modules/player/join.php',
             __DIR__ . '/../../modules/quiz/edit.php',
             __DIR__ . '/../../modules/quiz/list.php',
+            __DIR__ . '/../../modules/api/game_state.php',
+            __DIR__ . '/../../modules/api/submit_answer.php',
+            __DIR__ . '/../../modules/host/play.php',
         ];
 
         $allOk = true;
@@ -58,7 +63,7 @@ class ReviewModeV2Test {
             }
         }
 
-        self::assert($allOk, 'testStaticCodeAnalysis', 'One or more Review Mode files have syntax errors.');
+        self::assert($allOk, 'testStaticCodeAnalysis', 'One or more files have syntax errors.');
     }
 
     public static function testReviewPinFormat(): void {
@@ -132,6 +137,51 @@ class ReviewModeV2Test {
         $hasViewBtn = strpos($editContent, 'data-target="#reviewViewModal"') !== false;
 
         self::assert($hasActionHandler && $hasOptionsDropdownItem && $hasViewBtn, 'testQuizEditDomContracts', 'edit.php must have action handler, dropdown item, and view button.');
+    }
+
+    public static function testEditQrCodeGenerationAndUrlContract(): void {
+        $editContent = file_get_contents(__DIR__ . '/../../modules/quiz/edit.php');
+        $listContent = file_get_contents(__DIR__ . '/../../modules/quiz/list.php');
+
+        // Check for no duplicated host
+        $noDuplicatedHostEdit = strpos($editContent, "HTTP_HOST'] ?? 'localhost') . BASE_URL") === false;
+        $noDuplicatedHostList = strpos($listContent, "HTTP_HOST'] ?? 'localhost') . BASE_URL") === false;
+
+        // Check for qrcodegen and renderQrSvg inclusion
+        $hasQrcodegenScript = strpos($editContent, 'assets/js/qrcodegen.js') !== false;
+        $hasRenderQrSvg = strpos($editContent, 'function renderQrSvg') !== false;
+        $hasModalShownListener = strpos($editContent, '$("#reviewViewModal").on("shown.bs.modal"') !== false;
+
+        self::assert(
+            $noDuplicatedHostEdit && $noDuplicatedHostList && $hasQrcodegenScript && $hasRenderQrSvg && $hasModalShownListener,
+            'testEditQrCodeGenerationAndUrlContract',
+            'edit.php & list.php must cleanly build URL without host duplicates, and edit.php must load qrcodegen & trigger renderQrSvg on modal open.'
+        );
+    }
+
+    public static function testWagerModeEliminationAutoSkipContracts(): void {
+        $roomAccessContent = file_get_contents(__DIR__ . '/../../includes/room_access.php');
+        $submitAnswerContent = file_get_contents(__DIR__ . '/../../modules/api/submit_answer.php');
+        $gameStateContent = file_get_contents(__DIR__ . '/../../modules/api/game_state.php');
+        $playContent = file_get_contents(__DIR__ . '/../../modules/host/play.php');
+
+        // 1. room_access must retain eliminated players in participant list for that question so votedCount works
+        $roomAccessRetainsEliminated = strpos($roomAccessContent, "WHERE l.id_room = :r AND l.id_question = :q AND l.is_sitting_out = 0 AND p.is_kicked = 0\"") !== false;
+
+        // 2. submit_answer must auto-finalize if active players count hits 0
+        $submitFinalizesWhenEmpty = strpos($submitAnswerContent, '$activePlayersCount === 0') !== false;
+
+        // 3. game_state.php must return active_players and auto-finalize if active is 0
+        $gameStateFinalizesWhenEmpty = strpos($gameStateContent, "'active_players'           => \$activePlayersCount") !== false;
+
+        // 4. play.php must auto-advance host when active_players is 0
+        $playAutoSkipsWhenEmpty = strpos($playContent, 'data.active_players === 0') !== false;
+
+        self::assert(
+            $roomAccessRetainsEliminated && $submitFinalizesWhenEmpty && $gameStateFinalizesWhenEmpty && $playAutoSkipsWhenEmpty,
+            'testWagerModeEliminationAutoSkipContracts',
+            'All Wager elimination contracts must be present in room_access, submit_answer, game_state, and play.php.'
+        );
     }
 }
 

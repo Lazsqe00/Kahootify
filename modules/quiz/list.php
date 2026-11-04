@@ -389,7 +389,7 @@ window.addEventListener('load', function() {
     <?php if (!empty($q['is_review_mode'])): 
         $rPin = $q['review_pin'] ?? '';
         $rUrl = ReviewManager::buildReviewUrl($rPin);
-        $joinPageUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://" . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_URL . 'modules/player/join.php';
+        $joinPageUrl = rtrim(BASE_URL, '/') . '/modules/player/join.php';
         $displayJoinUrl = preg_replace('#^https?://#', '', $joinPageUrl);
     ?>
     <div class="modal fade" id="reviewModal_<?= $q['id_quiz'] ?>" tabindex="-1" role="dialog" aria-hidden="true">

@@ -82,7 +82,7 @@ function room_question_counts($room, $questionId, $state = null) {
             "SELECT l.id_player 
              FROM player_question_logs l
              JOIN players p ON p.id_player = l.id_player
-             WHERE l.id_room = :r AND l.id_question = :q AND l.is_sitting_out = 0 AND p.is_kicked = 0 AND p.status = 'ACTIVE'",
+             WHERE l.id_room = :r AND l.id_question = :q AND l.is_sitting_out = 0 AND p.is_kicked = 0",
             [':r' => $roomId, ':q' => $questionId]
         );
         $playerIds = array_column($participants, 'id_player');

@@ -165,6 +165,12 @@ if ($action === 'get_question_status') {
         exit;
     }
     $counts = room_question_counts($room, $qId);
+    $activePlayersCount = (int)db_count('players', "id_room = :r AND status = 'ACTIVE' AND is_kicked = 0", [':r' => $roomId]);
+
+    if ($activePlayersCount === 0 && ($room['game_type'] ?? 'classic') !== 'obstacle' && !empty($room['status']) && $room['status'] !== 'finished' && !str_starts_with($room['status'], 'res_') && $room['status'] !== 'waiting') {
+        GameStateManager::finalizeQuestionPhase($roomId, $qId);
+        $room = db_fetch_one('SELECT * FROM room WHERE id_room = :r', [':r' => $roomId]);
+    }
 
     $buzzerPlayerName = '';
     if (!empty($room['buzzer_player_id'])) {
@@ -180,6 +186,7 @@ if ($action === 'get_question_status') {
         'status'                   => $room['status'],
         'total_players'            => $counts['total_players'],
         'voted_count'              => $counts['voted_count'],
+        'active_players'           => $activePlayersCount,
         'game_type'                => $room['game_type'] ?? 'classic',
         'buzzer_status'            => $room['buzzer_status'] ?? 'idle',
         'buzzer_player_id'         => $room['buzzer_player_id'] ? intval($room['buzzer_player_id']) : null,

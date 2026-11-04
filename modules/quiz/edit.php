@@ -965,7 +965,7 @@ $availableTeams = TeamManager::getTeamsForEntity($quiz);
 
 <!-- MODAL REVIEW VIEW (KAHOOT LOBBY STYLE) -->
 <?php 
-$joinPageUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://" . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_URL . 'modules/player/join.php';
+$joinPageUrl = rtrim(BASE_URL, '/') . '/modules/player/join.php';
 $displayJoinUrl = preg_replace('#^https?://#', '', $joinPageUrl);
 ?>
 <div class="modal fade" id="reviewViewModal" tabindex="-1" role="dialog" aria-hidden="true">
@@ -1191,5 +1191,79 @@ window.KAHOOT_EDIT = {
 </script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <script src="<?= BASE_URL ?>assets/js/edit-quiz.js?v=<?= file_exists(__DIR__ . '/../../assets/js/edit-quiz.js') ? filemtime(__DIR__ . '/../../assets/js/edit-quiz.js') : time() ?>"></script>
+
+<script src="<?= BASE_URL ?>assets/js/qrcodegen.js"></script>
+<script>
+function renderQrSvg(containerId, url) {
+    const el = document.getElementById(containerId);
+    if (!el || !window.qrcodegen) return;
+    try {
+        const qr = qrcodegen.QrCode.encodeText(url, qrcodegen.QrCode.Ecc.MEDIUM);
+        const border = 4;
+        const size = qr.size + border * 2;
+        const namespace = "http://www.w3.org/2000/svg";
+        const svg = document.createElementNS(namespace, "svg");
+        svg.setAttribute("viewBox", "0 0 " + size + " " + size);
+        svg.setAttribute("shape-rendering", "crispEdges");
+        svg.setAttribute("role", "img");
+
+        const background = document.createElementNS(namespace, "rect");
+        background.setAttribute("width", "100%");
+        background.setAttribute("height", "100%");
+        background.setAttribute("fill", "#fff");
+        svg.appendChild(background);
+
+        const modules = [];
+        for (let y = 0; y < qr.size; y++) {
+            for (let x = 0; x < qr.size; x++) {
+                if (qr.getModule(x, y)) {
+                    modules.push("M" + (x + border) + "," + (y + border) + "h1v1h-1z");
+                }
+            }
+        }
+        const path = document.createElementNS(namespace, "path");
+        path.setAttribute("d", modules.join(""));
+        path.setAttribute("fill", "#000");
+        svg.appendChild(path);
+
+        el.replaceChildren(svg);
+    } catch (e) {
+        console.error("QR Error", e);
+    }
+}
+
+function copyTextToClipboard(text, btn) {
+    navigator.clipboard.writeText(text).then(() => {
+        const origHtml = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check text-success mr-1"></i> Copied!';
+        setTimeout(() => { btn.innerHTML = origHtml; }, 2000);
+    }).catch(() => {
+        alert("Copied: " + text);
+    });
+}
+
+function toggleReviewCheckbox(e) {
+    if (e && e.target && (e.target.id === 'is_review_mode' || e.target.classList.contains('custom-control-label'))) {
+        return;
+    }
+    const chk = document.getElementById('is_review_mode');
+    if (chk) chk.checked = !chk.checked;
+}
+
+window.addEventListener("DOMContentLoaded", function () {
+    $("#reviewViewModal").on("shown.bs.modal", function () {
+        const qrBox = document.getElementById("reviewViewQrCode");
+        if (qrBox && qrBox.dataset.url) {
+            renderQrSvg("reviewViewQrCode", qrBox.dataset.url);
+        }
+    });
+    $("#qrZoomModalEdit").on("shown.bs.modal", function () {
+        const qrBoxLarge = document.getElementById("reviewViewQrCodeLarge");
+        if (qrBoxLarge && qrBoxLarge.dataset.url) {
+            renderQrSvg("reviewViewQrCodeLarge", qrBoxLarge.dataset.url);
+        }
+    });
+});
+</script>
 
 <?php require_once __DIR__ . '/../../includes/footer.php'; ?>
