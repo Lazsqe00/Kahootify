@@ -21,6 +21,7 @@ class ReviewModeV2Test {
         self::testQuizEditDomContracts();
         self::testEditQrCodeGenerationAndUrlContract();
         self::testWagerModeEliminationAutoSkipContracts();
+        self::testReviewQuestionsSchemaContract();
 
         echo "\n========================================================\n";
         echo sprintf("Summary: %d Passed | %d Failed | Total: %d\n", self::$passed, self::$failed, self::$passed + self::$failed);
@@ -181,6 +182,27 @@ class ReviewModeV2Test {
             $roomAccessRetainsEliminated && $submitFinalizesWhenEmpty && $gameStateFinalizesWhenEmpty && $playAutoSkipsWhenEmpty,
             'testWagerModeEliminationAutoSkipContracts',
             'All Wager elimination contracts must be present in room_access, submit_answer, game_state, and play.php.'
+        );
+    }
+
+    public static function testReviewQuestionsSchemaContract(): void {
+        $rmContent = file_get_contents(__DIR__ . '/../../includes/ReviewManager.php');
+        
+        // 1. Must query text column from questions, NOT non-existent question_text
+        $noBadQuestionColumn = strpos($rmContent, 'question_text, image, points') === false;
+        $queriesTextFromQuestions = strpos($rmContent, 'id_question, text, image, points') !== false;
+
+        // 2. Must query text and image_path columns from answers, NOT non-existent answer_text
+        $noBadAnswerColumn = strpos($rmContent, 'answer_text, image, is_correct') === false;
+        $queriesAnswersCorrectly = strpos($rmContent, 'id_answer, id_question, text, image_path, is_correct') !== false;
+
+        // 3. Must have resolveMediaUrl helper
+        $hasResolveMediaUrl = strpos($rmContent, 'function resolveMediaUrl') !== false;
+
+        self::assert(
+            $noBadQuestionColumn && $queriesTextFromQuestions && $noBadAnswerColumn && $queriesAnswersCorrectly && $hasResolveMediaUrl,
+            'testReviewQuestionsSchemaContract',
+            'ReviewManager must query real schema columns (questions.text, answers.text, answers.image_path) and provide resolveMediaUrl.'
         );
     }
 }

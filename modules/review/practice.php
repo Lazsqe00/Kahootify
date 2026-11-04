@@ -567,12 +567,12 @@ function loadQuestion(index) {
     });
 
     const q = QUIZ_DATA.questions[index];
-    document.getElementById('questionText').textContent = q.question_text || 'Câu hỏi trắc nghiệm';
+    document.getElementById('questionText').textContent = q.question_text || q.text || 'Câu hỏi trắc nghiệm';
 
     // Media
     const mediaEl = document.getElementById('questionMedia');
     if (q.image) {
-        mediaEl.src = '<?= BASE_URL ?>' + q.image;
+        mediaEl.src = (q.image.startsWith('http://') || q.image.startsWith('https://')) ? q.image : ('<?= BASE_URL ?>' + q.image.replace(/^\//, ''));
         mediaEl.classList.remove('d-none');
     } else {
         mediaEl.classList.add('d-none');
@@ -596,7 +596,8 @@ function loadQuestion(index) {
         // Build Inner Content (Shape, Image, Text)
         let html = `<span class="answer-shape-icon">${shapeMeta.shape}</span>`;
         if (ans.image) {
-            html += `<img src="<?= BASE_URL ?>${ans.image}" class="answer-img-thumb" alt="Option Image">`;
+            const imgSrc = (ans.image.startsWith('http://') || ans.image.startsWith('https://')) ? ans.image : ('<?= BASE_URL ?>' + ans.image.replace(/^\//, ''));
+            html += `<img src="${escapeHtml(imgSrc)}" class="answer-img-thumb" alt="Option Image">`;
         }
         if (ans.answer_text) {
             html += `<span class="answer-content">${escapeHtml(ans.answer_text)}</span>`;
@@ -754,7 +755,7 @@ function showResults() {
 
             answersHtml += `<div style="${rowStyle}">
                 ${icon}
-                <span class="flex-grow-1">${escapeHtml(ans.answer_text || '(Ảnh đáp án)')}</span>
+                <span class="flex-grow-1">${escapeHtml(ans.answer_text || ans.text || '(Ảnh đáp án)')}</span>
                 ${chosen ? '<span class="badge badge-light border ml-2">Lựa chọn của bạn</span>' : ''}
                 ${ansCorrect ? '<span class="badge badge-success ml-2">Đáp án chuẩn</span>' : ''}
             </div>`;
@@ -764,7 +765,7 @@ function showResults() {
         item.innerHTML = `
             <div class="d-flex justify-content-between align-items-center mb-1">
                 <span class="font-weight-bold text-dark" style="font-size: 1.05rem;">
-                    Câu ${idx + 1}: ${escapeHtml(q.question_text || '')}
+                    Câu ${idx + 1}: ${escapeHtml(q.question_text || q.text || '')}
                 </span>
                 <div>${badge}</div>
             </div>

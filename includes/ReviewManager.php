@@ -169,6 +169,32 @@ class ReviewManager {
     }
 
     /**
+     * Resolve media URL for question or answer image/video.
+     *
+     * @param string|null $path
+     * @return string|null
+     */
+    public static function resolveMediaUrl(?string $path): ?string {
+        if (empty($path)) {
+            return null;
+        }
+        if (preg_match('#^https?://#i', $path)) {
+            return $path;
+        }
+        $cleanPath = ltrim(str_replace('\\', '/', $path), '/');
+        $baseUrl = defined('BASE_URL') ? rtrim(BASE_URL, '/') : '';
+        if (str_starts_with($cleanPath, 'assets/img/')) {
+            return $baseUrl . '/' . $cleanPath;
+        }
+        $filename = basename($path);
+        $diskPath = dirname(__DIR__) . '/assets/img/questions/' . $filename;
+        if (is_file($diskPath)) {
+            return $baseUrl . '/assets/img/questions/' . rawurlencode($filename);
+        }
+        return $baseUrl . '/' . $cleanPath;
+    }
+
+    /**
      * Retrieve all questions and answers for a review quiz.
      * The number of answers (2, 3, 4, etc.) and presence of images/text
      * is completely dynamic as configured in edit.php.
@@ -178,7 +204,7 @@ class ReviewManager {
      */
     public static function getReviewQuestions(int $quizId): array {
         $questions = db_fetch_all(
-            "SELECT id_question, question_text, image, points, time_limit, sort_order
+            "SELECT id_question, text, image, points, time_limit, question_type, sort_order
              FROM questions
              WHERE id_quiz = :q
              ORDER BY sort_order ASC, id_question ASC",
@@ -193,7 +219,7 @@ class ReviewManager {
         $inClause = implode(',', array_map('intval', $questionIds));
 
         $answers = db_fetch_all(
-            "SELECT id_answer, id_question, answer_text, image, is_correct
+            "SELECT id_answer, id_question, text, image_path, is_correct
              FROM answers
              WHERE id_question IN ($inClause)
              ORDER BY id_question ASC, id_answer ASC"
@@ -207,8 +233,10 @@ class ReviewManager {
             }
             $answersByQ[$qId][] = [
                 'id_answer'   => intval($ans['id_answer']),
-                'answer_text' => $ans['answer_text'] ?? '',
-                'image'       => $ans['image'] ?? null,
+                'answer_text' => $ans['text'] ?? '',
+                'text'        => $ans['text'] ?? '',
+                'image'       => self::resolveMediaUrl($ans['image_path'] ?? null),
+                'image_path'  => $ans['image_path'] ?? null,
                 'is_correct'  => intval($ans['is_correct']) === 1
             ];
         }
@@ -218,10 +246,12 @@ class ReviewManager {
             $qId = intval($q['id_question']);
             $formatted[] = [
                 'id_question'   => $qId,
-                'question_text' => $q['question_text'] ?? '',
-                'image'         => $q['image'] ?? null,
+                'question_text' => $q['text'] ?? '',
+                'text'          => $q['text'] ?? '',
+                'image'         => self::resolveMediaUrl($q['image'] ?? null),
                 'points'        => intval($q['points'] ?? 1000),
                 'time_limit'    => intval($q['time_limit'] ?? 20),
+                'question_type' => $q['question_type'] ?? 'multiple_choice',
                 'answers'       => $answersByQ[$qId] ?? []
             ];
         }
