@@ -434,19 +434,27 @@ require_once __DIR__ . '/../../includes/header.php';
 <div class="container-fluid text-center text-white py-4">
 
     <div class="lobby-pin-card mx-auto text-dark">
+        <!-- TOP INFO STRIP: JOIN LINK & COMPACT TEAM MODE BADGE -->
+        <div class="d-flex align-items-center justify-content-between flex-wrap pb-3 mb-3 border-bottom" style="gap: 12px;">
+            <div class="d-flex align-items-center text-muted" style="font-size: 0.95rem;">
+                <span class="font-weight-bold text-dark mr-1"><i class="fas fa-globe text-primary mr-1"></i> Join at:</span>
+                <a class="lobby-join-address font-weight-bold text-primary text-decoration-none" href="<?= htmlspecialchars($joinPageUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
+                    <?= htmlspecialchars(preg_replace('#^https?://#', '', $joinPageUrl)) ?>
+                </a>
+            </div>
+            <?php if (!empty($room['is_team_mode'])): ?>
+                <div>
+                    <span class="badge text-white px-2 py-1 font-weight-bold shadow-sm" style="font-size: 0.82rem; background: #46178f; border-radius: 6px;">
+                        <i class="fas fa-users mr-1"></i> Team Mode (<?= intval($room['team_count'] ?? 2) ?> Teams)
+                    </span>
+                </div>
+            <?php endif; ?>
+        </div>
+
         <div class="lobby-join-options" id="lobbyJoin" data-join-url="<?= htmlspecialchars($joinUrl, ENT_QUOTES, 'UTF-8') ?>">
             <div class="lobby-pin-details">
-                <p class="font-weight-bold mb-2">Join at</p>
-                <a class="lobby-join-address" href="<?= htmlspecialchars($joinPageUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener"><?= htmlspecialchars(preg_replace('#^https?://#', '', $joinPageUrl)) ?></a>
-                <p class="text-muted font-weight-bold text-uppercase mt-3 mb-2" style="letter-spacing: 3px; font-size: 0.95rem;">GAME PIN</p>
+                <p class="text-muted font-weight-bold text-uppercase mb-2" style="letter-spacing: 3px; font-size: 0.95rem;">GAME PIN</p>
                 <div class="lobby-pin-number"><?= htmlspecialchars($room['pin']) ?></div>
-                <?php if (!empty($room['is_team_mode'])): ?>
-                    <div class="mt-2">
-                        <span class="badge text-white px-3 py-1 font-weight-bold shadow-sm" style="font-size: 0.92rem; background: linear-gradient(135deg, #1368ce, #46178f); border-radius: 20px;">
-                            <i class="fas fa-users mr-1"></i> TEAM MODE (<?= intval($room['team_count'] ?? 2) ?> TEAMS)
-                        </span>
-                    </div>
-                <?php endif; ?>
                 <div class="mt-3">
                     <button type="button" id="copyJoinLink" class="btn btn-outline-dark font-weight-bold" hidden>
                         <i class="fas fa-link mr-1" aria-hidden="true"></i> Copy join link
@@ -464,11 +472,6 @@ require_once __DIR__ . '/../../includes/header.php';
                 <noscript><p class="small text-danger">Enable JavaScript to display the QR code, or join using the PIN.</p></noscript>
             </div>
         </div>
-        <?php if ($isLoopbackHost): ?>
-            <div class="alert alert-warning small text-left mt-3 mb-0" role="note">
-                <strong>Joining from a phone?</strong> Connect to the same Wi-Fi and open this lobby using your computer's LAN IP instead of localhost (for example, http://192.168.1.10/Kahootify/). The QR code will then use that address.
-            </div>
-        <?php endif; ?>
         <form action="<?= BASE_URL ?>modules/host/lobby.php" method="POST" class="mt-3">
             <input type="hidden" name="room_lock_token" value="<?= htmlspecialchars($_SESSION['room_lock_token'], ENT_QUOTES, 'UTF-8') ?>">
             <input type="hidden" name="lock_room_id" value="<?= $roomId ?>">
