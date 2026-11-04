@@ -1205,74 +1205,63 @@ $joinPageUrl = rtrim(BASE_URL, '/') . '/modules/player/join.php';
 $displayJoinUrl = preg_replace('#^https?://#', '', $joinPageUrl);
 ?>
 <div class="modal fade" id="reviewViewModal" tabindex="-1" role="dialog" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered" role="document" style="max-width: 740px;">
+    <div class="modal-dialog modal-lg modal-dialog-centered" role="document" style="max-width: 720px;">
         <div class="modal-content border-0 bg-transparent">
             <!-- PURPLE OUTER CONTAINER -->
-            <div class="p-3 p-md-4 position-relative" style="background: #46178f; border-radius: 28px; box-shadow: 0 25px 50px -12px rgba(70, 23, 143, 0.45);">
-                <button type="button" class="close text-white position-absolute" data-dismiss="modal" aria-label="Close" style="top: 14px; right: 20px; font-size: 32px; opacity: 0.85; z-index: 10; outline: none;">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-
+            <div class="p-3 p-md-4 position-relative" style="background: #46178f; border-radius: 26px; box-shadow: 0 25px 50px -12px rgba(70, 23, 143, 0.45);">
                 <!-- INNER WHITE CARD -->
-                    <div class="bg-white text-dark p-4" style="border-radius: 18px; box-shadow: 0 10px 25px rgba(0,0,0,0.12);">
-                        <!-- MODAL HEADER -->
-                        <div class="d-flex align-items-center justify-content-between mb-3 pb-3 border-bottom">
-                            <div>
-                                <span class="badge badge-warning text-dark font-weight-bold px-2 py-1 mr-2" style="font-size: 0.8rem; border-radius: 6px;">
-                                    <i class="fas fa-book-reader mr-1"></i> CHẾ ĐỘ ÔN TẬP
-                                </span>
-                                <h5 class="d-inline-block font-weight-bold text-dark mb-0" style="font-size: 1.15rem; vertical-align: middle;">
-                                    <?= htmlspecialchars($quiz['title']) ?>
-                                </h5>
-                            </div>
-                        </div>
+                <div class="bg-white text-dark p-4" style="border-radius: 18px; box-shadow: 0 10px 25px rgba(0,0,0,0.12);">
+                    <!-- MODAL HEADER WITH VISIBLE CLOSE (X) BUTTON ON TOP RIGHT OF FORM -->
+                    <div class="d-flex align-items-center justify-content-between mb-3 pb-3 border-bottom">
+                        <h5 class="font-weight-bold text-dark mb-0" style="font-size: 1.25rem;">
+                            <?= htmlspecialchars($quiz['title'] ?? '') ?>
+                        </h5>
+                        <button type="button" class="close text-secondary" data-dismiss="modal" aria-label="Close" style="font-size: 32px; font-weight: 300; opacity: 0.75; outline: none; line-height: 0.8; padding: 4px; margin: -6px -4px 0 0;" title="Đóng">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
 
-                        <div class="row align-items-center">
-                            <!-- LEFT COLUMN: Practice Link & Open Button -->
-                            <div class="col-md-7 pr-md-4">
-                                <label class="small font-weight-bold text-muted text-uppercase mb-1" style="font-size: 0.75rem; letter-spacing: 0.5px;">
-                                    Đường link ôn tập
-                                </label>
-                                <div class="input-group mb-2 shadow-sm" style="border-radius: 10px; overflow: hidden; border: 1.5px solid #cbd5e1;">
-                                    <input type="text" class="form-control border-0 bg-light text-truncate font-weight-bold text-primary" value="<?= htmlspecialchars($reviewUrl) ?>" readonly onclick="window.open(this.value, '_blank')" style="cursor: pointer; font-size: 0.88rem; height: 42px;" title="Nhấp vào để mở trang ôn tập">
-                                    <div class="input-group-append">
-                                        <button type="button" class="btn btn-primary font-weight-bold px-3 d-flex align-items-center" onclick="copyTextToClipboard('<?= htmlspecialchars($reviewUrl) ?>', this)" style="background: #46178f; border-color: #46178f; font-size: 0.88rem;">
-                                            <i class="fas fa-copy mr-1"></i> Sao chép
-                                        </button>
-                                    </div>
-                                </div>
-                                <p class="text-muted small mb-3" style="font-size: 0.82rem;">
-                                    <i class="fas fa-info-circle text-info mr-1"></i> Nhấp vào link hoặc nút bên dưới để vào làm bài ngay.
-                                </p>
-
-                                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 pt-2 border-top">
-                                    <a href="<?= htmlspecialchars($reviewUrl) ?>" target="_blank" rel="noopener" class="btn btn-outline-primary btn-sm font-weight-bold px-3 py-2 rounded-pill shadow-sm" style="border-color: #46178f; color: #46178f;">
-                                        <i class="fas fa-external-link-alt mr-1"></i> Vào trang ôn tập ngay
-                                    </a>
-                                    <div class="text-muted small">
-                                        Mã PIN: <strong class="text-dark px-2 py-1 bg-light rounded border font-monospace" style="font-size: 0.95rem; letter-spacing: 1px;"><?= htmlspecialchars($reviewPin) ?></strong>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- RIGHT COLUMN: QR Code -->
-                            <div class="col-md-5 text-center pl-md-4 mt-4 mt-md-0" style="border-left: 1.5px solid #f1f5f9;">
-                                <p class="font-weight-bold text-dark mb-2" style="font-size: 0.95rem;">
-                                    <i class="fas fa-qrcode mr-1 text-primary"></i> Quét mã QR để vào ôn tập
-                                </p>
-                                <div class="d-flex justify-content-center">
-                                    <button type="button" class="border p-2 bg-white shadow-sm qr-zoom-trigger" data-toggle="modal" data-target="#qrZoomModalEdit" title="Nhấp để phóng to mã QR" style="cursor: zoom-in; outline: none; border-radius: 12px; border-color: #e2e8f0;">
-                                        <div id="reviewViewQrCode" class="review-qr-code mx-auto" data-url="<?= htmlspecialchars($reviewUrl) ?>" style="width: 145px; height: 145px;">
-                                            <div class="spinner-border text-primary" role="status"></div>
-                                        </div>
+                    <div class="row align-items-center">
+                        <!-- LEFT COLUMN: Practice Link & Open Button -->
+                        <div class="col-md-7 pr-md-4">
+                            <label class="small font-weight-bold text-muted text-uppercase mb-1" style="font-size: 0.75rem; letter-spacing: 0.5px;">
+                                Đường link ôn tập
+                            </label>
+                            <div class="input-group mb-2 shadow-sm" style="border-radius: 10px; overflow: hidden; border: 1.5px solid #cbd5e1;">
+                                <input type="text" class="form-control border-0 bg-light text-truncate font-weight-bold text-primary" value="<?= htmlspecialchars($reviewUrl) ?>" readonly onclick="window.open(this.value, '_blank')" style="cursor: pointer; font-size: 0.88rem; height: 42px;" title="Nhấp vào để mở trang ôn tập">
+                                <div class="input-group-append">
+                                    <button type="button" class="btn btn-primary font-weight-bold px-3 d-flex align-items-center" onclick="copyTextToClipboard('<?= htmlspecialchars($reviewUrl) ?>', this)" style="background: #46178f; border-color: #46178f; font-size: 0.88rem;">
+                                        <i class="fas fa-copy mr-1"></i> Sao chép
                                     </button>
                                 </div>
-                                <p class="small text-muted mt-2 mb-0" style="font-size: 0.8rem; color: #94a3b8;">
-                                    Nhấp mã QR để phóng to
-                                </p>
+                            </div>
+                            <p class="text-muted small mb-3" style="font-size: 0.82rem;">
+                                <i class="fas fa-info-circle text-info mr-1"></i> Nhấp vào link hoặc nút bên dưới để vào làm bài ngay.
+                            </p>
+
+                            <div class="pt-2 border-top">
+                                <a href="<?= htmlspecialchars($reviewUrl) ?>" target="_blank" rel="noopener" class="btn btn-outline-primary btn-sm font-weight-bold px-3 py-2 rounded-pill shadow-sm" style="border-color: #46178f; color: #46178f;">
+                                    <i class="fas fa-external-link-alt mr-1"></i> Vào trang ôn tập ngay
+                                </a>
                             </div>
                         </div>
-                    </div>
+
+                        <!-- RIGHT COLUMN: QR Code -->
+                        <div class="col-md-5 text-center pl-md-4 mt-4 mt-md-0" style="border-left: 1.5px solid #f1f5f9;">
+                            <p class="font-weight-bold text-dark mb-2" style="font-size: 0.95rem;">
+                                <i class="fas fa-qrcode mr-1 text-primary"></i> Quét mã QR để vào ôn tập
+                            </p>
+                            <div class="d-flex justify-content-center">
+                                <button type="button" class="border p-2 bg-white shadow-sm qr-zoom-trigger" data-toggle="modal" data-target="#qrZoomModalEdit" title="Nhấp để phóng to mã QR" style="cursor: zoom-in; outline: none; border-radius: 12px; border-color: #e2e8f0;">
+                                    <div id="reviewViewQrCode" class="review-qr-code mx-auto" data-url="<?= htmlspecialchars($reviewUrl) ?>" style="width: 145px; height: 145px;">
+                                        <div class="spinner-border text-primary" role="status"></div>
+                                    </div>
+                                </button>
+                            </div>
+                            <p class="small text-muted mt-2 mb-0" style="font-size: 0.8rem; color: #94a3b8;">
+                                Nhấp mã QR để phóng to
+                            </p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1293,7 +1282,7 @@ $displayJoinUrl = preg_replace('#^https?://#', '', $joinPageUrl);
             <div id="reviewViewQrCodeLarge" class="mx-auto my-2" data-url="<?= htmlspecialchars($reviewUrl) ?>" style="width: 320px; height: 320px;">
                 <div class="spinner-border text-primary mt-5" role="status"></div>
             </div>
-            <p class="small text-muted mt-2 mb-3">Mã PIN: <strong class="text-dark font-monospace" style="font-size: 1.1rem;"><?= htmlspecialchars($reviewPin) ?></strong></p>
+            
             <button type="button" class="btn btn-secondary font-weight-bold rounded-pill px-4 mx-auto" data-dismiss="modal">Đóng</button>
         </div>
     </div>

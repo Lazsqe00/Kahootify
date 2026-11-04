@@ -480,26 +480,20 @@ document.addEventListener('DOMContentLoaded', function() {
         $displayJoinUrl = preg_replace('#^https?://#', '', $joinPageUrl);
     ?>
     <div class="modal fade" id="reviewModal_<?= $q['id_quiz'] ?>" tabindex="-1" role="dialog" aria-hidden="true">
-        <div class="modal-dialog modal-lg modal-dialog-centered" role="document" style="max-width: 740px;">
+        <div class="modal-dialog modal-lg modal-dialog-centered" role="document" style="max-width: 720px;">
             <div class="modal-content border-0 bg-transparent">
                 <!-- PURPLE OUTER CONTAINER -->
-                <div class="p-3 p-md-4 position-relative" style="background: #46178f; border-radius: 28px; box-shadow: 0 25px 50px -12px rgba(70, 23, 143, 0.45);">
-                    <button type="button" class="close text-white position-absolute" data-dismiss="modal" aria-label="Close" style="top: 14px; right: 20px; font-size: 32px; opacity: 0.85; z-index: 10; outline: none;">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
-
+                <div class="p-3 p-md-4 position-relative" style="background: #46178f; border-radius: 26px; box-shadow: 0 25px 50px -12px rgba(70, 23, 143, 0.45);">
                     <!-- INNER WHITE CARD -->
                     <div class="bg-white text-dark p-4" style="border-radius: 18px; box-shadow: 0 10px 25px rgba(0,0,0,0.12);">
-                        <!-- MODAL HEADER -->
+                        <!-- MODAL HEADER WITH VISIBLE CLOSE (X) BUTTON ON TOP RIGHT OF FORM -->
                         <div class="d-flex align-items-center justify-content-between mb-3 pb-3 border-bottom">
-                            <div>
-                                <span class="badge badge-warning text-dark font-weight-bold px-2 py-1 mr-2" style="font-size: 0.8rem; border-radius: 6px;">
-                                    <i class="fas fa-book-reader mr-1"></i> CHẾ ĐỘ ÔN TẬP
-                                </span>
-                                <h5 class="d-inline-block font-weight-bold text-dark mb-0" style="font-size: 1.15rem; vertical-align: middle;">
-                                    <?= htmlspecialchars($q['title']) ?>
-                                </h5>
-                            </div>
+                            <h5 class="font-weight-bold text-dark mb-0" style="font-size: 1.25rem;">
+                                <?= htmlspecialchars($q['name'] ?? '') ?>
+                            </h5>
+                            <button type="button" class="close text-secondary" data-dismiss="modal" aria-label="Close" style="font-size: 32px; font-weight: 300; opacity: 0.75; outline: none; line-height: 0.8; padding: 4px; margin: -6px -4px 0 0;" title="Đóng">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
                         </div>
 
                         <div class="row align-items-center">
@@ -520,13 +514,10 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <i class="fas fa-info-circle text-info mr-1"></i> Nhấp vào link hoặc nút bên dưới để vào làm bài ngay.
                                 </p>
 
-                                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 pt-2 border-top">
+                                <div class="pt-2 border-top">
                                     <a href="<?= htmlspecialchars($rUrl) ?>" target="_blank" rel="noopener" class="btn btn-outline-primary btn-sm font-weight-bold px-3 py-2 rounded-pill shadow-sm" style="border-color: #46178f; color: #46178f;">
                                         <i class="fas fa-external-link-alt mr-1"></i> Vào trang ôn tập ngay
                                     </a>
-                                    <div class="text-muted small">
-                                        Mã PIN: <strong class="text-dark px-2 py-1 bg-light rounded border font-monospace" style="font-size: 0.95rem; letter-spacing: 1px;"><?= htmlspecialchars($rPin) ?></strong>
-                                    </div>
                                 </div>
                             </div>
 
@@ -566,7 +557,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div id="reviewQrCodeLarge_<?= $q['id_quiz'] ?>" class="mx-auto my-2" data-url="<?= htmlspecialchars($rUrl) ?>" style="width: 320px; height: 320px;">
                     <div class="spinner-border text-primary mt-5" role="status"></div>
                 </div>
-                <p class="small text-muted mt-2 mb-3">Mã PIN: <strong class="text-dark font-monospace" style="font-size: 1.1rem;"><?= htmlspecialchars($rPin) ?></strong></p>
+                
                 <button type="button" class="btn btn-secondary font-weight-bold rounded-pill px-4 mx-auto" data-dismiss="modal">Đóng</button>
             </div>
         </div>
