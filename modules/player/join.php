@@ -13,12 +13,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' || isset($_GET['pin'])) {
 
     if (preg_match('/\A[0-9]{6}\z/', $pin)) {
         $room = db_fetch_one("SELECT * FROM room WHERE pin = :pin AND status != 'finished' LIMIT 1", [':pin' => $pin]);
-        $error = room_join_error($room);
-
-        if ($error === '') {
-            $_SESSION['player_room_id'] = $room['id_room'];
-            $_SESSION['player_pin'] = $room['pin'];
-            redirect('modules/player/nickname.php?room_id=' . $room['id_room'] . '&pin=' . urlencode($room['pin']));
+        if ($room) {
+            $error = room_join_error($room);
+            if ($error === '') {
+                $_SESSION['player_room_id'] = $room['id_room'];
+                $_SESSION['player_pin'] = $room['pin'];
+                redirect('modules/player/nickname.php?room_id=' . $room['id_room'] . '&pin=' . urlencode($room['pin']));
+            }
+        } else {
+            // Check if PIN corresponds to an active self-paced Review Mode quiz
+            require_once __DIR__ . '/../../includes/ReviewManager.php';
+            $reviewQuiz = ReviewManager::getQuizByPin($pin);
+            if ($reviewQuiz) {
+                redirect('modules/review/practice.php?pin=' . urlencode($pin));
+            } else {
+                $error = 'Invalid Game PIN or room has closed!';
+            }
         }
     } else {
         $error = $pin === '' ? 'Please enter a Game PIN!' : 'Game PIN must contain exactly 6 digits!';

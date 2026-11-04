@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/../../includes/auth_check.php';
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../includes/ReviewManager.php';
 
 $creatorId = intval($_SESSION['id_creator']);
 
@@ -259,6 +260,9 @@ $flash = get_flash_message();
                                             <i class="fas fa-puzzle-piece mr-1"></i> Obstacle Puzzle
                                         </span>
                                     </div>
+                                    <?php if (!empty($q['is_review_mode'])): ?>
+                                        <div class="mb-1"><span class="badge badge-warning text-dark font-weight-bold px-2 py-1 shadow-sm"><i class="fas fa-book-reader mr-1"></i> Review Mode</span></div>
+                                    <?php endif; ?>
                                     <h5 class="quiz-card-title text-truncate" title="<?= htmlspecialchars($q['name']) ?>">
                                         <?= htmlspecialchars($q['name']) ?>
                                     </h5>
@@ -283,6 +287,9 @@ $flash = get_flash_message();
                                             <i class="fas fa-coins mr-1 text-warning"></i> WAGER MODE
                                         </span>
                                     </div>
+                                    <?php if (!empty($q['is_review_mode'])): ?>
+                                        <div class="mb-1"><span class="badge badge-warning text-dark font-weight-bold px-2 py-1 shadow-sm"><i class="fas fa-book-reader mr-1"></i> Review Mode</span></div>
+                                    <?php endif; ?>
                                     <h5 class="quiz-card-title text-truncate" title="<?= htmlspecialchars($q['name']) ?>">
                                         <?= htmlspecialchars($q['name']) ?>
                                     </h5>
@@ -303,6 +310,9 @@ $flash = get_flash_message();
                                             <i class="fas fa-gamepad mr-1 text-primary"></i> CLASSIC QUIZ
                                         </span>
                                     </div>
+                                    <?php if (!empty($q['is_review_mode'])): ?>
+                                        <div class="mb-1"><span class="badge badge-warning text-dark font-weight-bold px-2 py-1 shadow-sm"><i class="fas fa-book-reader mr-1"></i> Review Mode</span></div>
+                                    <?php endif; ?>
                                     <h5 class="quiz-card-title text-truncate" title="<?= htmlspecialchars($q['name']) ?>">
                                         <?= htmlspecialchars($q['name']) ?>
                                     </h5>
@@ -322,9 +332,15 @@ $flash = get_flash_message();
                             <div class="d-flex justify-content-between align-items-center pt-2 border-top">
                                 <small class="text-muted"><?= date('M d, Y', strtotime($q['quizadd'] ?? $q['created_at'] ?? 'now')) ?></small>
                                 <div class="d-flex align-items-center">
-                                    <a href="<?= BASE_URL ?>modules/host/create_room.php?id_quiz=<?= $q['id_quiz'] ?>" class="btn btn-sm btn-primary font-weight-bold mr-2" title="Play">
-                                        <i class="fas fa-play mr-1"></i> Play
-                                    </a>
+                                    <?php if (!empty($q['is_review_mode'])): ?>
+                                        <button type="button" class="btn btn-sm btn-warning font-weight-bold mr-2 text-dark" data-toggle="modal" data-target="#reviewModal_<?= $q['id_quiz'] ?>" title="View Review Mode">
+                                            <i class="fas fa-eye mr-1"></i> View
+                                        </button>
+                                    <?php else: ?>
+                                        <a href="<?= BASE_URL ?>modules/host/create_room.php?id_quiz=<?= $q['id_quiz'] ?>" class="btn btn-sm btn-primary font-weight-bold mr-2" title="Play">
+                                            <i class="fas fa-play mr-1"></i> Play
+                                        </a>
+                                    <?php endif; ?>
                                     <div class="dropdown">
                                         <button class="btn btn-sm btn-outline-secondary font-weight-bold dropdown-toggle" type="button" id="quizActions_<?= $q['id_quiz'] ?>" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" title="Actions">
                                             <i class="fas fa-ellipsis-v mr-1"></i> Actions
@@ -364,6 +380,153 @@ window.addEventListener('load', function() {
             $(this).closest('.quiz-card').css('z-index', '');
         });
     }
+});
+</script>
+
+
+<!-- REVIEW MODE VIEW MODALS -->
+<?php foreach ($quizzes as $q): ?>
+    <?php if (!empty($q['is_review_mode'])): 
+        $rPin = $q['review_pin'] ?? '';
+        $rUrl = ReviewManager::buildReviewUrl($rPin);
+    ?>
+    <div class="modal fade" id="reviewModal_<?= $q['id_quiz'] ?>" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 20px; overflow: hidden;">
+                <div class="modal-header text-white px-4 py-3" style="background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);">
+                    <div class="d-flex align-items-center">
+                        <span class="badge badge-warning text-dark font-weight-bold mr-2 px-2 py-1" style="border-radius: 6px;">
+                            <i class="fas fa-book-reader mr-1"></i> REVIEW MODE
+                        </span>
+                        <h5 class="modal-title font-weight-bold mb-0 text-truncate text-white" style="max-width: 480px;">
+                            <?= htmlspecialchars($q['name']) ?>
+                        </h5>
+                    </div>
+                    <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close" style="opacity: 0.85;">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body p-4 bg-light">
+                    <div class="row align-items-center bg-white rounded-xl shadow-sm p-3 mx-0" style="border-radius: 16px; border: 1px solid #e2e8f0;">
+                        <!-- LEFT COLUMN: Large QR Code -->
+                        <div class="col-md-5 d-flex flex-column align-items-center justify-content-center p-3 border-right border-light">
+                            <div class="p-3 bg-white rounded-lg shadow-sm border text-center" style="border-radius: 16px;">
+                                <div id="reviewQrCode_<?= $q['id_quiz'] ?>" class="d-flex align-items-center justify-content-center" data-url="<?= htmlspecialchars($rUrl) ?>" style="width: 200px; height: 200px;">
+                                    <div class="spinner-border text-primary" role="status"></div>
+                                </div>
+                            </div>
+                            <span class="small font-weight-bold text-muted mt-2">
+                                <i class="fas fa-qrcode mr-1"></i> Quét mã để vào ôn tập ngay
+                            </span>
+                        </div>
+
+                        <!-- RIGHT COLUMN: PIN & Direct Link -->
+                        <div class="col-md-7 p-3 pl-md-4">
+                            <div class="mb-4">
+                                <label class="text-uppercase small font-weight-bold text-muted mb-1" style="letter-spacing: 0.5px;">
+                                    <i class="fas fa-key text-warning mr-1"></i> Mã PIN Ôn tập
+                                </label>
+                                <div class="d-flex align-items-center">
+                                    <div class="font-weight-bold text-dark px-3 py-2 rounded shadow-sm mr-2" style="font-size: 2.1rem; letter-spacing: 4px; font-family: monospace; background: #f8fafc; border: 2px dashed #cbd5e1;">
+                                        <?= htmlspecialchars($rPin) ?>
+                                    </div>
+                                    <button type="button" class="btn btn-outline-secondary font-weight-bold px-3 py-2 rounded-lg" onclick="copyTextToClipboard('<?= htmlspecialchars($rPin) ?>', this)" title="Sao chép PIN">
+                                        <i class="fas fa-copy mr-1"></i> Copy
+                                    </button>
+                                </div>
+                                <small class="text-muted d-block mt-1">
+                                    Học sinh có thể nhập mã này tại trang chủ <code>join.php</code>
+                                </small>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="text-uppercase small font-weight-bold text-muted mb-1" style="letter-spacing: 0.5px;">
+                                    <i class="fas fa-link text-primary mr-1"></i> Link ôn tập trực tiếp
+                                </label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control font-weight-bold text-dark bg-white" readonly value="<?= htmlspecialchars($rUrl) ?>">
+                                    <div class="input-group-append">
+                                        <button class="btn btn-primary font-weight-bold px-3" type="button" onclick="copyTextToClipboard('<?= htmlspecialchars($rUrl) ?>', this)">
+                                            <i class="fas fa-copy mr-1"></i> Copy Link
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="pt-2 d-flex align-items-center">
+                                <a href="<?= htmlspecialchars($rUrl) ?>" target="_blank" class="btn btn-success font-weight-bold rounded-pill px-4 shadow-sm mr-2">
+                                    <i class="fas fa-external-link-alt mr-1"></i> Mở bài làm
+                                </a>
+                                <button type="button" class="btn btn-secondary font-weight-bold rounded-pill px-3" data-dismiss="modal">
+                                    Đóng
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+<?php endforeach; ?>
+
+<script src="<?= BASE_URL ?>assets/js/qrcodegen.js"></script>
+<script>
+function renderQrSvg(containerId, url) {
+    const el = document.getElementById(containerId);
+    if (!el || !window.qrcodegen) return;
+    try {
+        const qr = qrcodegen.QrCode.encodeText(url, qrcodegen.QrCode.Ecc.MEDIUM);
+        const border = 4;
+        const size = qr.size + border * 2;
+        const namespace = "http://www.w3.org/2000/svg";
+        const svg = document.createElementNS(namespace, "svg");
+        svg.setAttribute("viewBox", "0 0 " + size + " " + size);
+        svg.setAttribute("shape-rendering", "crispEdges");
+        svg.setAttribute("role", "img");
+
+        const background = document.createElementNS(namespace, "rect");
+        background.setAttribute("width", "100%");
+        background.setAttribute("height", "100%");
+        background.setAttribute("fill", "#fff");
+        svg.appendChild(background);
+
+        const modules = [];
+        for (let y = 0; y < qr.size; y++) {
+            for (let x = 0; x < qr.size; x++) {
+                if (qr.getModule(x, y)) {
+                    modules.push("M" + (x + border) + "," + (y + border) + "h1v1h-1z");
+                }
+            }
+        }
+        const path = document.createElementNS(namespace, "path");
+        path.setAttribute("d", modules.join(""));
+        path.setAttribute("fill", "#000");
+        svg.appendChild(path);
+
+        el.replaceChildren(svg);
+    } catch (e) {
+        console.error("QR Error", e);
+    }
+}
+
+function copyTextToClipboard(text, btn) {
+    navigator.clipboard.writeText(text).then(() => {
+        const origHtml = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check text-success mr-1"></i> Copied!';
+        setTimeout(() => { btn.innerHTML = origHtml; }, 2000);
+    }).catch(() => {
+        alert("Copied: " + text);
+    });
+}
+
+window.addEventListener("DOMContentLoaded", function () {
+    $(".modal").on("shown.bs.modal", function () {
+        const qrBox = this.querySelector("[id^='reviewQrCode_']");
+        if (qrBox && qrBox.dataset.url) {
+            renderQrSvg(qrBox.id, qrBox.dataset.url);
+        }
+    });
 });
 </script>
 

@@ -4,6 +4,7 @@ require_once __DIR__ . '/../../includes/auth_check.php';
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../includes/modes/QuestionModeRegistry.php';
 require_once __DIR__ . '/../../includes/TeamManager.php';
+require_once __DIR__ . '/../../includes/ReviewManager.php';
 
 $creatorId = intval($_SESSION['id_creator']);
 $quizId    = intval($_GET['id'] ?? 0);
@@ -14,6 +15,9 @@ if (!$quiz) {
     redirect('modules/quiz/list.php');
 }
 $isObstacle = (($quiz['game_type'] ?? 'classic') === 'obstacle');
+$isReviewMode = !empty($quiz['is_review_mode']);
+$reviewPin    = $quiz['review_pin'] ?? '';
+$reviewUrl    = ReviewManager::buildReviewUrl($reviewPin);
 
 function saveUploadedFile($fileKey) {
     if (!isset($_FILES[$fileKey]) || $_FILES[$fileKey]['error'] !== UPLOAD_ERR_OK) return null;
@@ -68,6 +72,18 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
             ]
         );
         set_flash_message('success', 'Team Mode settings saved successfully!');
+        redirect('modules/quiz/edit.php?id=' . $quizId);
+    }
+
+    if ($action === 'update_review_settings') {
+        $enable = !empty($_POST['is_review_mode']) ? 1 : 0;
+        if ($enable) {
+            $res = ReviewManager::enableReviewMode($quizId, $creatorId);
+            set_flash_message('success', 'Review Mode enabled! PIN: ' . $res['pin']);
+        } else {
+            ReviewManager::disableReviewMode($quizId, $creatorId);
+            set_flash_message('success', 'Review Mode disabled successfully.');
+        }
         redirect('modules/quiz/edit.php?id=' . $quizId);
     }
 
@@ -463,6 +479,12 @@ $availableTeams = TeamManager::getTeamsForEntity($quiz);
             </div>
             <?php endif; ?>
 
+            <?php if ($isReviewMode): ?>
+                <span class="badge badge-warning text-dark px-2 py-1 font-weight-bold d-none d-md-inline-flex align-items-center mr-1" style="font-size: 0.8rem; border-radius: 8px;">
+                    <i class="fas fa-book-reader mr-1"></i> Review Mode (PIN: <?= htmlspecialchars($reviewPin) ?>)
+                </span>
+            <?php endif; ?>
+
             <?php if ($isTeamMode): ?>
                 <span class="badge badge-success px-2 py-1 font-weight-bold d-none d-md-inline-flex align-items-center" style="font-size: 0.8rem; border-radius: 8px;">
                     <i class="fas fa-users mr-1"></i> Team Mode (<?= $teamCount ?> Teams)
@@ -475,6 +497,15 @@ $availableTeams = TeamManager::getTeamsForEntity($quiz);
                 </button>
                 <div class="dropdown-menu dropdown-menu-right shadow border-0" aria-labelledby="quizOptionsDropdown" style="min-width: 220px; border-radius: 12px; padding: 8px;">
                     <div class="dropdown-header text-uppercase font-weight-bold text-muted px-2 py-1" style="font-size: 0.72rem; letter-spacing: 0.5px;">Advanced Settings</div>
+                    <button class="dropdown-item d-flex align-items-center py-2 px-2 rounded mb-1" type="button" data-toggle="modal" data-target="#reviewModeModal" onclick="$('#reviewModeModal').modal('show')">
+                        <i class="fas fa-book-reader mr-2 text-warning"></i>
+                        <span class="font-weight-bold">Review Mode</span>
+                        <?php if ($isReviewMode): ?>
+                            <span class="badge badge-warning ml-auto font-weight-bold text-dark">ON</span>
+                        <?php else: ?>
+                            <span class="badge badge-light border ml-auto text-muted font-weight-bold">OFF</span>
+                        <?php endif; ?>
+                    </button>
                     <button class="dropdown-item d-flex align-items-center py-2 px-2 rounded" type="button" data-toggle="modal" data-target="#teamModeModal" onclick="$('#teamModeModal').modal('show')">
                         <i class="fas fa-users mr-2 text-primary"></i>
                         <span class="font-weight-bold">Team Mode</span>
@@ -487,7 +518,11 @@ $availableTeams = TeamManager::getTeamsForEntity($quiz);
                 </div>
             </div>
 
-            <?php if ($isObstacle && count($questions) < intval($quiz['total_pieces'] ?? 4)): ?>
+            <?php if ($isReviewMode): ?>
+                <button type="button" class="btn btn-sm font-weight-bold btn-warning text-dark px-3 shadow-sm" data-toggle="modal" data-target="#reviewViewModal" title="View Review Link">
+                    <i class="fas fa-eye mr-1"></i> View
+                </button>
+            <?php elseif ($isObstacle && count($questions) < intval($quiz['total_pieces'] ?? 4)): ?>
                 <button type="button" class="btn btn-sm font-weight-bold btn-secondary" onclick="alert('This Puzzle quiz requires exactly <?= intval($quiz["total_pieces"] ?? 4) ?> questions for all <?= intval($quiz["total_pieces"] ?? 4) ?> tiles before hosting! Currently has <?= count($questions) ?> questions.')">
                     <i class="fas fa-play mr-1"></i> Host Game Now
                 </button>
@@ -872,6 +907,140 @@ $availableTeams = TeamManager::getTeamsForEntity($quiz);
     </div>
 </div>
 <?php endif; ?>
+
+<!-- MODAL REVIEW MODE SETTINGS -->
+<div class="modal fade" id="reviewModeModal" tabindex="-1" role="dialog" aria-labelledby="reviewModeModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content border-0 shadow" style="border-radius: 16px; overflow: hidden;">
+            <div class="modal-header text-dark" style="background: linear-gradient(135deg, #fef3c7, #fde68a); border-bottom: 1px solid #fcd34d;">
+                <h5 class="modal-title font-weight-bold" id="reviewModeModalLabel">
+                    <i class="fas fa-book-reader mr-2 text-warning"></i>Review Mode Settings
+                </h5>
+                <button type="button" class="close text-dark" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form action="" method="POST">
+                <input type="hidden" name="action" value="update_review_settings">
+                <div class="modal-body p-4">
+                    <div class="d-flex align-items-center justify-content-between p-3 mb-3 rounded" style="background-color: #fffbeb; border: 1px solid #fef3c7; cursor: pointer;" onclick="toggleReviewCheckbox(event)">
+                        <div style="max-width: 75%;">
+                            <h6 class="font-weight-bold mb-1 text-dark">
+                                <i class="fas fa-toggle-on text-warning mr-1"></i> Enable Review Mode
+                            </h6>
+                            <p class="text-muted small mb-0">
+                                When enabled, students can practice independently at their own pace without host control, timer, or leaderboard.
+                            </p>
+                        </div>
+                        <div class="custom-control custom-switch pl-4" style="font-size: 1.25rem;">
+                            <input type="checkbox" class="custom-control-input" id="is_review_mode" name="is_review_mode" value="1" <?= $isReviewMode ? 'checked' : '' ?>>
+                            <label class="custom-control-label" for="is_review_mode" style="cursor: pointer;"></label>
+                        </div>
+                    </div>
+
+                    <?php if ($isReviewMode && !empty($reviewPin)): ?>
+                    <div class="p-3 bg-light rounded" style="border: 1px solid #e2e8f0;">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="small font-weight-bold text-muted text-uppercase">Current Game PIN:</span>
+                            <span class="h5 font-weight-bold text-dark font-monospace mb-0"><?= htmlspecialchars($reviewPin) ?></span>
+                        </div>
+                        <div class="text-right">
+                            <button type="button" class="btn btn-sm btn-outline-warning text-dark font-weight-bold" onclick="$('#reviewModeModal').modal('hide'); $('#reviewViewModal').modal('show');">
+                                <i class="fas fa-qrcode mr-1"></i> View PIN & QR Code
+                            </button>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+                </div>
+                <div class="modal-footer bg-light py-2">
+                    <button type="button" class="btn btn-secondary font-weight-bold rounded-pill px-3" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning font-weight-bold rounded-pill px-4 text-dark shadow-sm">
+                        <i class="fas fa-save mr-1"></i> Save Settings
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL REVIEW VIEW (RECTANGULAR UI: QR on left, PIN + Link on right) -->
+<div class="modal fade" id="reviewViewModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 20px; overflow: hidden;">
+            <div class="modal-header text-white px-4 py-3" style="background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);">
+                <div class="d-flex align-items-center">
+                    <span class="badge badge-warning text-dark font-weight-bold mr-2 px-2 py-1" style="border-radius: 6px;">
+                        <i class="fas fa-book-reader mr-1"></i> REVIEW MODE
+                    </span>
+                    <h5 class="modal-title font-weight-bold mb-0 text-truncate text-white" style="max-width: 480px;">
+                        <?= htmlspecialchars($quiz['name']) ?>
+                    </h5>
+                </div>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close" style="opacity: 0.85;">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body p-4 bg-light">
+                <div class="row align-items-center bg-white rounded-xl shadow-sm p-3 mx-0" style="border-radius: 16px; border: 1px solid #e2e8f0;">
+                    <!-- LEFT COLUMN: Large QR Code -->
+                    <div class="col-md-5 d-flex flex-column align-items-center justify-content-center p-3 border-right border-light">
+                        <div class="p-3 bg-white rounded-lg shadow-sm border text-center" style="border-radius: 16px;">
+                            <div id="reviewViewQrCode" class="d-flex align-items-center justify-content-center" data-url="<?= htmlspecialchars($reviewUrl) ?>" style="width: 200px; height: 200px;">
+                                <div class="spinner-border text-primary" role="status"></div>
+                            </div>
+                        </div>
+                        <span class="small font-weight-bold text-muted mt-2">
+                            <i class="fas fa-qrcode mr-1"></i> Quét mã để vào ôn tập ngay
+                        </span>
+                    </div>
+
+                    <!-- RIGHT COLUMN: PIN & Direct Link -->
+                    <div class="col-md-7 p-3 pl-md-4">
+                        <div class="mb-4">
+                            <label class="text-uppercase small font-weight-bold text-muted mb-1" style="letter-spacing: 0.5px;">
+                                <i class="fas fa-key text-warning mr-1"></i> Mã PIN Ôn tập
+                            </label>
+                            <div class="d-flex align-items-center">
+                                <div class="font-weight-bold text-dark px-3 py-2 rounded shadow-sm mr-2" style="font-size: 2.1rem; letter-spacing: 4px; font-family: monospace; background: #f8fafc; border: 2px dashed #cbd5e1;">
+                                    <?= htmlspecialchars($reviewPin) ?>
+                                </div>
+                                <button type="button" class="btn btn-outline-secondary font-weight-bold px-3 py-2 rounded-lg" onclick="copyTextToClipboard('<?= htmlspecialchars($reviewPin) ?>', this)" title="Sao chép PIN">
+                                    <i class="fas fa-copy mr-1"></i> Copy
+                                </button>
+                            </div>
+                            <small class="text-muted d-block mt-1">
+                                Học sinh có thể nhập mã này tại trang chủ <code>join.php</code>
+                            </small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="text-uppercase small font-weight-bold text-muted mb-1" style="letter-spacing: 0.5px;">
+                                <i class="fas fa-link text-primary mr-1"></i> Link ôn tập trực tiếp
+                            </label>
+                            <div class="input-group">
+                                <input type="text" class="form-control font-weight-bold text-dark bg-white" readonly value="<?= htmlspecialchars($reviewUrl) ?>">
+                                <div class="input-group-append">
+                                    <button class="btn btn-primary font-weight-bold px-3" type="button" onclick="copyTextToClipboard('<?= htmlspecialchars($reviewUrl) ?>', this)">
+                                        <i class="fas fa-copy mr-1"></i> Copy Link
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="pt-2 d-flex align-items-center">
+                            <a href="<?= htmlspecialchars($reviewUrl) ?>" target="_blank" class="btn btn-success font-weight-bold rounded-pill px-4 shadow-sm mr-2">
+                                <i class="fas fa-external-link-alt mr-1"></i> Mở bài làm
+                            </a>
+                            <button type="button" class="btn btn-secondary font-weight-bold rounded-pill px-3" data-dismiss="modal">
+                                Đóng
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- MODAL TEAM MODE SETTINGS -->
 <div class="modal fade" id="teamModeModal" tabindex="-1" role="dialog" aria-labelledby="teamModeModalLabel" aria-hidden="true">
