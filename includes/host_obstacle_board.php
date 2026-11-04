@@ -189,22 +189,13 @@ require_once __DIR__ . '/header.php';
 }
 </style>
 
-<nav class="navbar navbar-dark bg-dark px-4 py-2 d-flex justify-content-between align-items-center">
+<nav class="navbar navbar-dark bg-dark px-4 py-3 d-flex justify-content-between align-items-center shadow-sm" style="min-height: 64px;">
     <div class="d-flex align-items-center">
-        <img src="<?= BASE_URL ?>assets/img/logo.png" alt="Logo" style="max-height: 32px; filter: brightness(100);" class="mr-3">
-        <span class="badge badge-light font-weight-bold mr-2">PIN: <?= htmlspecialchars($room['pin']) ?></span>
-        <span class="badge badge-warning text-dark font-weight-bold mr-3 vcnv-badge">
-            <i class="fas fa-puzzle-piece mr-1"></i> OBSTACLE PUZZLE
-        </span>
-        <?php if (!empty($room['is_team_mode'])): ?>
-            <span class="badge text-white font-weight-bold mr-3 shadow-sm" style="background: linear-gradient(135deg, #1368ce, #46178f); border-radius: 20px; font-size: 0.85rem; padding: 5px 12px;">
-                <i class="fas fa-users mr-1"></i> TEAM MODE (<?= intval($room['team_count'] ?? 2) ?> TEAMS)
-            </span>
-        <?php endif; ?>
-        <span class="text-white font-weight-bold d-none d-md-inline"><?= htmlspecialchars($quiz['name']) ?></span>
+        <img src="<?= BASE_URL ?>assets/img/logo.png" alt="Logo" style="max-height: 34px; filter: brightness(100);" class="mr-3">
+        <span class="badge badge-light font-weight-bold font-monospace px-3 py-2" style="font-size: 0.95rem; border-radius: 8px; letter-spacing: 0.5px;">PIN: <?= htmlspecialchars($room['pin']) ?></span>
     </div>
     <div class="d-flex align-items-center">
-        <a href="<?= BASE_URL ?>modules/host/leaderboard.php?final=true" onclick="return confirm('Are you sure you want to end the game and view final podium?');" class="btn btn-outline-danger btn-sm font-weight-bold rounded-pill px-3">
+        <a href="<?= BASE_URL ?>modules/host/leaderboard.php?final=true" onclick="return confirm('Are you sure you want to end the game and view final podium?');" class="btn btn-outline-danger btn-sm font-weight-bold rounded-pill px-3 py-2">
             <i class="fas fa-flag-checkered mr-1"></i> End Game &raquo;
         </a>
     </div>
