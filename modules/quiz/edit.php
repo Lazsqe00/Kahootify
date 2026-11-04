@@ -154,7 +154,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
 
         $modeConfig = null;
         if ($qMode === 'wager') {
-            $wTime = intval($_POST['wager_time_sec'] ?? 10);
+            $wTime = intval($_POST['wager_time_sec'] ?? 25);
             $modeConfig = json_encode($modeObj->validateConfig([
                 'wagerTimeSec' => $wTime,
             ]));
@@ -791,6 +791,10 @@ $availableTeams = TeamManager::getTeamsForEntity($quiz);
                                         <img src="<?= htmlspecialchars($imgSrc) ?>" alt="Question Media" loading="lazy">
                                     <?php endif; ?>
                                 </div>
+                            <?php else: ?>
+                                <div class="q-thumb-media-preview">
+                                    <img src="<?= BASE_URL ?>assets/img/cover.png" alt="No image" loading="lazy">
+                                </div>
                             <?php endif; ?>
 
                             <?php
@@ -904,7 +908,7 @@ $availableTeams = TeamManager::getTeamsForEntity($quiz);
                 <input type="hidden" name="editing_question_id"  id="editingQuestionId"       value="">
                 <input type="hidden" name="question_type"        id="hiddenQuestionType"      value="<?= htmlspecialchars($defaultQType) ?>">
                 <input type="hidden" name="question_mode"        id="hiddenQuestionMode"      value="normal">
-                <input type="hidden" name="wager_time_sec"       id="hiddenWagerTimeSec"       value="10">
+                <input type="hidden" name="wager_time_sec"       id="hiddenWagerTimeSec"       value="25">
                 <input type="hidden" name="time_limit"           id="hiddenTimeLimit"         value="<?= htmlspecialchars($defaultTimeLimit) ?>">
                 <input type="hidden" name="points"               id="hiddenPoints"            value="<?= htmlspecialchars($defaultPoints) ?>">
                 <input type="hidden" name="question_media_remove" id="questionMediaRemoveFlag" value="0">
@@ -996,18 +1000,18 @@ $availableTeams = TeamManager::getTeamsForEntity($quiz);
         </div>
 
         <div class="props-panel">
-            <div id="modeSettingsPanel" class="prop-group" style="<?= $defaultQMode === 'wager' ? 'display:block;' : 'display:none;' ?> background: #fffdf5; border: 1px solid #fde68a; border-radius: 8px; padding: 10px 12px;">
-                <div class="prop-label mb-2 text-dark font-weight-bold d-flex align-items-center" style="font-size: 11px; white-space: nowrap; letter-spacing: 0.3px;">
-                    <i class="fas fa-sliders-h mr-1 text-warning"></i> Wager Settings
+            <div id="modeSettingsPanel" class="prop-group" style="<?= $defaultQMode === 'wager' ? 'display:block;' : 'display:none;' ?> background: #fffdf5; border: 1.5px solid #fde68a; border-radius: 8px; padding: 10px 12px;">
+                <div class="prop-label mb-2 text-dark font-weight-bold d-flex align-items-center" style="font-size: 11px; letter-spacing: 0.2px;">
+                    <i class="fas fa-star mr-1 text-warning"></i> Star of Hope
                 </div>
                 <div class="form-group mb-0">
-                    <label class="small text-muted font-weight-bold mb-1 d-block" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px;">Wager Duration</label>
+                    <label class="small text-muted font-weight-bold mb-1 d-block" style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.2px;">Duration</label>
                     <select class="prop-select" id="propWagerTimeSec" style="height: 34px; font-size: 13px;">
-                        <option value="5">5s</option>
-                        <option value="10" selected>10s (Default)</option>
                         <option value="15">15s</option>
                         <option value="20">20s</option>
+                        <option value="25" selected>25s (Default)</option>
                         <option value="30">30s</option>
+                        <option value="45">45s</option>
                     </select>
                 </div>
             </div>

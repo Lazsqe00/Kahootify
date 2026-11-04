@@ -382,8 +382,8 @@ $flash = get_flash_message();
                                         <i class="fas fa-puzzle-piece mr-1"></i> Puzzle
                                     </span>
                                 <?php elseif ($isWager): ?>
-                                    <span class="quiz-badge badge-wager" title="Wager Mode">
-                                        <i class="fas fa-coins mr-1"></i> Wager
+                                    <span class="quiz-badge badge-wager" title="Star of Hope">
+                                        <i class="fas fa-star mr-1"></i> Star of Hope
                                     </span>
                                 <?php else: ?>
                                     <span class="quiz-badge badge-classic" title="Classic Quiz Mode">

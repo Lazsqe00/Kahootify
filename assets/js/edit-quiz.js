@@ -498,7 +498,7 @@ function resetToNewMode() {
     var modeEl = document.getElementById('propQuestionMode');
     if (modeEl) modeEl.value = EQ.defaultMode || 'normal';
     var wagerTimeEl = document.getElementById('propWagerTimeSec');
-    if (wagerTimeEl) wagerTimeEl.value = '10';
+    if (wagerTimeEl) wagerTimeEl.value = '25';
 
     if (EQ.gameType === 'obstacle') {
         var nextPiece = 1;
@@ -569,7 +569,7 @@ window.loadQuestionForEdit = function (questionId) {
             cfg = (typeof q.mode_config === 'string') ? JSON.parse(q.mode_config) : q.mode_config;
         } catch(e) {}
     }
-    if (wagerTimeEl) wagerTimeEl.value = cfg.wagerTimeSec || 10;
+    if (wagerTimeEl) wagerTimeEl.value = cfg.wagerTimeSec || 25;
     // Speed bonus feature removed
 
     if (EQ.gameType === 'obstacle') {

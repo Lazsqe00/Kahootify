@@ -125,13 +125,14 @@ try {
                 'isCorrect'    => $isCorrect,
                 'speedBonus'   => $speedBonus,
                 'config'       => $qConfig,
+                'basePoints'   => intval($ans['points'] ?: 1000),
             ]);
 
             $wagerAmount = $scoreResult['wagerAmount'];
             $scoreDelta  = $scoreResult['delta'];
             $newStreak   = $isCorrect ? ($currentStreak + 1) : 0;
             $streakLost  = (!$isCorrect && $currentStreak >= 2);
-            $pointsEarned = $isCorrect ? $wagerAmount : 0;
+            $pointsEarned = $isCorrect ? $scoreDelta : 0;
             $streakBonus  = $speedBonus;
 
             $after = $mode->afterScoring($playerCheck, $scoreResult, $room, $ans);

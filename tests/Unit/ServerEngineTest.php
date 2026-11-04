@@ -146,7 +146,7 @@ class ServerEngineTest
             $lockRes = GameStateManager::lockWagerPhaseAndAdvance($rId, $qId);
             $this->assertEquals(true, $lockRes['success']);
             $this->assert(in_array($p1, $lockRes['participants']));
-            $this->assert(in_array($p2, $lockRes['sitting_out']));
+            $this->assert(in_array($p2, $lockRes['participants']));
 
             // Verify room advanced to Question phase: "<qId>"
             $updatedRoom = db_fetch_one("SELECT status FROM room WHERE id_room = :r", [':r' => $rId]);
@@ -157,7 +157,8 @@ class ServerEngineTest
                 ':r' => $rId, ':q' => $qId, ':p' => $p2
             ]);
             $this->assert($p2Log !== false);
-            $this->assertEquals(1, intval($p2Log['is_sitting_out']));
+            $this->assertEquals('tier_0', $p2Log['wager_tier']);
+            $this->assertEquals(0, intval($p2Log['is_sitting_out']));
 
             $pdo->rollBack();
         } catch (Throwable $e) {

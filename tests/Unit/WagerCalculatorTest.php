@@ -21,6 +21,13 @@ class WagerCalculatorTest
 
     public function testTierPercentLookup()
     {
+        // Star of Hope tiers
+        $this->assertEquals(0.00, WagerCalculator::getTierPercent('tier_0'));
+        $this->assertEquals(0.15, WagerCalculator::getTierPercent('tier_15'));
+        $this->assertEquals(0.30, WagerCalculator::getTierPercent('tier_30'));
+        $this->assertEquals(0.40, WagerCalculator::getTierPercent('tier_40'));
+
+        // Legacy tiers
         $this->assertEquals(0.10, WagerCalculator::getTierPercent('tier_10'));
         $this->assertEquals(0.25, WagerCalculator::getTierPercent('tier_25'));
         $this->assertEquals(0.50, WagerCalculator::getTierPercent('tier_50'));
@@ -28,10 +35,80 @@ class WagerCalculatorTest
         $this->assertEquals(null, WagerCalculator::getTierPercent('invalid_tier'));
 
         // Label assertions
+        $this->assertEquals('No Star', WagerCalculator::getTierLabel('tier_0'));
+        $this->assertEquals('Star 15%', WagerCalculator::getTierLabel('tier_15'));
+        $this->assertEquals('Star 30%', WagerCalculator::getTierLabel('tier_30'));
+        $this->assertEquals('Star 40%', WagerCalculator::getTierLabel('tier_40'));
         $this->assertEquals('10%', WagerCalculator::getTierLabel('tier_10'));
         $this->assertEquals('25%', WagerCalculator::getTierLabel('tier_25'));
         $this->assertEquals('50%', WagerCalculator::getTierLabel('tier_50'));
         $this->assertEquals('100% (ALL-IN)', WagerCalculator::getTierLabel('tier_100'));
+    }
+
+    public function testStarOfHopeNoStarSafety()
+    {
+        // tier_0 (0%): If incorrect, 0 deduction (score remains untouched, not eliminated)
+        $resWrong = WagerCalculator::calculateWagerResult([
+            'currentScore' => 1000,
+            'tierPercent'  => 0.00,
+            'isCorrect'    => false,
+            'basePoints'   => 1000,
+        ]);
+        $this->assertEquals(0, $resWrong['wagerAmount']);
+        $this->assertEquals(0, $resWrong['delta']);
+        $this->assertEquals(1000, $resWrong['newScore']);
+        $this->assertEquals(false, $resWrong['eliminated']);
+
+        // tier_0 (0%): If correct, earns basePoints
+        $resRight = WagerCalculator::calculateWagerResult([
+            'currentScore' => 1000,
+            'tierPercent'  => 0.00,
+            'isCorrect'    => true,
+            'basePoints'   => 800,
+        ]);
+        $this->assertEquals(0, $resRight['wagerAmount']);
+        $this->assertEquals(800, $resRight['delta']);
+        $this->assertEquals(1800, $resRight['newScore']);
+
+        // tier_15 (15%): If correct = question points + 15% (1000 + 150 = 1150)
+        $resStar15Right = WagerCalculator::calculateWagerResult([
+            'currentScore' => 1000,
+            'tierPercent'  => 0.15,
+            'isCorrect'    => true,
+            'basePoints'   => 1000,
+        ]);
+        $this->assertEquals(1150, $resStar15Right['delta']);
+        $this->assertEquals(2150, $resStar15Right['newScore']);
+
+        // tier_15 (15%): If wrong = -15% of question points (-150)
+        $resStar15Wrong = WagerCalculator::calculateWagerResult([
+            'currentScore' => 1000,
+            'tierPercent'  => 0.15,
+            'isCorrect'    => false,
+            'basePoints'   => 1000,
+        ]);
+        $this->assertEquals(-150, $resStar15Wrong['delta']);
+        $this->assertEquals(850, $resStar15Wrong['newScore']);
+
+        // tier_30 (30%): If correct = 1000 + 300 = 1300
+        $resStar30Right = WagerCalculator::calculateWagerResult([
+            'currentScore' => 500,
+            'tierPercent'  => 0.30,
+            'isCorrect'    => true,
+            'basePoints'   => 1000,
+        ]);
+        $this->assertEquals(1300, $resStar30Right['delta']);
+        $this->assertEquals(1800, $resStar30Right['newScore']);
+
+        // tier_40 (40%): If wrong = -400
+        $resStar40Wrong = WagerCalculator::calculateWagerResult([
+            'currentScore' => 500,
+            'tierPercent'  => 0.40,
+            'isCorrect'    => false,
+            'basePoints'   => 1000,
+        ]);
+        $this->assertEquals(-400, $resStar40Wrong['delta']);
+        $this->assertEquals(100, $resStar40Wrong['newScore']);
     }
 
     public function testStandardWagerAmountRoundingDownTo10()

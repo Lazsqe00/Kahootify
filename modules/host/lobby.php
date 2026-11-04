@@ -43,6 +43,13 @@ $hasWagerInQuiz = (($room['quiz_mode'] ?? '') === 'wager')
     || (db_count('questions', "id_quiz = :q AND mode = 'wager'", [':q' => $room['id_quiz']]) > 0);
 
 if (isset($_GET['start_game'])) {
+    if (!empty($room['is_team_mode'])) {
+        $activeTeams = db_fetch_one("SELECT COUNT(DISTINCT team_id) as c FROM players WHERE id_room = :r AND team_id IS NOT NULL AND team_id > 0 AND is_kicked = 0", [':r' => $roomId]);
+        if (intval($activeTeams['c'] ?? 0) < 2) {
+            set_flash_message('danger', 'Team Mode requires at least 2 teams with players to start!');
+            redirect('modules/host/lobby.php');
+        }
+    }
     if ($totalQuizQuestions > 0) {
         $allQIds = array_column($questions, 'id_question');
 
@@ -502,7 +509,20 @@ require_once __DIR__ . '/../../includes/header.php';
         <p class="font-weight-bold mt-2 mb-0">Game PIN: <?= htmlspecialchars($room['pin']) ?></p>
     </dialog>
 
-<div class="d-flex justify-content-center align-items-center my-4" style="gap: 20px;">
+<?php
+$isTeamGame = !empty($room['is_team_mode']);
+$distinctTeams = 0;
+if ($isTeamGame) {
+    $tIds = [];
+    foreach ($players as $p) {
+        if (!empty($p['team_id'])) $tIds[$p['team_id']] = true;
+    }
+    $distinctTeams = count($tIds);
+}
+$canStartGame = count($players) > 0 && (!$isTeamGame || $distinctTeams >= 2);
+?>
+<div class="text-center my-4">
+    <div class="d-flex justify-content-center align-items-center" style="gap: 20px;">
         <div class="bg-dark px-4 py-2 rounded-pill shadow">
             <i class="fas fa-users text-success mr-2"></i>
             <span class="font-weight-bold" style="font-size: 1.2rem;">
@@ -510,10 +530,16 @@ require_once __DIR__ . '/../../includes/header.php';
             </span>
         </div>
 
-        <a href="lobby.php?start_game=true&show_questions=<?= $showOnPlayers ? '1' : '0' ?>" id="btnStartGame" class="btn btn-kahoot btn-kahoot-green btn-lg px-5 py-3 shadow" style="<?= count($players) === 0 ? 'pointer-events: none; opacity: 0.6;' : '' ?>">
+        <a href="lobby.php?start_game=true&show_questions=<?= $showOnPlayers ? '1' : '0' ?>" id="btnStartGame" class="btn btn-kahoot btn-kahoot-green btn-lg px-5 py-3 shadow" style="<?= !$canStartGame ? 'pointer-events: none; opacity: 0.6; cursor: not-allowed;' : '' ?>">
             <i class="fas fa-play mr-2"></i> START GAME
         </a>
     </div>
+    <?php if ($isTeamGame): ?>
+        <p id="teamModeNotice" class="small font-weight-bold text-warning mt-2 mb-0" <?= $distinctTeams >= 2 ? 'hidden' : '' ?>>
+            <i class="fas fa-info-circle mr-1"></i> Team Mode requires players in at least 2 teams to start (currently <span id="distinctTeamCount"><?= $distinctTeams ?></span>/2 teams ready).
+        </p>
+    <?php endif; ?>
+</div>
 
     <div class="container mt-4" style="max-width: 900px;">
         <h5 class="font-weight-bold mb-3" style="text-shadow: 1px 1px 3px rgba(0,0,0,0.5);">
@@ -778,9 +804,29 @@ document.addEventListener('roomplayerschange', function (event) {
     const data = event.detail;
     updateRoomLockUI(data.is_locked);
     $('#playerCount').text(data.players.length);
-    $('#btnStartGame').css(data.players.length > 0
-        ? {'pointer-events': 'auto', 'opacity': '1'}
-        : {'pointer-events': 'none', 'opacity': '0.6'});
+
+    const isTeamMode = <?= !empty($room['is_team_mode']) ? 'true' : 'false' ?>;
+    let distinctTeams = 0;
+    if (isTeamMode && data.players) {
+        const tMap = {};
+        data.players.forEach(p => {
+            if (p.team_id) tMap[p.team_id] = true;
+        });
+        distinctTeams = Object.keys(tMap).length;
+    }
+    const canStart = data.players.length > 0 && (!isTeamMode || distinctTeams >= 2);
+    $('#btnStartGame').css(canStart
+        ? {'pointer-events': 'auto', 'opacity': '1', 'cursor': 'pointer'}
+        : {'pointer-events': 'none', 'opacity': '0.6', 'cursor': 'not-allowed'});
+
+    if (isTeamMode) {
+        $('#distinctTeamCount').text(distinctTeams);
+        if (distinctTeams >= 2) {
+            $('#teamModeNotice').attr('hidden', true);
+        } else {
+            $('#teamModeNotice').removeAttr('hidden');
+        }
+    }
 });
 
 function updateRoomLockUI(isLocked) {

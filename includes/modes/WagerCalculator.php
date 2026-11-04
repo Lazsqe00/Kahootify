@@ -7,12 +7,23 @@
  */
 class WagerCalculator
 {
+    // Star of Hope Tiers
+    public const TIER_0   = 'tier_0';
+    public const TIER_15  = 'tier_15';
+    public const TIER_30  = 'tier_30';
+    public const TIER_40  = 'tier_40';
+
+    // Legacy Tiers (backwards compatible)
     public const TIER_10  = 'tier_10';
     public const TIER_25  = 'tier_25';
     public const TIER_50  = 'tier_50';
     public const TIER_100 = 'tier_100';
 
     public const TIERS = [
+        self::TIER_0   => ['percent' => 0.00, 'label' => 'No Star (0%)'],
+        self::TIER_15  => ['percent' => 0.15, 'label' => 'Star of Hope (15%)'],
+        self::TIER_30  => ['percent' => 0.30, 'label' => 'Star of Hope (30%)'],
+        self::TIER_40  => ['percent' => 0.40, 'label' => 'Star of Hope (40%)'],
         self::TIER_10  => ['percent' => 0.10, 'label' => '10%'],
         self::TIER_25  => ['percent' => 0.25, 'label' => '25%'],
         self::TIER_50  => ['percent' => 0.50, 'label' => '50%'],
@@ -29,10 +40,14 @@ class WagerCalculator
         }
         $clean = trim($tierId);
         return match ($clean) {
-            '10%', '0.1', '0.10'         => 0.10,
-            '25%', '0.25'                => 0.25,
-            '50%', '0.5', '0.50'         => 0.50,
-            '100%', 'ALL-IN', '1.0', '1' => 1.00,
+            'tier_0', '0%', '0', '0.0'   => 0.00,
+            'tier_15', '15%', '0.15'     => 0.15,
+            'tier_30', '30%', '0.30'     => 0.30,
+            'tier_40', '40%', '0.40'     => 0.40,
+            'tier_10', '10%', '0.1', '0.10' => 0.10,
+            'tier_25', '25%', '0.25'     => 0.25,
+            'tier_50', '50%', '0.5', '0.50' => 0.50,
+            'tier_100', '100%', 'ALL-IN', '1.0', '1' => 1.00,
             default                      => null,
         };
     }
@@ -44,6 +59,10 @@ class WagerCalculator
     {
         $clean = trim($tierId);
         return match ($clean) {
+            'tier_0', '0%', '0'                      => 'No Star',
+            'tier_15', '15%', '0.15'                 => 'Star 15%',
+            'tier_30', '30%', '0.30'                 => 'Star 30%',
+            'tier_40', '40%', '0.40'                 => 'Star 40%',
             'tier_10', '10%', '0.1', '0.10'          => '10%',
             'tier_25', '25%', '0.25'                 => '25%',
             'tier_50', '50%', '0.5', '0.50'          => '50%',
@@ -63,6 +82,10 @@ class WagerCalculator
      */
     public static function calculateWagerAmount(int $currentScore, float $tierPercent, array $config = []): int
     {
+        if ($tierPercent <= 0.0) {
+            return 0;
+        }
+
         $minWagerAmount = intval($config['minWagerAmount'] ?? ($config['min_wager_amount'] ?? 10));
         if ($minWagerAmount < 1) {
             $minWagerAmount = 10;
@@ -117,18 +140,50 @@ class WagerCalculator
         $config = (array)($params['config'] ?? []);
         $speedBonusEnabled = !empty($config['speedBonusEnabled'] ?? ($config['speed_bonus_enabled'] ?? false));
 
-        $wagerAmount = self::calculateWagerAmount($currentScore, $tierPercent, $config);
+        $basePoints = intval($params['basePoints'] ?? ($params['points'] ?? ($config['points'] ?? 1000)));
+        if ($basePoints <= 0) $basePoints = 1000;
 
-        if ($isCorrect) {
-            $effectiveBonus = $speedBonusEnabled ? max(0, $speedBonus) : 0;
-            $delta = $wagerAmount + $effectiveBonus;
-            $newScore = $currentScore + $delta;
+        if ($tierPercent <= 0.0) {
+            // No Star: correct = +basePoints, wrong = 0 deduction (keep score)
+            $wagerAmount = 0;
+            if ($isCorrect) {
+                $effectiveBonus = $speedBonusEnabled ? max(0, $speedBonus) : 0;
+                $delta = $basePoints + $effectiveBonus;
+                $newScore = $currentScore + $delta;
+            } else {
+                $delta = 0;
+                $newScore = $currentScore;
+            }
+            $eliminated = false;
+        } elseif (in_array(round($tierPercent, 2), [0.15, 0.30, 0.40], true)) {
+            // Star of Hope: percentage is of the question's base points!
+            $starAmount = (int)round($basePoints * $tierPercent);
+            $wagerAmount = $starAmount;
+            if ($isCorrect) {
+                $effectiveBonus = $speedBonusEnabled ? max(0, $speedBonus) : 0;
+                $delta = $basePoints + $starAmount + $effectiveBonus;
+                $newScore = $currentScore + $delta;
+                $eliminated = false;
+            } else {
+                $delta = -$starAmount;
+                $newScore = max(0, $currentScore - $starAmount);
+                $eliminated = ($newScore <= 0);
+            }
         } else {
-            $delta = -$wagerAmount;
-            $newScore = max(0, $currentScore - $wagerAmount);
-        }
+            // Legacy wager calculations (10%, 25%, 50%, 100%) based on currentScore
+            $wagerAmount = self::calculateWagerAmount($currentScore, $tierPercent, $config);
 
-        $eliminated = ($newScore <= 0);
+            if ($isCorrect) {
+                $effectiveBonus = $speedBonusEnabled ? max(0, $speedBonus) : 0;
+                $delta = $wagerAmount + $effectiveBonus;
+                $newScore = $currentScore + $delta;
+            } else {
+                $delta = -$wagerAmount;
+                $newScore = max(0, $currentScore - $wagerAmount);
+            }
+
+            $eliminated = ($newScore <= 0);
+        }
 
         return [
             'wagerAmount' => $wagerAmount,

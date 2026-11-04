@@ -48,6 +48,13 @@ if ($currentIdx !== false && isset($selectedQIds[$currentIdx + 1])) {
 $questionNumber = ($currentIdx !== false) ? ($currentIdx + 1) : 1;
 
 if (!$isFinal && $currentQId > 0) {
+    if (str_starts_with($room['status'], 'res_') || isset($_GET['show_scoreboard'])) {
+        db_execute("UPDATE room SET status = :s WHERE id_room = :r", [
+            ':s' => 'score_' . $currentQId,
+            ':r' => $roomId,
+        ]);
+        $room['status'] = 'score_' . $currentQId;
+    }
     $sql = "SELECT p.*,
                    COALESCE(l.points_change, l.delta_score, COALESCE(v.points_earned + v.streak_bonus, 0)) as points_gained,
                    COALESCE(a.is_correct, 0) as is_round_correct,
@@ -59,9 +66,41 @@ if (!$isFinal && $currentQId > 0) {
             WHERE p.id_room = :id_room
             ORDER BY p.score DESC, p.playeradd ASC, p.id_player ASC";
     $leaderboard = filter_room_players($roomId, db_fetch_all($sql, [':id_room' => $roomId, ':qid' => $currentQId, ':r' => $roomId, ':qid2' => $currentQId]));
+
+    // Prepare previous vs final scores and ranks for FLIP re-order animation
+    foreach ($leaderboard as &$p) {
+        $p['final_score'] = max(0, intval($p['score']));
+        $gained = intval($p['points_gained'] ?? 0);
+        $p['prev_score'] = max(0, $p['final_score'] - $gained);
+    }
+    unset($p);
+
+    $finalSorted = $leaderboard;
+    usort($finalSorted, function($a, $b) {
+        if ($b['final_score'] !== $a['final_score']) {
+            return $b['final_score'] <=> $a['final_score'];
+        }
+        return ($a['id_player'] ?? 0) <=> ($b['id_player'] ?? 0);
+    });
+    $finalRankMap = [];
+    foreach ($finalSorted as $fIdx => $fP) {
+        $finalRankMap[$fP['id_player']] = $fIdx + 1;
+    }
+
+    // Sort initially by prev_score so rows start in their previous rank positions
+    usort($leaderboard, function($a, $b) {
+        if ($b['prev_score'] !== $a['prev_score']) {
+            return $b['prev_score'] <=> $a['prev_score'];
+        }
+        return ($a['id_player'] ?? 0) <=> ($b['id_player'] ?? 0);
+    });
 } else {
     $leaderboard = get_room_leaderboard($roomId);
     $leaderboard = WagerCalculator::calculateFinalRanking($leaderboard);
+    $finalRankMap = [];
+    foreach ($leaderboard as $idx => $p) {
+        $finalRankMap[$p['id_player']] = $idx + 1;
+    }
 }
 
 if ($isFinal) {
@@ -225,6 +264,12 @@ require_once __DIR__ . '/../../includes/header.php';
     color: #1368ce;
     transition: color 0.3s ease;
 }
+.score-anim-up {
+    color: #28a745 !important;
+}
+.score-anim-down {
+    color: #dc3545 !important;
+}
 .score-unit {
     font-size: 0.95rem;
 }
@@ -250,35 +295,7 @@ require_once __DIR__ . '/../../includes/header.php';
         </p>
     </div>
 
-    <?php if ($isWagerQuestion): ?>
-        <!-- WAGER ROUND SUMMARY BAR (HOST VIEW) -->
-        <div class="row mb-4">
-            <div class="col-md-3 col-6 mb-2">
-                <div class="bg-white rounded p-3 text-center shadow-sm" style="border-radius: 14px;">
-                    <div class="text-danger font-weight-bold" style="font-size: 1.8rem;">🔥 <?= $allInCount ?></div>
-                    <div class="text-muted small font-weight-bold text-uppercase">ALL-IN Wagers</div>
-                </div>
-            </div>
-            <div class="col-md-3 col-6 mb-2">
-                <div class="bg-white rounded p-3 text-center shadow-sm" style="border-radius: 14px;">
-                    <div class="text-success font-weight-bold" style="font-size: 1.8rem;">🏆 <?= $wagerWinnersCount ?></div>
-                    <div class="text-muted small font-weight-bold text-uppercase">Wager Winners</div>
-                </div>
-            </div>
-            <div class="col-md-3 col-6 mb-2">
-                <div class="bg-white rounded p-3 text-center shadow-sm" style="border-radius: 14px;">
-                    <div class="text-dark font-weight-bold" style="font-size: 1.8rem;">💀 <?= $justEliminatedCount ?></div>
-                    <div class="text-muted small font-weight-bold text-uppercase">Just Eliminated</div>
-                </div>
-            </div>
-            <div class="col-md-3 col-6 mb-2">
-                <div class="bg-white rounded p-3 text-center shadow-sm" style="border-radius: 14px;">
-                    <div class="text-primary font-weight-bold" style="font-size: 1.8rem;">🛡️ <?= $activeRemainingCount ?></div>
-                    <div class="text-muted small font-weight-bold text-uppercase">Still Surviving</div>
-                </div>
-            </div>
-        </div>
-    <?php endif; ?>
+
 
     <?php if (!empty($room['is_team_mode'])): 
         $liveTeamScores = TeamManager::getTeamLeaderboard($roomId);
@@ -316,7 +333,7 @@ require_once __DIR__ . '/../../includes/header.php';
             <div class="leaderboard-list">
                 <?php foreach ($leaderboard as $idx => $p):
                     $rank = $idx + 1;
-                    $currScore = intval($p['score']);
+                    $currScore = max(0, intval($p['score']));
                     $gained = intval($p['points_gained'] ?? 0);
                     $prevScore = max(0, $currScore - $gained);
                     $streak = intval($p['current_streak'] ?? 0);
@@ -338,6 +355,9 @@ require_once __DIR__ . '/../../includes/header.php';
                     }
                 ?>
                     <div class="leaderboard-row d-flex justify-content-between align-items-center py-2 px-3 mb-2"
+                         data-player-id="<?= $p['id_player'] ?>"
+                         data-start-rank="<?= $rank ?>"
+                         data-final-rank="<?= $finalRankMap[$p['id_player']] ?? $rank ?>"
                          style="--row-delay: <?= $idx * 0.08 ?>s;">
                         <div class="d-flex align-items-center flex-grow-1 mr-2" style="min-width: 0;">
                             <!-- Rank Badge -->
@@ -389,7 +409,7 @@ require_once __DIR__ . '/../../includes/header.php';
                                         +<?= number_format($gained) ?>
                                     </span>
                                 <?php elseif ($gained < 0): ?>
-                                    <span class="badge badge-danger font-weight-bold gained-badge revealed shadow-sm"
+                                    <span class="badge badge-danger font-weight-bold gained-badge shadow-sm"
                                           data-gained="<?= $gained ?>">
                                         <?= number_format($gained) ?>
                                     </span>
@@ -404,7 +424,7 @@ require_once __DIR__ . '/../../includes/header.php';
                                       data-start="<?= $prevScore ?>"
                                       data-target="<?= $currScore ?>"
                                       data-gained="<?= $gained ?>">
-                                    <?= number_format($currScore) ?>
+                                    <?= number_format($prevScore) ?>
                                 </span>
                                 <span class="score-unit text-muted font-weight-bold ml-1">pts</span>
                             </div>
@@ -475,7 +495,7 @@ $(document).ready(function() {
             const gainedVal = parseInt($(el).attr('data-gained')) || 0;
 
             if (gainedVal > 0 && targetVal > startVal) {
-                $(el).addClass('text-success').removeClass('text-primary');
+                $(el).addClass('text-success score-anim-up').removeClass('text-primary text-danger');
                 let startTime = null;
                 const duration = 1200;
 
@@ -493,8 +513,105 @@ $(document).ready(function() {
                     }
                 }
                 window.requestAnimationFrame(step);
+            } else if (gainedVal < 0 && targetVal < startVal) {
+                $(el).addClass('text-danger score-anim-down').removeClass('text-primary text-success');
+                let startTime = null;
+                const duration = 1200;
+
+                function step(timestamp) {
+                    if (!startTime) startTime = timestamp;
+                    const progress = Math.min((timestamp - startTime) / duration, 1);
+                    const ease = 1 - Math.pow(1 - progress, 3);
+                    const currentVal = Math.round(startVal - (startVal - targetVal) * ease);
+                    el.textContent = Math.max(0, currentVal).toLocaleString('en-US');
+
+                    if (progress < 1) {
+                        window.requestAnimationFrame(step);
+                    } else {
+                        el.textContent = Math.max(0, targetVal).toLocaleString('en-US');
+                    }
+                }
+                window.requestAnimationFrame(step);
             }
         });
+
+        // FLIP Animation: Re-order rows smoothly if any ranks changed
+        setTimeout(function() {
+            const container = document.querySelector('.leaderboard-list');
+            if (!container) return;
+            const rows = Array.from(container.querySelectorAll('.leaderboard-row'));
+            if (rows.length <= 1) return;
+
+            let hasChange = false;
+            rows.forEach(function(r) {
+                if (r.dataset.startRank !== r.dataset.finalRank) hasChange = true;
+            });
+            if (!hasChange) return;
+
+            // 1. Record initial tops
+            const firstTops = new Map();
+            rows.forEach(function(r) {
+                firstTops.set(r, r.getBoundingClientRect().top);
+            });
+
+            // 2. Sort rows by final rank and re-append to DOM
+            rows.sort(function(a, b) {
+                const rA = parseInt(a.dataset.finalRank, 10) || 0;
+                const rB = parseInt(b.dataset.finalRank, 10) || 0;
+                return rA - rB;
+            });
+            rows.forEach(function(r) {
+                container.appendChild(r);
+            });
+
+            // 3. Invert (apply deltaY immediately with no transition)
+            rows.forEach(function(r) {
+                const newTop = r.getBoundingClientRect().top;
+                const oldTop = firstTops.get(r);
+                const deltaY = oldTop - newTop;
+                if (deltaY !== 0) {
+                    r.style.transform = 'translateY(' + deltaY + 'px)';
+                    r.style.transition = 'none';
+                    r.style.zIndex = '5';
+                }
+            });
+
+            // 4. Play (glide smoothly to target position)
+            window.requestAnimationFrame(function() {
+                window.requestAnimationFrame(function() {
+                    rows.forEach(function(r) {
+                        r.style.transition = 'transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1)';
+                        r.style.transform = '';
+                    });
+                });
+            });
+
+            // 5. Update rank badges to final rank
+            function getRankBadgeClass(rank) {
+                if (rank === 1) return 'rank-badge-gold';
+                if (rank === 2) return 'rank-badge-silver';
+                if (rank === 3) return 'rank-badge-bronze';
+                return 'rank-badge-default';
+            }
+            function getRankIcon(rank) {
+                if (rank === 1) return '<i class="fas fa-crown mr-1"></i>';
+                if (rank === 2) return '<i class="fas fa-medal mr-1"></i>';
+                if (rank === 3) return '<i class="fas fa-award mr-1"></i>';
+                return '';
+            }
+
+            setTimeout(function() {
+                rows.forEach(function(r) {
+                    r.style.zIndex = '';
+                    const finalRank = parseInt(r.dataset.finalRank, 10) || 1;
+                    const badgeEl = r.querySelector('.rank-badge');
+                    if (badgeEl) {
+                        badgeEl.className = 'rank-badge mr-3 flex-shrink-0 ' + getRankBadgeClass(finalRank);
+                        badgeEl.innerHTML = getRankIcon(finalRank) + finalRank;
+                    }
+                });
+            }, 800);
+        }, 1100);
     }, 500);
 });
 </script>

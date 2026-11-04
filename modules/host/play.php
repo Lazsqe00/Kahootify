@@ -112,15 +112,128 @@ if (isset($_GET['action']) && $_GET['action'] === 'next_question') {
 }
 
 // When show_result is triggered (either all answered or time is up),
-// immediately update status to res_<qid> via GameStateManager and go straight to leaderboard
+// update status to res_<qid> via GameStateManager and stay in play.php to show results!
 if (isset($_GET['action']) && $_GET['action'] === 'show_result') {
     GameStateManager::finalizeQuestionPhase($roomId, $qId);
-    redirect('modules/host/leaderboard.php?qid=' . $qId);
+    redirect('modules/host/play.php');
 }
 
-// If room is in result phase (and no action requested), directly show leaderboard
+// If room is in result phase: render question results on host screen!
 if ($phase === 'result') {
-    redirect('modules/host/leaderboard.php?qid=' . $qId);
+    $currentQuestion = db_fetch_one("SELECT * FROM questions WHERE id_question = :qid", [':qid' => $qId]);
+    $answers = db_fetch_all("SELECT * FROM answers WHERE id_question = :qid ORDER BY id_answer ASC", [':qid' => $qId]);
+    $currentIdx = array_search((int)$qId, $selectedQIds, true);
+    $questionNumber = ($currentIdx !== false) ? ($currentIdx + 1) : 1;
+
+    $voteCountsRaw = db_fetch_all(
+        "SELECT v.id_answer, COUNT(*) as vote_count 
+         FROM votes v 
+         JOIN players p ON v.id_player = p.id_player 
+         WHERE p.id_room = :r 
+           AND v.id_answer IN (SELECT id_answer FROM answers WHERE id_question = :qid)
+         GROUP BY v.id_answer",
+        [':r' => $roomId, ':qid' => $qId]
+    );
+    $voteCounts = [];
+    $totalVotes = 0;
+    foreach ($voteCountsRaw as $vc) {
+        $voteCounts[$vc['id_answer']] = intval($vc['vote_count']);
+        $totalVotes += intval($vc['vote_count']);
+    }
+
+    $colors = ['#e21b3c', '#1368ce', '#ffa602', '#26890c'];
+    $icons  = ['🔺', '🔷', '🟡', '🟩'];
+
+    $pageTitle = "Question " . $questionNumber . " Results - Kahoot! Host";
+    $bodyClass = "backgroundColorChanges";
+    require_once __DIR__ . '/../../includes/header.php';
+    ?>
+    <nav class="navbar navbar-dark bg-dark px-4 py-3 d-flex justify-content-between align-items-center shadow-sm" style="min-height: 64px;">
+        <div class="d-flex align-items-center">
+            <img src="<?= BASE_URL ?>assets/img/logo.png" alt="Logo" style="max-height: 34px; filter: brightness(100);" class="mr-3">
+            <span class="badge badge-light font-weight-bold font-monospace px-3 py-2 mr-3" style="font-size: 0.95rem; border-radius: 8px; letter-spacing: 0.5px;">PIN: <?= htmlspecialchars($room['pin']) ?></span>
+            <span class="text-white font-weight-bold" style="font-size: 1.05rem;">Question <?= $questionNumber ?> / <?= $totalQuestions ?> &bull; Results</span>
+        </div>
+        <div class="d-flex align-items-center">
+            <?php if (($room['game_type'] ?? 'classic') === 'obstacle'): ?>
+                <a href="play.php?action=return_to_board" class="btn btn-kahoot btn-kahoot-secondary btn-kahoot-sm mr-2">
+                    <i class="fas fa-th mr-1"></i> Return to Board
+                </a>
+            <?php endif; ?>
+        </div>
+    </nav>
+
+    <div class="container my-4" style="max-width: 1050px;">
+        <div class="card border-0 shadow-sm p-4 mb-4 text-center" style="border-radius: 18px; background: #ffffff;">
+            <span class="badge badge-primary px-3 py-1 font-weight-bold mb-2 text-uppercase" style="font-size: 0.85rem; letter-spacing: 0.5px; border-radius: 6px; width: fit-content; margin: 0 auto;">
+                Question <?= $questionNumber ?> of <?= $totalQuestions ?>
+            </span>
+            <h2 class="font-weight-bold text-dark mb-0" style="font-size: 1.85rem; line-height: 1.35;">
+                <?= htmlspecialchars($currentQuestion['text']) ?>
+            </h2>
+
+            <?php if (!empty($currentQuestion['image'])): 
+                $imgUrl = '';
+                if (preg_match('#^https?://#i', $currentQuestion['image'])) {
+                    $imgUrl = $currentQuestion['image'];
+                } else {
+                    $fn = basename($currentQuestion['image']);
+                    $dp = dirname(__DIR__, 2) . '/assets/img/questions/' . $fn;
+                    if (file_exists($dp)) {
+                        $imgUrl = BASE_URL . 'assets/img/questions/' . rawurlencode($fn);
+                    }
+                }
+            ?>
+                <?php if ($imgUrl): ?>
+                    <div class="my-3 text-center">
+                        <img src="<?= htmlspecialchars($imgUrl) ?>" alt="Question Media" class="rounded shadow-sm" style="max-height: 240px; max-width: 100%; object-fit: contain;">
+                    </div>
+                <?php endif; ?>
+            <?php endif; ?>
+        </div>
+
+        <div class="row">
+            <?php foreach ($answers as $idx => $a):
+                $cIdx = $idx % 4;
+                $isAnsCorrect = ($a['is_correct'] == 1);
+                $cnt = $voteCounts[$a['id_answer']] ?? 0;
+            ?>
+                <div class="col-md-6 mb-3">
+                    <div class="answer-box shadow-sm d-flex justify-content-between align-items-center position-relative"
+                         style="background-color: <?= $colors[$cIdx] ?>; border-radius: 12px; padding: 18px 22px; <?= $isAnsCorrect ? 'opacity: 1;' : 'opacity: 0.65;' ?>">
+                        
+                        <div class="d-flex align-items-center flex-grow-1 mr-3 text-truncate">
+                            <span class="symbol mr-3" style="font-size: 1.8rem;"><?= $icons[$cIdx] ?></span>
+                            <span class="font-weight-bold text-white text-truncate" style="font-size: 1.3rem;">
+                                <?= htmlspecialchars($a['text']) ?>
+                            </span>
+                        </div>
+
+                        <div class="d-flex align-items-center" style="gap: 8px;">
+                            <?php if ($isAnsCorrect): ?>
+                                <span class="badge badge-success px-3 py-2 text-white font-weight-bold shadow-sm" style="font-size: 1rem; border-radius: 8px;">
+                                    <i class="fas fa-check mr-1"></i> Correct
+                                </span>
+                            <?php endif; ?>
+                            <span class="badge badge-light text-dark font-weight-bold px-3 py-2 shadow-sm" style="font-size: 1rem; border-radius: 8px;" title="<?= $cnt ?> player(s) selected this answer">
+                                <i class="fas fa-user mr-1 text-muted"></i> <?= $cnt ?>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        </div>
+
+        <div class="text-center mt-4">
+            <a href="leaderboard.php?qid=<?= $qId ?>&show_scoreboard=1" class="btn btn-kahoot btn-kahoot-blue btn-lg px-5 py-3 font-weight-bold shadow" style="font-size: 1.25rem;">
+                <i class="fas fa-trophy mr-2"></i> Show Scoreboard &raquo;
+            </a>
+        </div>
+    </div>
+    </body>
+    </html>
+    <?php
+    exit;
 }
 
 $currentQuestion = db_fetch_one("SELECT * FROM questions WHERE id_question = :qid", [':qid' => $qId]);
@@ -134,8 +247,7 @@ $questionNumber = ($currentIdx !== false) ? ($currentIdx + 1) : 1;
 // WAGER PHASE HOST VIEW
 // =========================================================================
 if ($phase === 'wager') {
-    $wagerTimeLimit = intval($modeConfig['wager_time_sec'] ?? 10);
-    if ($wagerTimeLimit <= 0) $wagerTimeLimit = 10;
+    $wagerTimeLimit = max(25, intval($modeConfig['wager_time_sec'] ?? ($modeConfig['wagerTimeSec'] ?? 25)));
 
     $startTime = !empty($room['question_start_time']) ? intval($room['question_start_time']) : time();
     $elapsed = time() - $startTime;
@@ -171,10 +283,10 @@ if ($phase === 'wager') {
         </details>
 
         <div class="question-card-banner text-center py-4 shadow-sm" style="background: rgba(255, 255, 255, 0.96); border-radius: 20px;">
-            <div style="font-size: 3.8rem; line-height: 1;" class="mb-2">🎲</div>
-            <h2 class="font-weight-bold text-dark mb-1">WAGER MODE</h2>
+            <div style="font-size: 3.8rem; line-height: 1;" class="mb-2">⭐</div>
+            <h2 class="font-weight-bold text-dark mb-1">STAR OF HOPE</h2>
             <p class="text-muted font-weight-bold mb-0" style="font-size: 1.15rem;">
-                Players are secretly placing their wagers (10%, 25%, 50%, ALL-IN). Each player's wager is kept private.
+                Players are choosing their Star of Hope
             </p>
         </div>
 
@@ -187,11 +299,11 @@ if ($phase === 'wager') {
 
             <div class="text-center">
                 <div class="bg-white rounded-pill px-5 py-3 shadow font-weight-bold text-dark" style="font-size: 1.35rem;">
-                    <i class="fas fa-coins text-warning mr-2"></i>
-                    Wagers placed: <span id="wagerCount" class="text-primary font-weight-bold"><?= $wageredCount ?></span> / <span id="activeCount"><?= $activeCount ?></span>
+                    <i class="fas fa-star text-warning mr-2"></i>
+                    Stars chosen: <span id="wagerCount" class="text-primary font-weight-bold"><?= $wageredCount ?></span> / <span id="activeCount"><?= $activeCount ?></span>
                 </div>
                 <div class="text-white mt-2 small font-weight-bold" style="text-shadow: 1px 1px 2px rgba(0,0,0,0.4);">
-                    The game will automatically advance to the question when all players have wagered or time expires.
+                    The game will automatically advance to the question when all players have chosen or time expires.
                 </div>
             </div>
         </div>

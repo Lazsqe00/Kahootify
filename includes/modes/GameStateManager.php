@@ -63,7 +63,12 @@ class GameStateManager
         if (preg_match('/^([a-z0-9_-]+)_(\d+)$/i', $status, $matches)) {
             $prefix = $matches[1];
             $qId = intval($matches[2]);
-            $phase = ($prefix === 'res') ? 'result' : $prefix;
+            $phase = match ($prefix) {
+                'res'           => 'result',
+                'score', 'lead' => 'leaderboard',
+                'wager', 'hope' => 'wager',
+                default         => $prefix,
+            };
             return [
                 'phase' => $phase,
                 'qid' => $qId,
@@ -130,7 +135,7 @@ class GameStateManager
         $qConfig = !empty($question['mode_config']) ? json_decode($question['mode_config'], true) : [];
         if (!is_array($qConfig)) $qConfig = [];
 
-        $wagerTimeSec = intval($qConfig['wagerTimeSec'] ?? 10);
+        $wagerTimeSec = max(25, intval($qConfig['wagerTimeSec'] ?? ($qConfig['wager_time_sec'] ?? 25)));
         $startTime = intval($room['question_start_time'] ?? time());
         $elapsed = time() - $startTime;
 
@@ -139,7 +144,13 @@ class GameStateManager
         }
 
         $currentScore = max(0, intval($player['score'] ?? 0));
-        $wagerAmount = WagerCalculator::calculateWagerAmount($currentScore, $tierPercent, $qConfig);
+        if (in_array(round($tierPercent, 2), [0.0, 0.15, 0.30, 0.40], true)) {
+            $qPoints = intval($question['points'] ?? 1000);
+            if ($qPoints <= 0) $qPoints = 1000;
+            $wagerAmount = (int)round($qPoints * $tierPercent);
+        } else {
+            $wagerAmount = WagerCalculator::calculateWagerAmount($currentScore, $tierPercent, $qConfig);
+        }
 
         // Save wager to player_question_logs (idempotent upsert)
         $existingLog = db_fetch_one(
@@ -201,7 +212,7 @@ class GameStateManager
         $qConfig = (!empty($question['mode_config'])) ? json_decode($question['mode_config'], true) : [];
         if (!is_array($qConfig)) $qConfig = [];
 
-        $wagerTimeSec = intval($qConfig['wagerTimeSec'] ?? 10);
+        $wagerTimeSec = max(25, intval($qConfig['wagerTimeSec'] ?? ($qConfig['wager_time_sec'] ?? 25)));
         $startTime = intval($room['question_start_time'] ?? time());
         $elapsed = max(0, time() - $startTime);
         $remaining = max(0, $wagerTimeSec - $elapsed);
@@ -302,11 +313,8 @@ class GameStateManager
                 );
             }
 
-            if ($hasWagered && !$isEliminated) {
-                $participants[] = $pId;
-            } else {
+            if ($isEliminated) {
                 $sittingOut[] = $pId;
-                // Record sitting out in log
                 $existingLog = db_fetch_one(
                     "SELECT id_log FROM player_question_logs WHERE id_room = :r AND id_question = :q AND id_player = :p",
                     [':r' => $roomId, ':q' => $questionId, ':p' => $pId]
@@ -320,16 +328,42 @@ class GameStateManager
                     db_insert(
                         "INSERT INTO player_question_logs 
                          (id_room, id_question, id_player, mode, wager_amount, delta_score, points_change, final_score, is_correct, player_status, is_sitting_out) 
-                         VALUES (:r, :q, :p, 'wager', 0, 0, 0, :fs, 0, :st, 1)",
+                         VALUES (:r, :q, :p, 'wager', 0, 0, 0, :fs, 0, 'ELIMINATED', 1)",
                         [
                             ':r'  => $roomId,
                             ':q'  => $questionId,
                             ':p'  => $pId,
                             ':fs' => intval($p['score']),
-                            ':st' => $isEliminated ? 'ELIMINATED' : 'ACTIVE',
                         ]
                     );
                 }
+            } else {
+                // If player did not choose a star of hope, default to tier_0 (No Star)
+                if (!$hasWagered) {
+                    $existingLog = db_fetch_one(
+                        "SELECT id_log FROM player_question_logs WHERE id_room = :r AND id_question = :q AND id_player = :p",
+                        [':r' => $roomId, ':q' => $questionId, ':p' => $pId]
+                    );
+                    if ($existingLog) {
+                        db_execute(
+                            "UPDATE player_question_logs SET wager_tier = 'tier_0', wager_amount = 0, is_sitting_out = 0 WHERE id_log = :id",
+                            [':id' => $existingLog['id_log']]
+                        );
+                    } else {
+                        db_insert(
+                            "INSERT INTO player_question_logs 
+                             (id_room, id_question, id_player, mode, wager_tier, wager_amount, delta_score, points_change, final_score, is_correct, player_status, is_sitting_out) 
+                             VALUES (:r, :q, :p, 'wager', 'tier_0', 0, 0, 0, :fs, 0, 'ACTIVE', 0)",
+                            [
+                                ':r'  => $roomId,
+                                ':q'  => $questionId,
+                                ':p'  => $pId,
+                                ':fs' => intval($p['score']),
+                            ]
+                        );
+                    }
+                }
+                $participants[] = $pId;
             }
         }
 
@@ -400,6 +434,7 @@ class GameStateManager
                     'tierPercent'  => $tierPercent,
                     'isCorrect'    => false, // Unanswered = incorrect
                     'config'       => $qConfig,
+                    'basePoints'   => intval($question['points'] ?? 1000),
                 ]);
 
                 $newScore = $res['newScore'];

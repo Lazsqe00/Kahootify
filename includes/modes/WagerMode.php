@@ -18,17 +18,17 @@ class WagerMode extends BaseQuestionMode
 
     public function getLabel(): string
     {
-        return 'Wager Mode';
+        return 'Star of Hope';
     }
 
     public function getDescription(): string
     {
-        return 'Wager your points before viewing the question. Lose wager to lose points, reach zero to be eliminated!';
+        return 'Choose a Star of Hope (15%, 30%, 40%) for high risk and high reward, or play safe with no Star!';
     }
 
     public function getIcon(): string
     {
-        return '🎲';
+        return '⭐';
     }
 
     public function getSupportedQuestionTypes(): array
@@ -40,15 +40,15 @@ class WagerMode extends BaseQuestionMode
     public function getDefaultConfig(): array
     {
         return [
-            'wagerTimeSec'      => 10,
+            'wagerTimeSec'      => 25,
             'wagerTiers'        => [
-                ['id' => 'tier_10',  'percent' => 0.10, 'label' => '10%'],
-                ['id' => 'tier_25',  'percent' => 0.25, 'label' => '25%'],
-                ['id' => 'tier_50',  'percent' => 0.50, 'label' => '50%'],
-                ['id' => 'tier_100', 'percent' => 1.00, 'label' => 'ALL-IN'],
+                ['id' => 'tier_0',   'percent' => 0.00, 'label' => 'No Star (0%)'],
+                ['id' => 'tier_15',  'percent' => 0.15, 'label' => 'Star 15%'],
+                ['id' => 'tier_30',  'percent' => 0.30, 'label' => 'Star 30%'],
+                ['id' => 'tier_40',  'percent' => 0.40, 'label' => 'Star 40%'],
             ],
             'minWagerAmount'    => 10,
-                    ];
+        ];
     }
 
     public function validateConfig(array $config): array
@@ -105,7 +105,7 @@ class WagerMode extends BaseQuestionMode
 
     public function afterScoring(array $player, array $scoreResult, array $room, array $question): array
     {
-        $isEliminated = !empty($scoreResult['eliminated']) || ($scoreResult['newScore'] ?? $scoreResult['new_score'] ?? 0) <= 0;
+        $isEliminated = !empty($scoreResult['eliminated']);
         $status = $isEliminated ? 'ELIMINATED' : 'ACTIVE';
         $eliminatedAt = $isEliminated ? intval($question['id_question'] ?? 0) : ($player['eliminated_at_question'] ?? null);
 
@@ -115,8 +115,10 @@ class WagerMode extends BaseQuestionMode
             $eliminationOrder = $orderCount;
         }
 
+        $newScore = max(0, intval($scoreResult['newScore'] ?? ($scoreResult['new_score'] ?? 0)));
+
         return [
-            'new_score'              => intval($scoreResult['newScore'] ?? ($scoreResult['new_score'] ?? 0)),
+            'new_score'              => $newScore,
             'status'                 => $status,
             'eliminated_at_question' => $eliminatedAt,
             'elimination_order'      => $eliminationOrder,
