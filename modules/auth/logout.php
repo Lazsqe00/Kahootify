@@ -8,6 +8,6 @@ unset($_SESSION['username']);
 unset($_SESSION['email']);
 unset($_SESSION['role']);
 unset($_SESSION['avatar']);
+unset($_SESSION['flash_message']);
 
-set_flash_message('success', 'You have been safely logged out!');
 redirect('index.php');
