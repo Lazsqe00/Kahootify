@@ -429,6 +429,15 @@ require_once __DIR__ . '/../../includes/header.php';
 .kahoot-toggle-switch:hover .kahoot-toggle-slider {
     filter: brightness(0.97);
 }
+
+#gameSettingsModal .close,
+#gameSettingsModal .close:focus,
+#gameSettingsModal .close:active,
+#gameSettingsModal .close:hover {
+    outline: none !important;
+    box-shadow: none !important;
+    border: none !important;
+}
 </style>
 
 <div class="container-fluid text-center text-white py-4">
@@ -521,7 +530,7 @@ require_once __DIR__ . '/../../includes/header.php';
                 <h5 class="modal-title font-weight-bold" id="settingsModalTitle">
                     <i class="fas fa-sliders-h mr-2"></i>Game Room Settings
                 </h5>
-                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close" style="outline: none !important; box-shadow: none !important; border: none !important; opacity: 0.9;">
                     <span aria-hidden="true">&times;</span>
                 </button>
             </div>
@@ -531,9 +540,7 @@ require_once __DIR__ . '/../../includes/header.php';
                         <h6 class="font-weight-bold mb-0" style="font-family: 'Montserrat', sans-serif; font-weight: 800; color: #111111;">
                             <i class="fas fa-random text-primary mr-2"></i>Questions Per Game
                         </h6>
-                        <span id="modalModeStatusBadge" class="badge badge-primary font-weight-bold px-2 py-1" style="font-size: 0.85rem;">
-                            All (<?= $totalQuizQuestions ?> questions)
-                        </span>
+
                     </div>
                     <p class="text-muted small mb-3">
                         Total questions available: <b><?= $totalQuizQuestions ?> questions</b>. You can play all questions or randomly select N questions for this round.
@@ -542,7 +549,7 @@ require_once __DIR__ . '/../../includes/header.php';
                     <div class="custom-control custom-radio mb-2">
                         <input type="radio" id="modalModeAll" name="modal_question_mode" class="custom-control-input" value="all" checked onchange="syncQuestionSettings('modal')">
                         <label class="custom-control-label font-weight-bold text-dark" for="modalModeAll" style="cursor: pointer;">
-                            Play all questions (<span class="text-primary font-weight-bold"><?= $totalQuizQuestions ?> questions</span>)
+                            Play all questions
                         </label>
                     </div>
 
@@ -600,7 +607,7 @@ require_once __DIR__ . '/../../includes/header.php';
                 <?php endif; ?>
             </div>
             <div class="modal-footer bg-light py-2">
-                <button type="button" class="btn btn-primary font-weight-bold rounded-pill px-4" data-dismiss="modal">Done</button>
+                <button type="button" class="btn text-white font-weight-bold rounded-pill px-4 shadow-sm" data-dismiss="modal" style="background-color: #46178f; border-color: #46178f;">Done</button>
             </div>
         </div>
     </div>
