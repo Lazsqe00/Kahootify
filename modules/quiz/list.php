@@ -384,86 +384,79 @@ window.addEventListener('load', function() {
 </script>
 
 
-<!-- REVIEW MODE VIEW MODALS -->
+<!-- REVIEW MODE VIEW MODALS (KAHOOT LOBBY STYLE) -->
 <?php foreach ($quizzes as $q): ?>
     <?php if (!empty($q['is_review_mode'])): 
         $rPin = $q['review_pin'] ?? '';
         $rUrl = ReviewManager::buildReviewUrl($rPin);
+        $joinPageUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://" . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_URL . 'modules/player/join.php';
+        $displayJoinUrl = preg_replace('#^https?://#', '', $joinPageUrl);
     ?>
     <div class="modal fade" id="reviewModal_<?= $q['id_quiz'] ?>" tabindex="-1" role="dialog" aria-hidden="true">
-        <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
-            <div class="modal-content border-0 shadow-lg" style="border-radius: 20px; overflow: hidden;">
-                <div class="modal-header text-white px-4 py-3" style="background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);">
-                    <div class="d-flex align-items-center">
-                        <span class="badge badge-warning text-dark font-weight-bold mr-2 px-2 py-1" style="border-radius: 6px;">
-                            <i class="fas fa-book-reader mr-1"></i> REVIEW MODE
-                        </span>
-                        <h5 class="modal-title font-weight-bold mb-0 text-truncate text-white" style="max-width: 480px;">
-                            <?= htmlspecialchars($q['name']) ?>
-                        </h5>
+        <div class="modal-dialog modal-lg modal-dialog-centered" role="document" style="max-width: 820px;">
+            <div class="modal-content border-0 bg-transparent">
+                <!-- PURPLE OUTER CONTAINER -->
+                <div class="p-3 p-md-4 position-relative" style="background: #46178f; border-radius: 28px; box-shadow: 0 25px 50px -12px rgba(70, 23, 143, 0.45);">
+                    <button type="button" class="close text-white position-absolute" data-dismiss="modal" aria-label="Close" style="top: 14px; right: 20px; font-size: 32px; opacity: 0.85; z-index: 10; outline: none;">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+
+                    <!-- INNER WHITE CARD -->
+                    <div class="bg-white text-dark py-4 px-3 px-md-4" style="border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.12);">
+                        <div class="row align-items-center m-0">
+                            <!-- LEFT COLUMN: Join at + Game PIN + Copy link -->
+                            <div class="col-md-7 text-center pr-md-4">
+                                <p class="font-weight-bold text-dark mb-1" style="font-size: 1.15rem; letter-spacing: 0.2px;">Join at</p>
+                                <a href="<?= htmlspecialchars($joinPageUrl) ?>" target="_blank" rel="noopener" class="font-weight-bold d-inline-block text-decoration-none mb-3" style="color: #1368ce; font-size: 1.05rem; word-break: break-all;">
+                                    <?= htmlspecialchars($displayJoinUrl) ?>
+                                </a>
+
+                                <p class="text-muted font-weight-bold text-uppercase mt-2 mb-1" style="letter-spacing: 3.5px; font-size: 0.95rem; color: #64748b;">GAME PIN</p>
+                                <div class="lobby-pin-number my-1" style="font-family: 'Montserrat', sans-serif; font-weight: 900; font-size: clamp(3rem, 6vw, 4.4rem); letter-spacing: 4px; color: #1e293b; line-height: 1.1;">
+                                    <?= htmlspecialchars($rPin) ?>
+                                </div>
+
+                                <div class="mt-4">
+                                    <button type="button" class="btn btn-outline-dark font-weight-bold rounded-lg px-4 py-2 shadow-sm" onclick="copyTextToClipboard('<?= htmlspecialchars($rUrl) ?>', this)" style="border-radius: 10px; border-width: 1.5px; font-size: 1.05rem; border-color: #334155; color: #1e293b;">
+                                        <i class="fas fa-link mr-2"></i> Copy join link
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- RIGHT COLUMN: Or scan to join + QR + Click to enlarge -->
+                            <div class="col-md-5 text-center pl-md-4 mt-4 mt-md-0" style="border-left: 2px solid #f1f5f9;">
+                                <p class="font-weight-bold text-dark mb-3" style="font-size: 1.15rem; letter-spacing: 0.2px;">Or scan to join</p>
+                                <div class="d-flex justify-content-center">
+                                    <button type="button" class="border-0 bg-transparent p-0 qr-zoom-trigger" data-toggle="modal" data-target="#qrZoomModal_<?= $q['id_quiz'] ?>" title="Click QR code to enlarge" style="cursor: zoom-in; outline: none;">
+                                        <div id="reviewQrCode_<?= $q['id_quiz'] ?>" class="review-qr-code mx-auto" data-url="<?= htmlspecialchars($rUrl) ?>" style="width: 175px; height: 175px;">
+                                            <div class="spinner-border text-primary" role="status"></div>
+                                        </div>
+                                    </button>
+                                </div>
+                                <p class="small text-muted mt-2 mb-0" style="font-size: 0.85rem; color: #94a3b8;">Click QR code to enlarge</p>
+                            </div>
+                        </div>
                     </div>
-                    <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close" style="opacity: 0.85;">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ENLARGE QR MODAL -->
+    <div class="modal fade" id="qrZoomModal_<?= $q['id_quiz'] ?>" tabindex="-1" role="dialog" aria-hidden="true" style="z-index: 1070;">
+        <div class="modal-dialog modal-dialog-centered" role="document" style="max-width: 460px;">
+            <div class="modal-content border-0 p-4 text-center shadow-lg" style="border-radius: 24px;">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="font-weight-bold text-dark mb-0"><i class="fas fa-qrcode mr-2 text-primary"></i> Quét mã để ôn tập</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close" style="outline: none;">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
-                <div class="modal-body p-4 bg-light">
-                    <div class="row align-items-center bg-white rounded-xl shadow-sm p-3 mx-0" style="border-radius: 16px; border: 1px solid #e2e8f0;">
-                        <!-- LEFT COLUMN: Large QR Code -->
-                        <div class="col-md-5 d-flex flex-column align-items-center justify-content-center p-3 border-right border-light">
-                            <div class="p-3 bg-white rounded-lg shadow-sm border text-center" style="border-radius: 16px;">
-                                <div id="reviewQrCode_<?= $q['id_quiz'] ?>" class="d-flex align-items-center justify-content-center" data-url="<?= htmlspecialchars($rUrl) ?>" style="width: 200px; height: 200px;">
-                                    <div class="spinner-border text-primary" role="status"></div>
-                                </div>
-                            </div>
-                            <span class="small font-weight-bold text-muted mt-2">
-                                <i class="fas fa-qrcode mr-1"></i> Quét mã để vào ôn tập ngay
-                            </span>
-                        </div>
-
-                        <!-- RIGHT COLUMN: PIN & Direct Link -->
-                        <div class="col-md-7 p-3 pl-md-4">
-                            <div class="mb-4">
-                                <label class="text-uppercase small font-weight-bold text-muted mb-1" style="letter-spacing: 0.5px;">
-                                    <i class="fas fa-key text-warning mr-1"></i> Mã PIN Ôn tập
-                                </label>
-                                <div class="d-flex align-items-center">
-                                    <div class="font-weight-bold text-dark px-3 py-2 rounded shadow-sm mr-2" style="font-size: 2.1rem; letter-spacing: 4px; font-family: monospace; background: #f8fafc; border: 2px dashed #cbd5e1;">
-                                        <?= htmlspecialchars($rPin) ?>
-                                    </div>
-                                    <button type="button" class="btn btn-outline-secondary font-weight-bold px-3 py-2 rounded-lg" onclick="copyTextToClipboard('<?= htmlspecialchars($rPin) ?>', this)" title="Sao chép PIN">
-                                        <i class="fas fa-copy mr-1"></i> Copy
-                                    </button>
-                                </div>
-                                <small class="text-muted d-block mt-1">
-                                    Học sinh có thể nhập mã này tại trang chủ <code>join.php</code>
-                                </small>
-                            </div>
-
-                            <div class="mb-3">
-                                <label class="text-uppercase small font-weight-bold text-muted mb-1" style="letter-spacing: 0.5px;">
-                                    <i class="fas fa-link text-primary mr-1"></i> Link ôn tập trực tiếp
-                                </label>
-                                <div class="input-group">
-                                    <input type="text" class="form-control font-weight-bold text-dark bg-white" readonly value="<?= htmlspecialchars($rUrl) ?>">
-                                    <div class="input-group-append">
-                                        <button class="btn btn-primary font-weight-bold px-3" type="button" onclick="copyTextToClipboard('<?= htmlspecialchars($rUrl) ?>', this)">
-                                            <i class="fas fa-copy mr-1"></i> Copy Link
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="pt-2 d-flex align-items-center">
-                                <a href="<?= htmlspecialchars($rUrl) ?>" target="_blank" class="btn btn-success font-weight-bold rounded-pill px-4 shadow-sm mr-2">
-                                    <i class="fas fa-external-link-alt mr-1"></i> Mở bài làm
-                                </a>
-                                <button type="button" class="btn btn-secondary font-weight-bold rounded-pill px-3" data-dismiss="modal">
-                                    Đóng
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+                <div id="reviewQrCodeLarge_<?= $q['id_quiz'] ?>" class="mx-auto my-2" data-url="<?= htmlspecialchars($rUrl) ?>" style="width: 320px; height: 320px;">
+                    <div class="spinner-border text-primary mt-5" role="status"></div>
                 </div>
+                <p class="small text-muted mt-2 mb-3">Mã PIN: <strong class="text-dark font-monospace" style="font-size: 1.1rem;"><?= htmlspecialchars($rPin) ?></strong></p>
+                <button type="button" class="btn btn-secondary font-weight-bold rounded-pill px-4 mx-auto" data-dismiss="modal">Đóng</button>
             </div>
         </div>
     </div>
@@ -525,6 +518,10 @@ window.addEventListener("DOMContentLoaded", function () {
         const qrBox = this.querySelector("[id^='reviewQrCode_']");
         if (qrBox && qrBox.dataset.url) {
             renderQrSvg(qrBox.id, qrBox.dataset.url);
+        }
+        const qrBoxLarge = this.querySelector("[id^='reviewQrCodeLarge_']");
+        if (qrBoxLarge && qrBoxLarge.dataset.url) {
+            renderQrSvg(qrBoxLarge.id, qrBoxLarge.dataset.url);
         }
     });
 });
