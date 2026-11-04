@@ -48,64 +48,69 @@ $flash = get_flash_message();
 
 <style>
 .quiz-card {
-    border-radius: 14px;
-    transition: transform 0.25s ease, box-shadow 0.25s ease;
+    border-radius: 12px;
+    border: 1px solid #e5e7eb;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
     overflow: visible !important;
     background: #fff;
     position: relative;
 }
+.quiz-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08) !important;
+    border-color: #d1d5db;
+}
 .quiz-card .card-body {
     overflow: visible !important;
+    position: relative;
 }
 .quiz-card .dropdown-menu {
     z-index: 1060 !important;
     border-radius: 10px;
-    box-shadow: 0 12px 28px rgba(0,0,0,0.2) !important;
+    box-shadow: 0 12px 28px rgba(0,0,0,0.18) !important;
+    border: 1px solid #e5e7eb;
+    min-width: 190px;
 }
 .col-quiz-item {
     position: relative;
 }
 .col-quiz-item:focus-within,
-.col-quiz-item:has(.dropdown.show) {
+.col-quiz-item.is-dropdown-open {
     z-index: 1050 !important;
 }
 .quiz-card:focus-within,
-.quiz-card:has(.dropdown.show) {
+.quiz-card.is-dropdown-open {
     z-index: 1050 !important;
 }
-.quiz-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 14px 28px rgba(0, 0, 0, 0.12) !important;
-}
 
+/* COVER BANNER */
 .quiz-cover-box {
-    height: 165px;
+    height: 145px;
     position: relative;
     overflow: hidden;
-    border-top-left-radius: 14px;
-    border-top-right-radius: 14px;
+    border-top-left-radius: 11px;
+    border-top-right-radius: 11px;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #1e1136;
+    background: #250954;
 }
 
-/* OBSTACLE PUZZLE CARD HEADER */
-.obstacle-cover-bg {
+.quiz-cover-bg {
     position: absolute;
     top: 0; left: 0; right: 0; bottom: 0;
     background-size: cover;
     background-position: center;
-    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: transform 0.35s ease;
 }
-.quiz-card:hover .obstacle-cover-bg {
-    transform: scale(1.07);
+.quiz-card:hover .quiz-cover-bg {
+    transform: scale(1.05);
 }
 
-.obstacle-cover-overlay {
+.quiz-cover-overlay {
     position: absolute;
     top: 0; left: 0; right: 0; bottom: 0;
-    background: linear-gradient(180deg, rgba(16, 9, 32, 0.45) 0%, rgba(16, 9, 32, 0.76) 55%, rgba(14, 7, 28, 0.94) 100%);
+    background: linear-gradient(180deg, rgba(20, 8, 45, 0.25) 0%, rgba(20, 8, 45, 0.78) 100%);
     z-index: 2;
 }
 
@@ -129,61 +134,150 @@ $flash = get_flash_message();
 .grid-5x5 { grid-template-columns: repeat(5, 1fr); grid-template-rows: repeat(5, 1fr); }
 
 .obstacle-card-cell {
-    border: 1px dashed rgba(255, 255, 255, 0.22);
+    border: 1px dashed rgba(255, 255, 255, 0.2);
     box-sizing: border-box;
     display: flex;
     align-items: flex-start;
     justify-content: flex-start;
-    padding: 6px 10px;
+    padding: 6px 8px;
 }
 .obstacle-card-cell .piece-num-pill {
-    font-size: 0.68rem;
-    font-weight: 800;
-    color: rgba(255, 255, 255, 0.65);
-    background: rgba(0, 0, 0, 0.35);
-    padding: 1px 6px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.7);
+    background: rgba(0, 0, 0, 0.4);
+    padding: 1px 5px;
     border-radius: 4px;
-    font-family: 'Montserrat', sans-serif;
-    letter-spacing: 0.5px;
 }
 
-/* CONTENT ON TOP */
+/* CONTENT INSIDE BANNER: Clean centered Title */
 .quiz-cover-content {
     position: relative;
     z-index: 4;
     text-align: center;
-    padding: 14px 18px;
+    padding: 16px 20px;
     width: 100%;
-}
-.vcnv-card-tag {
-    background: linear-gradient(135deg, #f59f00 0%, #e67700 100%);
-    color: #1a0f30 !important;
-    font-family: 'Montserrat', sans-serif;
-    font-weight: 800;
-    font-size: 0.72rem;
-    letter-spacing: 0.6px;
-    padding: 3px 10px;
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(245, 159, 0, 0.4);
-    display: inline-block;
-    margin-bottom: 6px;
-    text-transform: uppercase;
 }
 .quiz-card-title {
     font-family: 'Montserrat', sans-serif;
-    font-size: 1.15rem;
-    font-weight: 800;
-    color: #fff;
-    margin-bottom: 8px;
-    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
-    line-height: 1.25;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #ffffff;
+    margin: 0;
+    line-height: 1.3;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.75);
 }
 
-/* CLASSIC CARD HEADER */
-.classic-cover-bg {
+/* SLEEK CORNER BADGE: Question Count positioned neatly at bottom-right corner */
+.quiz-qcount-corner {
     position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: linear-gradient(135deg, #46178f 0%, #250954 100%);
+    bottom: 10px;
+    right: 12px;
+    z-index: 5;
+    display: inline-flex;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.65);
+    color: #ffffff;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.76rem;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    backdrop-filter: blur(4px);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    letter-spacing: 0.2px;
+}
+
+/* METADATA BADGES IN CARD BODY */
+.quiz-badge {
+    display: inline-flex;
+    align-items: center;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 6px;
+    line-height: 1.25;
+    letter-spacing: 0.2px;
+}
+.badge-classic {
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid #e2e8f0;
+}
+.badge-classic i {
+    color: #46178F;
+}
+.badge-wager {
+    background: #fff7ed;
+    color: #c2410c;
+    border: 1px solid #ffedd5;
+}
+.badge-wager i {
+    color: #ea580c;
+}
+.badge-puzzle {
+    background: #faf5ff;
+    color: #7e22ce;
+    border: 1px solid #f3e8ff;
+}
+.badge-puzzle i {
+    color: #9333ea;
+}
+.badge-review {
+    background: #fefce8;
+    color: #854d0e;
+    border: 1px solid #fef08a;
+}
+.badge-review i {
+    color: #ca8a04;
+}
+.badge-team {
+    background: #eff6ff;
+    color: #1e40af;
+    border: 1px solid #dbeafe;
+}
+.badge-team i {
+    color: #2563eb;
+}
+.badge-qcount {
+    background: #f8fafc;
+    color: #334155;
+    border: 1px solid #e2e8f0;
+}
+.badge-qcount i {
+    color: #64748b;
+}
+
+.quiz-desc {
+    font-size: 0.84rem;
+    line-height: 1.5;
+    color: #64748b;
+    min-height: 38px;
+    margin-bottom: 12px;
+}
+
+/* PURPLE CREATE BUTTON */
+.btn-create-quiz {
+    background: #46178F !important;
+    border: 1px solid #381072 !important;
+    color: #ffffff !important;
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 700;
+    padding: 9px 18px;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(70, 23, 143, 0.25);
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+.btn-create-quiz:hover {
+    background: #391177 !important;
+    color: #ffffff !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(70, 23, 143, 0.35);
 }
 </style>
 
@@ -203,8 +297,10 @@ $flash = get_flash_message();
             <p class="text-muted mb-0">View, edit questions, or host a live game session.</p>
         </div>
         <div>
-            <a href="<?= BASE_URL ?>modules/quiz/create.php" class="btn btn-kahoot btn-kahoot-green shadow-sm">
-                <i class="fas fa-plus-circle mr-1"></i> Create New Kahoot
+            <!-- Button changed to Kahoot Purple -->
+            <a href="<?= BASE_URL ?>modules/quiz/create.php" class="btn btn-create-quiz">
+                <i class="fas fa-plus-circle mr-2"></i>
+                <span>Create New Kahoot</span>
             </a>
         </div>
     </div>
@@ -217,8 +313,8 @@ $flash = get_flash_message();
                     <h4>You have no quizzes yet!</h4>
                     <p class="text-muted">Get started by creating your very first trivia quiz.</p>
                     <div>
-                        <a href="<?= BASE_URL ?>modules/quiz/create.php" class="btn btn-kahoot btn-kahoot-purple">
-                            <i class="fas fa-plus-circle mr-1"></i> Create Kahoot Now
+                        <a href="<?= BASE_URL ?>modules/quiz/create.php" class="btn btn-create-quiz">
+                            <i class="fas fa-plus-circle mr-2"></i> Create Kahoot Now
                         </a>
                     </div>
                 </div>
@@ -233,7 +329,7 @@ $flash = get_flash_message();
                 $totalPieces = intval($q['total_pieces'] ?? 4);
                 if (!in_array($totalPieces, [4, 6, 8, 9, 10, 12, 15, 16, 20, 25])) $totalPieces = 4;
 
-                // Grid layout class
+                // Grid layout class for puzzle
                 $gridClass = 'grid-2x2';
                 if ($totalPieces === 6) $gridClass = 'grid-3x2';
                 elseif ($totalPieces === 8) $gridClass = 'grid-4x2';
@@ -253,22 +349,18 @@ $flash = get_flash_message();
                 }
             ?>
                 <div class="col-md-6 col-lg-4 mb-4 col-quiz-item">
-                    <div class="card h-100 border-0 shadow-sm quiz-card">
+                    <div class="card h-100 quiz-card shadow-sm">
+                        
+                        <!-- COVER BANNER: Clean Title in center, Question Count in bottom-right corner -->
                         <div class="quiz-cover-box">
                             <?php if ($isObstacle): ?>
-                                <!-- OBSTACLE PUZZLE BACKGROUND -->
+                                <!-- Obstacle Background -->
                                 <?php if ($hasObstacleImg): ?>
-                                    <div class="obstacle-cover-bg" style="background-image: url('<?= htmlspecialchars($obstacleImgUrl) ?>');"></div>
+                                    <div class="quiz-cover-bg" style="background-image: url('<?= htmlspecialchars($obstacleImgUrl) ?>');"></div>
                                 <?php else: ?>
-                                    <div class="obstacle-cover-bg" style="background: radial-gradient(circle at 85% 15%, rgba(245, 159, 0, 0.22) 0%, transparent 45%), radial-gradient(circle at 15% 85%, rgba(121, 75, 196, 0.35) 0%, transparent 50%), linear-gradient(135deg, #130a28 0%, #251147 50%, #120726 100%);">
-                                        <i class="fas fa-puzzle-piece" style="position: absolute; right: -15px; bottom: -20px; font-size: 6.5rem; color: rgba(255, 255, 255, 0.05); transform: rotate(-15deg);"></i>
-                                    </div>
+                                    <div class="quiz-cover-bg" style="background: radial-gradient(circle at 80% 20%, rgba(245, 159, 0, 0.25) 0%, transparent 45%), linear-gradient(135deg, #180932 0%, #2f125a 100%);"></div>
                                 <?php endif; ?>
-
-                                <!-- DARK GRADIENT OVERLAY -->
-                                <div class="obstacle-cover-overlay"></div>
-
-                                <!-- PUZZLE PIECES GRID -->
+                                <div class="quiz-cover-overlay"></div>
                                 <div class="obstacle-card-grid <?= $gridClass ?>">
                                     <?php for ($p = 1; $p <= $totalPieces; $p++): ?>
                                         <div class="obstacle-card-cell">
@@ -276,100 +368,91 @@ $flash = get_flash_message();
                                         </div>
                                     <?php endfor; ?>
                                 </div>
-
-                                <!-- CARD CONTENT -->
-                                <div class="quiz-cover-content">
-                                    <div>
-                                        <span class="vcnv-card-tag">
-                                            <i class="fas fa-puzzle-piece mr-1"></i> Obstacle Puzzle
-                                        </span>
-                                    </div>
-                                    <?php if (!empty($q['active_review_room_id'])): ?>
-                                        <div class="mb-1"><span class="badge badge-warning text-dark font-weight-bold px-2 py-1 shadow-sm"><i class="fas fa-book-reader mr-1"></i> Review Active</span></div>
-                                    <?php endif; ?>
-                                    <h5 class="quiz-card-title text-truncate" title="<?= htmlspecialchars($q['name']) ?>">
-                                        <?= htmlspecialchars($q['name']) ?>
-                                    </h5>
-                                    <div class="d-flex justify-content-center flex-wrap" style="gap: 6px;">
-                                        <span class="badge badge-warning text-dark font-weight-bold px-2 py-1 shadow-sm" style="font-size: 0.8rem;">
-                                            <i class="fas fa-question-circle mr-1"></i> <?= $q['question_count'] ?> <?= $q['question_count'] == 1 ? 'question' : 'questions' ?>
-                                        </span>
-                                        <span class="badge badge-light text-dark font-weight-bold px-2 py-1 shadow-sm" style="font-size: 0.8rem;">
-                                            <i class="fas fa-th mr-1 text-primary"></i> <?= $totalPieces ?> <?= $totalPieces == 1 ? 'piece' : 'pieces' ?>
-                                        </span>
-                                    </div>
-                                </div>
-
                             <?php elseif ($isWager): ?>
-                                <!-- WAGER MODE -->
-                                <div class="classic-cover-bg" style="background-color: #7c2d12;"></div>
-                                <img src="<?= BASE_URL ?>assets/img/mode-wager.jpg" alt="Wager Mode" style="max-height: 100%; object-fit: cover; opacity: 0.85; width: 100%; position: absolute; top:0; left:0;">
-                                <div class="classic-cover-overlay" style="background: linear-gradient(180deg, rgba(124, 45, 18, 0.25) 0%, rgba(124, 45, 18, 0.75) 100%);"></div>
-                                <div class="quiz-cover-content">
-                                    <div>
-                                        <span class="badge badge-warning text-dark font-weight-bold px-2 py-1 shadow-sm mb-1" style="font-size: 0.72rem; letter-spacing: 0.5px; background-color: #ffedd5; border: 1px solid #fdba74;">
-                                            <i class="fas fa-coins mr-1 text-warning"></i> WAGER MODE
-                                        </span>
-                                    </div>
-                                    <?php if (!empty($q['active_review_room_id'])): ?>
-                                        <div class="mb-1"><span class="badge badge-warning text-dark font-weight-bold px-2 py-1 shadow-sm"><i class="fas fa-book-reader mr-1"></i> Review Active</span></div>
-                                    <?php endif; ?>
-                                    <h5 class="quiz-card-title text-truncate" title="<?= htmlspecialchars($q['name']) ?>">
-                                        <?= htmlspecialchars($q['name']) ?>
-                                    </h5>
-                                    <div class="d-flex justify-content-center flex-wrap">
-                                        <span class="badge badge-warning text-dark font-weight-bold px-2 py-1 shadow-sm" style="font-size: 0.8rem;">
-                                            <i class="fas fa-question-circle mr-1"></i> <?= $q['question_count'] ?> questions
-                                        </span>
-                                    </div>
-                                </div>
-
+                                <!-- Wager Background -->
+                                <div class="quiz-cover-bg" style="background-image: url('<?= BASE_URL ?>assets/img/mode-wager.jpg');"></div>
+                                <div class="quiz-cover-overlay" style="background: linear-gradient(180deg, rgba(80, 20, 5, 0.35) 0%, rgba(50, 12, 3, 0.85) 100%);"></div>
                             <?php else: ?>
-                                <!-- CLASSIC QUIZ HEADER -->
-                                <div class="classic-cover-bg"></div>
-                                <img src="<?= BASE_URL ?>assets/img/cover.png" alt="Cover" style="max-height: 100%; object-fit: cover; opacity: 0.3; width: 100%; position: absolute; top:0; left:0;">
-                                <div class="quiz-cover-content">
-                                    <div>
-                                        <span class="badge badge-light text-dark font-weight-bold px-2 py-1 shadow-sm mb-1" style="font-size: 0.72rem; letter-spacing: 0.5px;">
-                                            <i class="fas fa-gamepad mr-1 text-primary"></i> CLASSIC QUIZ
-                                        </span>
-                                    </div>
-                                    <?php if (!empty($q['active_review_room_id'])): ?>
-                                        <div class="mb-1"><span class="badge badge-warning text-dark font-weight-bold px-2 py-1 shadow-sm"><i class="fas fa-book-reader mr-1"></i> Review Active</span></div>
-                                    <?php endif; ?>
-                                    <h5 class="quiz-card-title text-truncate" title="<?= htmlspecialchars($q['name']) ?>">
-                                        <?= htmlspecialchars($q['name']) ?>
-                                    </h5>
-                                    <div class="d-flex justify-content-center flex-wrap">
-                                        <span class="badge badge-warning text-dark font-weight-bold px-2 py-1 shadow-sm" style="font-size: 0.8rem;">
-                                            <i class="fas fa-question-circle mr-1"></i> <?= $q['question_count'] ?> questions
-                                        </span>
-                                    </div>
-                                </div>
+                                <!-- Classic Background: lighter purple & clearer Kahoot watermark -->
+                                <div class="quiz-cover-bg" style="background: linear-gradient(135deg, #5b24b0 0%, #3a137b 100%);"></div>
+                                <img src="<?= BASE_URL ?>assets/img/cover.png" alt="Cover" style="max-height: 100%; object-fit: cover; opacity: 0.45; width: 100%; position: absolute; top:0; left:0;">
+                                <div class="quiz-cover-overlay" style="background: linear-gradient(180deg, rgba(20, 8, 45, 0.12) 0%, rgba(20, 8, 45, 0.52) 100%);"></div>
                             <?php endif; ?>
+
+                            <!-- Clean Title in Center -->
+                            <div class="quiz-cover-content">
+                                <h5 class="quiz-card-title text-truncate" title="<?= htmlspecialchars($q['name']) ?>">
+                                    <?= htmlspecialchars($q['name']) ?>
+                                </h5>
+                            </div>
+
+                            <!-- Sleek Corner Badge for Question Count -->
+                            <div class="quiz-qcount-corner" title="Number of questions">
+                                <i class="fas fa-question-circle mr-1"></i>
+                                <?= $q['question_count'] ?> <?= $q['question_count'] == 1 ? 'question' : 'questions' ?>
+                            </div>
                         </div>
 
+                        <!-- CARD BODY: Metadata tags, description, footer -->
                         <div class="card-body d-flex flex-column justify-content-between p-3">
-                            <p class="text-muted small mb-2">
-                                <?= !empty($q['description']) ? htmlspecialchars(mb_strimwidth($q['description'], 0, 100, '...')) : '<i>No description</i>' ?>
+                            
+                            <!-- Badges row: Game Mode & Active statuses placed neatly here -->
+                            <div class="d-flex align-items-center flex-wrap mb-2" style="gap: 6px;">
+                                <?php if ($isObstacle): ?>
+                                    <span class="quiz-badge badge-puzzle" title="Obstacle Puzzle Mode">
+                                        <i class="fas fa-puzzle-piece mr-1"></i> Puzzle
+                                    </span>
+                                <?php elseif ($isWager): ?>
+                                    <span class="quiz-badge badge-wager" title="Wager Mode">
+                                        <i class="fas fa-coins mr-1"></i> Wager
+                                    </span>
+                                <?php else: ?>
+                                    <span class="quiz-badge badge-classic" title="Classic Quiz Mode">
+                                        <i class="fas fa-gamepad mr-1"></i> Classic
+                                    </span>
+                                <?php endif; ?>
+
+                                <?php if (!empty($q['active_review_room_id'])): ?>
+                                    <span class="quiz-badge badge-review" title="Self-paced review room is currently open">
+                                        <i class="fas fa-book-reader mr-1"></i> Review Active
+                                    </span>
+                                <?php endif; ?>
+
+                                <?php if (!empty($q['is_team_mode'])): ?>
+                                    <span class="quiz-badge badge-team" title="Team mode is configured for this quiz">
+                                        <i class="fas fa-users mr-1"></i> Team
+                                    </span>
+                                <?php endif; ?>
+                            </div>
+
+                            <!-- Description -->
+                            <p class="quiz-desc">
+                                <?= !empty($q['description']) ? htmlspecialchars(mb_strimwidth($q['description'], 0, 95, '...')) : '<em>No description</em>' ?>
                             </p>
+
+                            <!-- Footer Row -->
                             <div class="d-flex justify-content-between align-items-center pt-2 border-top">
-                                <small class="text-muted"><?= date('M d, Y', strtotime($q['quizadd'] ?? $q['created_at'] ?? 'now')) ?></small>
+                                <small class="text-muted d-flex align-items-center">
+                                    <i class="far fa-calendar-alt mr-1"></i>
+                                    <?= date('M d, Y', strtotime($q['quizadd'] ?? $q['created_at'] ?? 'now')) ?>
+                                </small>
                                 <div class="d-flex align-items-center">
                                     <?php if (!empty($q['active_review_room_id'])): ?>
                                         <a href="<?= BASE_URL ?>modules/host/review_lobby.php?id_room=<?= $q['active_review_room_id'] ?>" class="btn btn-sm btn-warning text-dark font-weight-bold mr-2 shadow-sm" title="Review Room (Join Info)">
                                             <i class="fas fa-qrcode mr-1"></i> Join Info
                                         </a>
                                     <?php else: ?>
-                                        <a href="<?= BASE_URL ?>modules/host/create_room.php?id_quiz=<?= $q['id_quiz'] ?>" class="btn btn-sm btn-primary font-weight-bold mr-2" title="Play">
+                                        <a href="<?= BASE_URL ?>modules/host/create_room.php?id_quiz=<?= $q['id_quiz'] ?>" class="btn btn-sm btn-primary font-weight-bold mr-2" style="background-color: var(--kahoot-purple); border-color: var(--kahoot-purple);" title="Play">
                                             <i class="fas fa-play mr-1"></i> Play
                                         </a>
                                     <?php endif; ?>
+                                    
+                                    <!-- Actions Dropdown -->
                                     <div class="dropdown">
-                                        <button class="btn btn-sm btn-outline-secondary font-weight-bold dropdown-toggle" type="button" id="quizActions_<?= $q['id_quiz'] ?>" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" title="Actions">
+                                        <button class="btn btn-sm btn-outline-secondary font-weight-bold dropdown-toggle quiz-actions-btn" type="button" id="quizActions_<?= $q['id_quiz'] ?>" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" title="Actions">
                                             <i class="fas fa-ellipsis-v mr-1"></i> Actions
                                         </button>
-                                        <div class="dropdown-menu dropdown-menu-right shadow-sm" aria-labelledby="quizActions_<?= $q['id_quiz'] ?>">
+                                        <div class="dropdown-menu dropdown-menu-right" aria-labelledby="quizActions_<?= $q['id_quiz'] ?>">
                                             <?php if (!empty($q['active_review_room_id'])): ?>
                                                 <button type="button" class="dropdown-item text-muted disabled" style="cursor: not-allowed;" onclick="alert('This quiz currently has an active review room. Please end the review session before editing questions.');">
                                                     <i class="fas fa-edit mr-2"></i> Edit <span class="badge badge-light border ml-1">Locked</span>
@@ -400,6 +483,7 @@ $flash = get_flash_message();
                                 </div>
                             </div>
                         </div>
+
                     </div>
                 </div>
             <?php endforeach; ?>
@@ -408,15 +492,15 @@ $flash = get_flash_message();
 </div>
 
 <script>
-window.addEventListener('load', function() {
+document.addEventListener('DOMContentLoaded', function() {
     if (window.jQuery) {
-        $('.dropdown').on('show.bs.dropdown', function () {
-            $(this).closest('.col-quiz-item').css('z-index', 1050);
-            $(this).closest('.quiz-card').css('z-index', 1050);
+        $(document).on('show.bs.dropdown', '.dropdown', function () {
+            $(this).closest('.col-quiz-item').addClass('is-dropdown-open');
+            $(this).closest('.quiz-card').addClass('is-dropdown-open');
         });
-        $('.dropdown').on('hidden.bs.dropdown', function () {
-            $(this).closest('.col-quiz-item').css('z-index', '');
-            $(this).closest('.quiz-card').css('z-index', '');
+        $(document).on('hidden.bs.dropdown', '.dropdown', function () {
+            $(this).closest('.col-quiz-item').removeClass('is-dropdown-open');
+            $(this).closest('.quiz-card').removeClass('is-dropdown-open');
         });
     }
 });

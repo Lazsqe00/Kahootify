@@ -114,6 +114,18 @@ h1, h2, h3, h4, h5, h6, .brand-font, .btn, .badge {
   box-shadow: 0 4px 0 #966e00;
 }
 
+.btn-purple {
+  background-color: var(--kahoot-purple);
+  border-color: var(--kahoot-purple);
+  color: #fff !important;
+}
+.btn-purple:hover, .btn-purple:focus {
+  background-color: var(--kahoot-purple-dark);
+  border-color: var(--kahoot-purple-dark);
+  color: #fff !important;
+}
+
+
 .answer-box {
   border-radius: 8px;
   padding: 20px;

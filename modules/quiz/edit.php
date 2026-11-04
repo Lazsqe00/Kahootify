@@ -490,6 +490,221 @@ require_once __DIR__ . '/../../includes/navbar.php';
     width: 100% !important;
     padding: 4px 8px !important;
 }
+/* Clean Question Card in List */
+.q-list-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 9px 8px;
+    border-radius: 8px;
+    margin-bottom: 7px;
+    border: 1.5px solid #e2e8f0;
+    background: #ffffff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+    transition: all 0.18s ease;
+    cursor: pointer;
+    user-select: none;
+}
+.q-list-item:hover {
+    background: #fbfaff;
+    border-color: #c4b0ee;
+    box-shadow: 0 2px 6px rgba(70, 23, 143, 0.08);
+}
+.q-list-item.active-edit {
+    background: #faf8fe;
+    border-color: #46178f;
+    box-shadow: 0 0 0 1px #46178f, 0 3px 8px rgba(70, 23, 143, 0.12);
+}
+.q-thumb-content {
+    flex: 1;
+    min-width: 0;
+    cursor: pointer;
+}
+.q-thumb-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 3px;
+}
+.q-thumb-num {
+    font-size: 11px;
+    font-weight: 800;
+    color: #1e293b;
+    letter-spacing: 0.3px;
+}
+.q-thumb-meta {
+    font-size: 10px;
+    color: #64748b;
+    font-weight: 500;
+}
+.q-thumb-text {
+    font-size: 12px;
+    font-weight: 600;
+    color: #334155;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.35;
+    margin-bottom: 2px;
+}
+.q-thumb-media-preview {
+    width: 100%;
+    height: 56px;
+    border-radius: 5px;
+    overflow: hidden;
+    margin: 5px 0 4px;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.q-thumb-media-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+.q-thumb-media-video {
+    font-size: 11px;
+    font-weight: 600;
+    color: #64748b;
+    display: flex;
+    align-items: center;
+}
+#modeSettingsPanel {
+    background: #fffdf5 !important;
+    border: 1px solid #fde68a !important;
+    border-radius: 8px !important;
+    padding: 10px 12px !important;
+}
+#modeSettingsPanel .prop-label {
+    white-space: nowrap !important;
+    font-size: 11px !important;
+    letter-spacing: 0.3px !important;
+    display: flex !important;
+    align-items: center !important;
+}
+.props-panel {
+    width: 204px !important;
+}
+.editor-layout {
+    max-width: 1200px !important;
+    gap: 14px !important;
+}
+/* Topbar Clean Design */
+.topbar-back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    color: #475569 !important;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    text-decoration: none !important;
+    transition: all 0.15s ease;
+}
+.topbar-back-btn:hover {
+    background: #ede9fe;
+    border-color: #c4b0ee;
+    color: #46178f !important;
+    transform: translateX(-1px);
+}
+.topbar-divider {
+    width: 1px;
+    height: 22px;
+    background: #e2e8f0;
+    margin: 0 4px;
+}
+.quiz-title-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+#quizTitleDisplay {
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: #1e293b;
+    cursor: pointer;
+    border-bottom: 2px dashed transparent;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: all 0.15s;
+    max-width: 320px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+#quizTitleDisplay:hover {
+    background: #f1f5f9;
+    border-bottom-color: #94a3b8;
+}
+.btn-topbar-puzzle {
+    display: inline-flex;
+    align-items: center;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 5px 10px;
+    border-radius: 6px;
+    background: #f8fafc;
+    border: 1px solid #cbd5e1;
+    color: #334155;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.btn-topbar-puzzle:hover {
+    background: #f1f5f9;
+    border-color: #94a3b8;
+    color: #0f172a;
+}
+.topbar-settings-btn {
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 13px;
+    color: #475569;
+    border-color: #cbd5e1;
+    background: #fff;
+}
+.topbar-settings-btn:hover {
+    background: #f8fafc;
+    color: #0f172a;
+    border-color: #94a3b8;
+}
+.btn-host-game {
+    background: #46178f !important;
+    border: 1px solid #381072 !important;
+    color: #ffffff !important;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 6px 15px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    box-shadow: 0 2px 4px rgba(70, 23, 143, 0.2);
+    transition: all 0.15s ease;
+    text-decoration: none !important;
+}
+.btn-host-game:hover {
+    background: #391177 !important;
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px rgba(70, 23, 143, 0.3);
+    color: #ffffff !important;
+}
+.btn-host-game.disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background: #64748b !important;
+    border-color: #475569 !important;
+    box-shadow: none !important;
+    transform: none !important;
+}
 </style>
 
 <?php
@@ -514,40 +729,32 @@ $availableTeams = TeamManager::getTeamsForEntity($quiz);
 <div class="editor-page-wrapper">
 
     <div class="editor-topbar">
-        <div class="d-flex align-items-center flex-wrap" style="gap: 8px;">
-            <a href="<?= BASE_URL ?>modules/quiz/list.php" class="btn btn-sm btn-outline-secondary font-weight-bold">
-                <i class="fas fa-chevron-left mr-1"></i> My Kahoots
+        <div class="d-flex align-items-center" style="gap: 10px; min-width: 0;">
+            <a href="<?= BASE_URL ?>modules/quiz/list.php" class="topbar-back-btn" title="Back to My Kahoots">
+                <i class="fas fa-arrow-left"></i>
+                <span class="d-none d-sm-inline">My Kahoots</span>
             </a>
+
+            <div class="topbar-divider"></div>
+
             <div class="quiz-title-wrapper">
-                <span id="quizTitleDisplay"><?= htmlspecialchars($quiz['name']) ?></span>
+                <span id="quizTitleDisplay" title="Click to rename"><?= htmlspecialchars($quiz['name']) ?></span>
                 <input type="text" id="quizTitleInput" value="<?= htmlspecialchars($quiz['name']) ?>" maxlength="100">
-                <i class="fas fa-pencil-alt title-edit-icon" id="editTitleIcon" title="Edit title"></i>
+                <i class="fas fa-pencil-alt title-edit-icon" id="editTitleIcon" title="Rename quiz"></i>
             </div>
-            <?php if ($defaultQMode === 'wager' || $hasWagerInQuiz): ?>
-                <span class="badge badge-warning text-dark font-weight-bold py-1 px-2" style="font-size: 0.85rem;">
-                    🎲 Mode: Wager
-                </span>
-            <?php endif; ?>
+
             <?php if ($isObstacle): 
                 $reqPieces = intval($quiz['total_pieces'] ?? 4);
                 $curQCount = count($questions);
             ?>
-                <?php if ($curQCount >= $reqPieces): ?>
-                    <span class="badge badge-success text-white font-weight-bold py-1 px-2 vcnv-badge" style="font-size: 0.85rem;">
-                        <i class="fas fa-check-circle mr-1"></i> All <?=$curQCount?>/<?=$reqPieces?> tiles ready
-                    </span>
-                <?php else: ?>
-                    <span class="badge badge-warning text-dark font-weight-bold py-1 px-2 vcnv-badge" style="font-size: 0.85rem;">
-                        <i class="fas fa-exclamation-triangle mr-1"></i> <?=$curQCount?>/<?=$reqPieces?> tiles (Missing <?=$reqPieces - $curQCount?>)
-                    </span>
-                <?php endif; ?>
-                <button type="button" class="btn btn-sm btn-outline-warning font-weight-bold py-1 px-2" data-toggle="modal" data-target="#obstacleSettingsModal" title="Secret image & keyword">
-                    <i class="fas fa-image mr-1"></i> Secret Image
+                <button type="button" class="btn-topbar-puzzle" data-toggle="modal" data-target="#obstacleSettingsModal" title="Secret Image & Puzzle Settings (<?= $curQCount ?>/<?= $reqPieces ?> tiles ready)">
+                    <i class="fas fa-puzzle-piece text-warning mr-1"></i>
+                    <span><?= $curQCount ?>/<?= $reqPieces ?> Tiles</span>
                 </button>
             <?php endif; ?>
         </div>
 
-        <div class="d-flex align-items-center" style="gap: 12px;">
+        <div class="d-flex align-items-center" style="gap: 10px;">
             <?php if ($flash): ?>
             <div class="alert alert-<?= htmlspecialchars($flash['type']) ?> alert-auto-dismiss alert-dismissible fade show mb-0 py-1 px-3 d-flex align-items-center shadow-sm"
                  role="alert"
@@ -560,23 +767,23 @@ $availableTeams = TeamManager::getTeamsForEntity($quiz);
             </div>
             <?php endif; ?>
 
-            <?php if ($isReviewMode): ?>
-                <span class="badge badge-warning text-dark px-2 py-1 font-weight-bold d-none d-md-inline-flex align-items-center shadow-sm" style="font-size: 0.8rem; border-radius: 8px;">
-                    <i class="fas fa-book-reader mr-1"></i> Review Mode (Active)
-                </span>
-            <?php endif; ?>
-            <?php if ($isTeamMode): ?>
-                <span class="badge badge-success px-2 py-1 font-weight-bold d-none d-md-inline-flex align-items-center" style="font-size: 0.8rem; border-radius: 8px;">
-                    <i class="fas fa-users mr-1"></i> Team Mode (<?= $teamCount ?> Teams)
-                </span>
-            <?php endif; ?>
-
             <div class="dropdown">
-                <button class="btn btn-sm btn-outline-secondary font-weight-bold dropdown-toggle" type="button" id="quizOptionsDropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" title="Quiz Options">
-                    <i class="fas fa-cog mr-1"></i> Option
+                <button class="btn btn-sm btn-outline-secondary font-weight-bold dropdown-toggle topbar-settings-btn" type="button" id="quizOptionsDropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" title="Quiz Settings">
+                    <i class="fas fa-cog mr-1"></i> Settings
                 </button>
-                <div class="dropdown-menu dropdown-menu-right shadow border-0" aria-labelledby="quizOptionsDropdown" style="min-width: 220px; border-radius: 12px; padding: 8px;">
-                    <div class="dropdown-header text-uppercase font-weight-bold text-muted px-2 py-1" style="font-size: 0.72rem; letter-spacing: 0.5px;">Advanced Settings</div>
+                <div class="dropdown-menu dropdown-menu-right shadow-sm border" aria-labelledby="quizOptionsDropdown" style="min-width: 230px; border-radius: 10px; padding: 6px;">
+                    <div class="dropdown-header text-uppercase font-weight-bold text-muted px-2 py-1" style="font-size: 0.7rem; letter-spacing: 0.5px;">Game Settings</div>
+
+                    <?php if ($isObstacle): ?>
+                    <button class="dropdown-item d-flex align-items-center py-2 px-2 rounded" type="button" data-toggle="modal" data-target="#obstacleSettingsModal">
+                        <i class="fas fa-puzzle-piece mr-2 text-warning"></i>
+                        <span class="font-weight-bold">Secret Image &amp; Tiles</span>
+                        <span class="badge <?= count($questions) >= intval($quiz['total_pieces'] ?? 4) ? 'badge-success' : 'badge-warning text-dark' ?> ml-auto font-weight-bold">
+                            <?= count($questions) ?>/<?= intval($quiz['total_pieces'] ?? 4) ?>
+                        </span>
+                    </button>
+                    <?php endif; ?>
+
                     <button class="dropdown-item d-flex align-items-center py-2 px-2 rounded" type="button" data-toggle="modal" data-target="#teamModeModal" onclick="$('#teamModeModal').modal('show')">
                         <i class="fas fa-users mr-2 text-primary"></i>
                         <span class="font-weight-bold">Team Mode</span>
@@ -603,12 +810,12 @@ $availableTeams = TeamManager::getTeamsForEntity($quiz);
             </div>
 
             <?php if ($isObstacle && count($questions) < intval($quiz['total_pieces'] ?? 4)): ?>
-                <button type="button" class="btn btn-sm font-weight-bold btn-secondary" onclick="alert('This Puzzle quiz requires exactly <?= intval($quiz["total_pieces"] ?? 4) ?> questions for all <?= intval($quiz["total_pieces"] ?? 4) ?> tiles before hosting! Currently has <?= count($questions) ?> questions.')">
-                    <i class="fas fa-play mr-1"></i> Host Game Now
+                <button type="button" class="btn btn-sm btn-host-game disabled" onclick="alert('This Puzzle quiz requires exactly <?= intval($quiz['total_pieces'] ?? 4) ?> questions for all <?= intval($quiz['total_pieces'] ?? 4) ?> tiles before hosting! Currently has <?= count($questions) ?> questions.')" title="Complete all tiles to host">
+                    <i class="fas fa-play mr-1.5"></i> Host Game
                 </button>
             <?php else: ?>
-                <a href="<?= BASE_URL ?>modules/host/create_room.php?id_quiz=<?= $quiz['id_quiz'] ?>" class="btn btn-sm font-weight-bold" style="background:#46178f;color:#fff;">
-                    <i class="fas fa-play mr-1"></i> Host Game Now
+                <a href="<?= BASE_URL ?>modules/host/create_room.php?id_quiz=<?= $quiz['id_quiz'] ?>" class="btn btn-sm btn-host-game" title="Host live game session">
+                    <i class="fas fa-play mr-1.5"></i> Host Game
                 </a>
             <?php endif; ?>
         </div>
@@ -630,21 +837,34 @@ $availableTeams = TeamManager::getTeamsForEntity($quiz);
                     ?>
                     <li class="q-list-item" data-id="<?= $q['id_question'] ?>" data-mode="<?= htmlspecialchars($curMode) ?>" data-piece="<?= intval($q['piece_index'] ?? ($idx + 1)) ?>">
                         <span class="drag-handle"><i class="fas fa-grip-vertical"></i></span>
-                        <div class="q-thumb-content">
-                            <div class="q-thumb-num">
-                                <?= $isObstacle ? ('🧩 Tile ' . ($idx + 1)) : ('Q' . ($idx + 1)) ?>
+                        <div class="q-thumb-content" onclick="loadQuestionForEdit(<?= $q['id_question'] ?>)">
+                            <div class="q-thumb-header">
+                                <span class="q-thumb-num">
+                                    <?= $isObstacle ? ('Tile ' . ($idx + 1)) : ('Q' . ($idx + 1)) ?>
+                                </span>
+                                <span class="q-thumb-meta">
+                                    <?= intval($q['time_limit']) ?>s &bull; <?= number_format(intval($q['points'])) ?> pts
+                                </span>
                             </div>
                             <div class="q-thumb-text" title="<?= htmlspecialchars($q['text'] ?? '') ?>">
-                                <?= htmlspecialchars(mb_strimwidth($q['text'] ?? '', 0, 36, '…')) ?>
+                                <?= htmlspecialchars(mb_strimwidth($q['text'] ?? '', 0, 38, '…')) ?>
                             </div>
-                            <div class="q-thumb-meta">
-                                <?= intval($q['time_limit']) ?>s &bull; <?= number_format(intval($q['points'])) ?> pts
-                                <?php if ($curMode === 'wager'): ?>
-                                    <span class="badge badge-warning text-dark font-weight-bold ml-1" style="font-size:10px;">🎲 Wager</span>
-                                <?php else: ?>
-                                    <span class="badge badge-light text-secondary font-weight-normal ml-1" style="font-size:10px;">⚡ Normal</span>
-                                <?php endif; ?>
-                            </div>
+
+                            <?php if (!empty($q['image'])): ?>
+                                <?php
+                                $imgSrc = (strpos($q['image'], 'http://') === 0 || strpos($q['image'], 'https://') === 0)
+                                    ? $q['image']
+                                    : (BASE_URL . ltrim($q['image'], '/'));
+                                $isVid = ($q['media_type'] ?? '') === 'video' || preg_match('/\.(mp4|webm)$/i', $q['image']);
+                                ?>
+                                <div class="q-thumb-media-preview">
+                                    <?php if ($isVid): ?>
+                                        <div class="q-thumb-media-video"><i class="fas fa-play-circle mr-1"></i> Video</div>
+                                    <?php else: ?>
+                                        <img src="<?= htmlspecialchars($imgSrc) ?>" alt="Question Media" loading="lazy">
+                                    <?php endif; ?>
+                                </div>
+                            <?php endif; ?>
 
                             <?php
                             $qType = $q['question_type'] ?? 'multiple_choice';
@@ -849,13 +1069,13 @@ $availableTeams = TeamManager::getTeamsForEntity($quiz);
         </div>
 
         <div class="props-panel">
-            <div id="modeSettingsPanel" class="prop-group" style="<?= $defaultQMode === 'wager' ? 'display:block;' : 'display:none;' ?> background: #fff8e1; border: 1px solid #ffe082; border-radius: 8px; padding: 10px;">
-                <div class="prop-label mb-2 text-dark font-weight-bold" style="font-size: 12px;">
+            <div id="modeSettingsPanel" class="prop-group" style="<?= $defaultQMode === 'wager' ? 'display:block;' : 'display:none;' ?> background: #fffdf5; border: 1px solid #fde68a; border-radius: 8px; padding: 10px 12px;">
+                <div class="prop-label mb-2 text-dark font-weight-bold d-flex align-items-center" style="font-size: 11px; white-space: nowrap; letter-spacing: 0.3px;">
                     <i class="fas fa-sliders-h mr-1 text-warning"></i> Wager Settings
                 </div>
-                <div class="form-group mb-2">
-                    <label class="small text-muted font-weight-bold mb-1 d-block" style="font-size: 11px;">Wager Duration</label>
-                    <select class="prop-select" id="propWagerTimeSec" style="height: 32px; font-size: 12px;">
+                <div class="form-group mb-0">
+                    <label class="small text-muted font-weight-bold mb-1 d-block" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px;">Wager Duration</label>
+                    <select class="prop-select" id="propWagerTimeSec" style="height: 34px; font-size: 13px;">
                         <option value="5">5s</option>
                         <option value="10" selected>10s (Default)</option>
                         <option value="15">15s</option>

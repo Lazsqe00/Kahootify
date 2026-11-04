@@ -82,7 +82,7 @@ require_once __DIR__ . '/../../includes/navbar.php';
                             <label class="font-weight-bold">Email Address</label>
                             <input type="email" name="email" class="form-control" value="<?= htmlspecialchars($user['email']) ?>" required>
                         </div>
-                        <button type="submit" class="btn btn-kahoot btn-kahoot-purple">
+                        <button type="submit" class="btn btn-purple font-weight-bold">
                             <i class="fas fa-save mr-1"></i> Save Changes
                         </button>
                     </form>

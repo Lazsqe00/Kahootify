@@ -53,7 +53,7 @@ function updateQuestionNumberLabels() {
         var numEl = item.querySelector('.q-thumb-num');
         if (numEl) {
             if (EQ.gameType === 'obstacle') {
-                numEl.textContent = '🧩 Tile ' + pIdx;
+                numEl.textContent = 'Tile ' + pIdx;
             } else {
                 numEl.textContent = 'Q' + pIdx;
             }
