@@ -71,15 +71,26 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
                 ':c'   => $creatorId
             ]
         );
-        set_flash_message('success', 'Team Mode settings saved successfully!');
+
+        if ($isTeam) {
+            ReviewManager::disableReviewMode($quizId, $creatorId);
+        }
+
+        set_flash_message('success', 'Team Mode settings saved successfully!' . ($isTeam ? ' (Review Mode has been disabled)' : ''));
         redirect('modules/quiz/edit.php?id=' . $quizId);
     }
 
     if ($action === 'update_review_settings') {
+        if (!$isClassicQuiz) {
+            set_flash_message('danger', 'Review Mode is only available in Classic Mode.');
+            redirect('modules/quiz/edit.php?id=' . $quizId);
+        }
+
         $enable = !empty($_POST['is_review_mode']) ? 1 : 0;
         if ($enable) {
+            db_execute("UPDATE quiz SET is_team_mode = 0 WHERE id_quiz = :q AND id_creator = :c", [':q' => $quizId, ':c' => $creatorId]);
             $res = ReviewManager::enableReviewMode($quizId, $creatorId);
-            set_flash_message('success', 'Review Mode enabled! PIN: ' . $res['pin']);
+            set_flash_message('success', 'Review Mode enabled! PIN: ' . $res['pin'] . ' (Team Mode has been disabled)');
         } else {
             ReviewManager::disableReviewMode($quizId, $creatorId);
             set_flash_message('success', 'Review Mode disabled successfully.');
@@ -425,6 +436,7 @@ $isObstacle = ($quiz['game_type'] ?? 'classic') === 'obstacle';
 $isClassicQuiz = (($quiz['game_type'] ?? 'classic') === 'classic') && (($quiz['mode'] ?? 'normal') === 'normal') && empty($hasWagerInQuiz);
 
 $isTeamMode = !empty($quiz['is_team_mode']);
+$isReviewEligible = ($isClassicQuiz && !$isTeamMode && !empty($quiz['is_review_mode']));
 $teamCount = TeamManager::getTeamCount($quiz);
 $teamLimit = TeamManager::getTeamPlayerLimit($quiz);
 $availableTeams = TeamManager::getTeamsForEntity($quiz);
@@ -479,7 +491,7 @@ $availableTeams = TeamManager::getTeamsForEntity($quiz);
             </div>
             <?php endif; ?>
 
-            <?php if ($isReviewMode): ?>
+            <?php if ($isReviewEligible): ?>
                 <span class="badge badge-warning text-dark px-2 py-1 font-weight-bold d-none d-md-inline-flex align-items-center mr-1" style="font-size: 0.8rem; border-radius: 8px;">
                     <i class="fas fa-book-reader mr-1"></i> Review Mode (PIN: <?= htmlspecialchars($reviewPin) ?>)
                 </span>
@@ -497,15 +509,17 @@ $availableTeams = TeamManager::getTeamsForEntity($quiz);
                 </button>
                 <div class="dropdown-menu dropdown-menu-right shadow border-0" aria-labelledby="quizOptionsDropdown" style="min-width: 220px; border-radius: 12px; padding: 8px;">
                     <div class="dropdown-header text-uppercase font-weight-bold text-muted px-2 py-1" style="font-size: 0.72rem; letter-spacing: 0.5px;">Advanced Settings</div>
+                    <?php if ($isClassicQuiz): ?>
                     <button class="dropdown-item d-flex align-items-center py-2 px-2 rounded mb-1" type="button" data-toggle="modal" data-target="#reviewModeModal" onclick="$('#reviewModeModal').modal('show')">
                         <i class="fas fa-book-reader mr-2 text-warning"></i>
                         <span class="font-weight-bold">Review Mode</span>
-                        <?php if ($isReviewMode): ?>
+                        <?php if ($isReviewMode && !$isTeamMode): ?>
                             <span class="badge badge-warning ml-auto font-weight-bold text-dark">ON</span>
                         <?php else: ?>
                             <span class="badge badge-light border ml-auto text-muted font-weight-bold">OFF</span>
                         <?php endif; ?>
                     </button>
+                    <?php endif; ?>
                     <button class="dropdown-item d-flex align-items-center py-2 px-2 rounded" type="button" data-toggle="modal" data-target="#teamModeModal" onclick="$('#teamModeModal').modal('show')">
                         <i class="fas fa-users mr-2 text-primary"></i>
                         <span class="font-weight-bold">Team Mode</span>
@@ -518,7 +532,7 @@ $availableTeams = TeamManager::getTeamsForEntity($quiz);
                 </div>
             </div>
 
-            <?php if ($isReviewMode): ?>
+            <?php if ($isReviewEligible): ?>
                 <button type="button" class="btn btn-sm font-weight-bold btn-warning text-dark px-3 shadow-sm" data-toggle="modal" data-target="#reviewViewModal" title="View Review Link">
                     <i class="fas fa-eye mr-1"></i> View
                 </button>

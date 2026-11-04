@@ -158,7 +158,7 @@ class ReviewManager {
                 "SELECT q.*, c.name AS creator_name
                  FROM quiz q
                  LEFT JOIN creators c ON q.id_creator = c.id_creator
-                 WHERE q.review_pin = :pin AND q.is_review_mode = 1",
+                 WHERE q.review_pin = :pin AND q.is_review_mode = 1 AND (q.is_team_mode = 0 OR q.is_team_mode IS NULL) AND (q.game_type = 'classic' OR q.game_type IS NULL) AND (q.mode = 'normal' OR q.mode IS NULL)",
                 [':pin' => $cleanPin]
             );
 

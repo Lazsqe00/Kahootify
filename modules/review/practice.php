@@ -202,6 +202,34 @@ require_once __DIR__ . '/../../includes/header.php';
     gap: 16px;
     margin-bottom: 24px;
 }
+.answers-grid.is-text-mode {
+    display: block;
+}
+.text-ans-practice-card {
+    background: #ffffff;
+    border-radius: 20px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+    border: 2px solid #e2e8f0;
+    max-width: 650px;
+    margin: 10px auto;
+    padding: 24px;
+}
+.text-ans-field {
+    border-radius: 12px 0 0 12px !important;
+    border: 2px solid #cbd5e1 !important;
+    border-right: none !important;
+    font-size: 1.25rem !important;
+    color: #1e293b !important;
+}
+.text-ans-field:focus {
+    border-color: #6366f1 !important;
+    box-shadow: none !important;
+}
+.text-ans-submit-btn {
+    border-radius: 0 12px 12px 0 !important;
+    padding: 0 24px !important;
+    font-size: 1.1rem !important;
+}
 
 @media (max-width: 768px) {
     .answers-grid {
@@ -594,6 +622,7 @@ function loadQuestion(index) {
     if (q.image) {
         mediaEl.src = (q.image.startsWith('http://') || q.image.startsWith('https://')) ? q.image : ('<?= BASE_URL ?>' + q.image.replace(/^\//, ''));
         mediaEl.classList.remove('d-none');
+        mediaEl.onerror = function() { this.classList.add('d-none'); };
     } else {
         mediaEl.classList.add('d-none');
     }
@@ -606,37 +635,124 @@ function loadQuestion(index) {
     const currentState = answersState[index];
     const isAnswered = (currentState !== null);
 
-    answers.forEach((ans, aIdx) => {
-        const shapeMeta = SHAPES[aIdx % SHAPES.length];
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = `answer-btn ${shapeMeta.colorClass}`;
-        btn.id = `ansBtn_${ans.id_answer}`;
+    if (q.question_type === 'text') {
+        answersGrid.classList.add('is-text-mode');
+        const correctAns = (answers[0]?.answer_text || answers[0]?.text || '').trim();
+        const userAns = currentState ? (currentState.userTextAnswer || '') : '';
+        const isCorrect = currentState ? Boolean(currentState.isCorrect) : false;
 
-        // Build Inner Content (Shape, Image, Text)
-        let html = `<span class="answer-shape-icon">${shapeMeta.shape}</span>`;
-        if (ans.image) {
-            const imgSrc = (ans.image.startsWith('http://') || ans.image.startsWith('https://')) ? ans.image : ('<?= BASE_URL ?>' + ans.image.replace(/^\//, ''));
-            html += `<img src="${escapeHtml(imgSrc)}" class="answer-img-thumb" alt="Option Image">`;
-        }
-        if (ans.answer_text) {
-            html += `<span class="answer-content">${escapeHtml(ans.answer_text)}</span>`;
-        } else if (!ans.image) {
-            html += `<span class="answer-content">Đáp án ${aIdx + 1}</span>`;
-        }
-        btn.innerHTML = html;
+        const textCard = document.createElement('div');
+        textCard.className = 'text-ans-practice-card';
+
+        let html = `
+            <label for="practiceTextInput" class="font-weight-bold text-muted small text-uppercase mb-2 d-block" style="letter-spacing: 0.5px;">
+                <i class="fas fa-keyboard mr-1 text-primary"></i> Nhập câu trả lời của bạn:
+            </label>
+            <div class="input-group input-group-lg mb-3">
+                <input type="text" id="practiceTextInput" class="form-control text-ans-field font-weight-bold px-3"
+                       placeholder="Gõ đáp án vào đây…"
+                       value="${escapeHtml(userAns)}"
+                       ${isAnswered ? 'disabled' : ''}
+                       autocomplete="off">
+                <div class="input-group-append">
+                    <button type="button" class="btn btn-primary font-weight-bold text-ans-submit-btn" id="btnSubmitTextInput"
+                            ${isAnswered ? 'disabled' : ''}>
+                        <i class="fas fa-paper-plane mr-1"></i> Gửi
+                    </button>
+                </div>
+            </div>
+            <div id="textFeedbackContainer">
+        `;
 
         if (isAnswered) {
-            btn.disabled = true;
-            applyAnswerStyles(btn, ans, currentState.selectedAnswerId);
-        } else {
-            btn.addEventListener('click', function () {
-                onAnswerSelected(index, ans.id_answer);
-            });
+            if (isCorrect) {
+                html += `
+                    <div class="alert alert-success d-flex align-items-center mb-0 py-2 px-3 font-weight-bold" style="border-radius: 10px; font-size: 1.05rem;">
+                        <i class="fas fa-check-circle mr-2" style="font-size: 1.3rem;"></i>
+                        <div>Chính xác! Đáp án của bạn: <u>${escapeHtml(userAns)}</u></div>
+                    </div>
+                `;
+            } else {
+                html += `
+                    <div class="alert alert-danger mb-0 py-2 px-3 font-weight-bold" style="border-radius: 10px; font-size: 1rem;">
+                        <div class="d-flex align-items-center mb-1">
+                            <i class="fas fa-times-circle mr-2 text-danger" style="font-size: 1.2rem;"></i>
+                            <div>Chưa chính xác! Bạn đã nhập: <span class="badge badge-light border text-danger ml-1">${escapeHtml(userAns || '(Trống)')}</span></div>
+                        </div>
+                        <div class="text-success small ml-4">
+                            <i class="fas fa-check mr-1"></i> Đáp án đúng là: <strong>${escapeHtml(correctAns)}</strong>
+                        </div>
+                    </div>
+                `;
+            }
         }
 
-        answersGrid.appendChild(btn);
-    });
+        html += `
+            </div>
+        `;
+
+        textCard.innerHTML = html;
+        answersGrid.appendChild(textCard);
+
+        if (!isAnswered) {
+            const inputEl = document.getElementById('practiceTextInput');
+            const submitBtn = document.getElementById('btnSubmitTextInput');
+
+            const handleTextSubmit = function() {
+                const entered = inputEl.value.trim();
+                if (!entered) {
+                    inputEl.focus();
+                    inputEl.classList.add('is-invalid');
+                    setTimeout(() => inputEl.classList.remove('is-invalid'), 1200);
+                    return;
+                }
+                onTextAnswerSubmitted(index, entered, correctAns);
+            };
+
+            submitBtn.addEventListener('click', handleTextSubmit);
+            inputEl.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleTextSubmit();
+                }
+            });
+
+            setTimeout(() => { if (inputEl) inputEl.focus(); }, 100);
+        }
+    } else {
+        answersGrid.classList.remove('is-text-mode');
+        answers.forEach((ans, aIdx) => {
+            const shapeMeta = SHAPES[aIdx % SHAPES.length];
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = `answer-btn ${shapeMeta.colorClass}`;
+            btn.id = `ansBtn_${ans.id_answer}`;
+
+            // Build Inner Content (Shape, Image, Text)
+            let html = `<span class="answer-shape-icon">${shapeMeta.shape}</span>`;
+            if (ans.image) {
+                const imgSrc = (ans.image.startsWith('http://') || ans.image.startsWith('https://')) ? ans.image : ('<?= BASE_URL ?>' + ans.image.replace(/^\//, ''));
+                html += `<img src="${escapeHtml(imgSrc)}" class="answer-img-thumb" alt="Option Image">`;
+            }
+            if (ans.answer_text) {
+                html += `<span class="answer-content">${escapeHtml(ans.answer_text)}</span>`;
+            } else if (!ans.image) {
+                html += `<span class="answer-content">Đáp án ${aIdx + 1}</span>`;
+            }
+            btn.innerHTML = html;
+
+            if (isAnswered) {
+                btn.disabled = true;
+                applyAnswerStyles(btn, ans, currentState.selectedAnswerId);
+            } else {
+                btn.addEventListener('click', function () {
+                    onAnswerSelected(index, ans.id_answer);
+                });
+            }
+
+            answersGrid.appendChild(btn);
+        });
+    }
 
     // Next Button State
     const nextBtn = document.getElementById('btnNextQuestion');
@@ -650,6 +766,23 @@ function loadQuestion(index) {
     } else {
         nextBtn.style.display = 'none';
     }
+}
+
+function onTextAnswerSubmitted(qIndex, enteredText, correctText) {
+    if (answersState[qIndex] !== null) return;
+
+    const isCorrect = (enteredText.trim().toLowerCase() === correctText.trim().toLowerCase());
+
+    answersState[qIndex] = {
+        selectedAnswerId: null,
+        userTextAnswer: enteredText,
+        isCorrect: isCorrect
+    };
+
+    const cell = document.getElementById(`paletteCell_${qIndex}`);
+    if (cell) updateCellState(cell, qIndex);
+
+    loadQuestion(qIndex);
 }
 
 function onAnswerSelected(qIndex, selectedAnsId) {
@@ -871,38 +1004,85 @@ function showResults() {
             `;
         }
 
-        cardHtml += '<div class="results-review-answers">';
-        (q.answers || []).forEach((ans, aIdx) => {
-            const isCorrectAnswer = (ans.is_correct === true || ans.is_correct === 1);
-            const isPlayerChoice = isAnswered && (ans.id_answer === state.selectedAnswerId);
-            const symbol = symbols[aIdx % 4];
+        if (q.question_type === 'text') {
+            const correctAns = (q.answers && q.answers[0]) ? (q.answers[0].answer_text || q.answers[0].text || '') : '';
+            const userAns = state ? (state.userTextAnswer || '') : '';
 
-            let ansClass = 'results-review-answer';
-            if (isCorrectAnswer) ansClass += ' is-correct-answer';
-            if (isPlayerChoice) ansClass += ' is-player-choice';
-
-            const ansText = ans.answer_text || ans.text || '';
-            let ansImgHtml = '';
-            if (ans.image) {
-                const aImgSrc = (ans.image.startsWith('http://') || ans.image.startsWith('https://')) ? ans.image : ('<?= BASE_URL ?>' + ans.image.replace(/^\//, ''));
-                ansImgHtml = `<img src="${escapeHtml(aImgSrc)}" alt="Answer illustration" loading="lazy">`;
+            cardHtml += '<div class="results-review-answers" style="grid-template-columns: repeat(2, minmax(0, 1fr));">';
+            if (isAnswered && isCorrect) {
+                cardHtml += `
+                    <div class="results-review-answer is-correct-answer is-player-choice">
+                        <span class="results-review-answer-symbol" style="background:#26890c;"><i class="fas fa-check"></i></span>
+                        <div class="results-review-answer-content">
+                            <span>${escapeHtml(correctAns)}</span>
+                        </div>
+                        <div class="results-review-answer-labels">
+                            <span class="results-review-choice-label">Your answer</span>
+                            <span class="results-review-correct-label">Correct answer</span>
+                        </div>
+                    </div>
+                `;
+            } else {
+                if (isAnswered) {
+                    cardHtml += `
+                        <div class="results-review-answer is-player-choice">
+                            <span class="results-review-answer-symbol" style="background:#e21b3c;"><i class="fas fa-times"></i></span>
+                            <div class="results-review-answer-content">
+                                <span>${escapeHtml(userAns || '(Trống)')}</span>
+                            </div>
+                            <div class="results-review-answer-labels">
+                                <span class="results-review-choice-label" style="background:#ffebee; color:#b31630;">Your answer</span>
+                            </div>
+                        </div>
+                    `;
+                }
+                cardHtml += `
+                    <div class="results-review-answer is-correct-answer">
+                        <span class="results-review-answer-symbol" style="background:#26890c;"><i class="fas fa-check"></i></span>
+                        <div class="results-review-answer-content">
+                            <span>${escapeHtml(correctAns)}</span>
+                        </div>
+                        <div class="results-review-answer-labels">
+                            <span class="results-review-correct-label">Correct answer</span>
+                        </div>
+                    </div>
+                `;
             }
+            cardHtml += '</div>';
+        } else {
+            cardHtml += '<div class="results-review-answers">';
+            (q.answers || []).forEach((ans, aIdx) => {
+                const isCorrectAnswer = (ans.is_correct === true || ans.is_correct === 1);
+                const isPlayerChoice = isAnswered && (ans.id_answer === state.selectedAnswerId);
+                const symbol = symbols[aIdx % 4];
 
-            cardHtml += `
-                <div class="${ansClass}">
-                    <span class="results-review-answer-symbol">${symbol}</span>
-                    <div class="results-review-answer-content">
-                        ${ansText ? `<span>${escapeHtml(ansText)}</span>` : ''}
-                        ${ansImgHtml}
+                let ansClass = 'results-review-answer';
+                if (isCorrectAnswer) ansClass += ' is-correct-answer';
+                if (isPlayerChoice) ansClass += ' is-player-choice';
+
+                const ansText = ans.answer_text || ans.text || '';
+                let ansImgHtml = '';
+                if (ans.image) {
+                    const aImgSrc = (ans.image.startsWith('http://') || ans.image.startsWith('https://')) ? ans.image : ('<?= BASE_URL ?>' + ans.image.replace(/^\//, ''));
+                    ansImgHtml = `<img src="${escapeHtml(aImgSrc)}" alt="Answer illustration" loading="lazy">`;
+                }
+
+                cardHtml += `
+                    <div class="${ansClass}">
+                        <span class="results-review-answer-symbol">${symbol}</span>
+                        <div class="results-review-answer-content">
+                            ${ansText ? `<span>${escapeHtml(ansText)}</span>` : ''}
+                            ${ansImgHtml}
+                        </div>
+                        <div class="results-review-answer-labels">
+                            ${isPlayerChoice ? '<span class="results-review-choice-label">Your answer</span>' : ''}
+                            ${isCorrectAnswer ? '<span class="results-review-correct-label">Correct answer</span>' : ''}
+                        </div>
                     </div>
-                    <div class="results-review-answer-labels">
-                        ${isPlayerChoice ? '<span class="results-review-choice-label">Your answer</span>' : ''}
-                        ${isCorrectAnswer ? '<span class="results-review-correct-label">Correct answer</span>' : ''}
-                    </div>
-                </div>
-            `;
-        });
-        cardHtml += '</div>';
+                `;
+            });
+            cardHtml += '</div>';
+        }
 
         card.innerHTML = cardHtml;
 

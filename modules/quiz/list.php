@@ -205,6 +205,9 @@ $flash = get_flash_message();
                 $quizMode = $q['mode'] ?? 'normal';
                 $isObstacle = ($gameType === 'obstacle');
                 $isWager = ($quizMode === 'wager');
+                $isClassic = (!$isObstacle && !$isWager);
+                $isTeam = !empty($q['is_team_mode']);
+                $isReviewEligible = ($isClassic && !$isTeam && !empty($q['is_review_mode']));
 
                 $totalPieces = intval($q['total_pieces'] ?? 4);
                 if (!in_array($totalPieces, [4, 6, 8, 9, 10, 12, 15, 16, 20, 25])) $totalPieces = 4;
@@ -260,7 +263,7 @@ $flash = get_flash_message();
                                             <i class="fas fa-puzzle-piece mr-1"></i> Obstacle Puzzle
                                         </span>
                                     </div>
-                                    <?php if (!empty($q['is_review_mode'])): ?>
+                                    <?php if (!empty($q['is_review_mode']) && empty($q['is_team_mode']) && ($q['game_type'] ?? 'classic') === 'classic' && ($q['mode'] ?? 'normal') === 'normal'): ?>
                                         <div class="mb-1"><span class="badge badge-warning text-dark font-weight-bold px-2 py-1 shadow-sm"><i class="fas fa-book-reader mr-1"></i> Review Mode</span></div>
                                     <?php endif; ?>
                                     <h5 class="quiz-card-title text-truncate" title="<?= htmlspecialchars($q['name']) ?>">
@@ -287,7 +290,7 @@ $flash = get_flash_message();
                                             <i class="fas fa-coins mr-1 text-warning"></i> WAGER MODE
                                         </span>
                                     </div>
-                                    <?php if (!empty($q['is_review_mode'])): ?>
+                                    <?php if (!empty($q['is_review_mode']) && empty($q['is_team_mode']) && ($q['game_type'] ?? 'classic') === 'classic' && ($q['mode'] ?? 'normal') === 'normal'): ?>
                                         <div class="mb-1"><span class="badge badge-warning text-dark font-weight-bold px-2 py-1 shadow-sm"><i class="fas fa-book-reader mr-1"></i> Review Mode</span></div>
                                     <?php endif; ?>
                                     <h5 class="quiz-card-title text-truncate" title="<?= htmlspecialchars($q['name']) ?>">
@@ -310,7 +313,7 @@ $flash = get_flash_message();
                                             <i class="fas fa-gamepad mr-1 text-primary"></i> CLASSIC QUIZ
                                         </span>
                                     </div>
-                                    <?php if (!empty($q['is_review_mode'])): ?>
+                                    <?php if (!empty($q['is_review_mode']) && empty($q['is_team_mode']) && ($q['game_type'] ?? 'classic') === 'classic' && ($q['mode'] ?? 'normal') === 'normal'): ?>
                                         <div class="mb-1"><span class="badge badge-warning text-dark font-weight-bold px-2 py-1 shadow-sm"><i class="fas fa-book-reader mr-1"></i> Review Mode</span></div>
                                     <?php endif; ?>
                                     <h5 class="quiz-card-title text-truncate" title="<?= htmlspecialchars($q['name']) ?>">
@@ -332,7 +335,7 @@ $flash = get_flash_message();
                             <div class="d-flex justify-content-between align-items-center pt-2 border-top">
                                 <small class="text-muted"><?= date('M d, Y', strtotime($q['quizadd'] ?? $q['created_at'] ?? 'now')) ?></small>
                                 <div class="d-flex align-items-center">
-                                    <?php if (!empty($q['is_review_mode'])): ?>
+                                    <?php if ($isReviewEligible): ?>
                                         <button type="button" class="btn btn-sm btn-warning font-weight-bold mr-2 text-dark" data-toggle="modal" data-target="#reviewModal_<?= $q['id_quiz'] ?>" title="View Review Mode">
                                             <i class="fas fa-eye mr-1"></i> View
                                         </button>
@@ -386,7 +389,7 @@ window.addEventListener('load', function() {
 
 <!-- REVIEW MODE VIEW MODALS (KAHOOT LOBBY STYLE) -->
 <?php foreach ($quizzes as $q): ?>
-    <?php if (!empty($q['is_review_mode'])): 
+    <?php if (!empty($q['is_review_mode']) && empty($q['is_team_mode']) && ($q['game_type'] ?? 'classic') === 'classic' && ($q['mode'] ?? 'normal') === 'normal'): 
         $rPin = $q['review_pin'] ?? '';
         $rUrl = ReviewManager::buildReviewUrl($rPin);
         $joinPageUrl = rtrim(BASE_URL, '/') . '/modules/player/join.php';

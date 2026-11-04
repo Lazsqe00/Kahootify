@@ -22,6 +22,8 @@ class ReviewModeV2Test {
         self::testEditQrCodeGenerationAndUrlContract();
         self::testWagerModeEliminationAutoSkipContracts();
         self::testReviewQuestionsSchemaContract();
+        self::testTextInputQuestionSupport();
+        self::testReviewModeClassicExclusivityAndTeamMutualExclusion();
 
         echo "\n========================================================\n";
         echo sprintf("Summary: %d Passed | %d Failed | Total: %d\n", self::$passed, self::$failed, self::$passed + self::$failed);
@@ -207,6 +209,45 @@ class ReviewModeV2Test {
             $noBadQuestionColumn && $queriesTextFromQuestions && $noBadAnswerColumn && $queriesAnswersCorrectly && $hasResolveMediaUrl,
             'testReviewQuestionsSchemaContract',
             'ReviewManager must query real schema columns (questions.text, answers.text, answers.image_path) and provide resolveMediaUrl.'
+        );
+    }
+
+    public static function testTextInputQuestionSupport(): void {
+        $practiceContent = file_get_contents(__DIR__ . '/../../modules/review/practice.php');
+
+        $hasTextInputBranch = strpos($practiceContent, "q.question_type === 'text'") !== false;
+        $hasInputField = strpos($practiceContent, 'id="practiceTextInput"') !== false;
+        $hasSubmitBtn = strpos($practiceContent, 'id="btnSubmitTextInput"') !== false;
+        $hasTextHandler = strpos($practiceContent, 'function onTextAnswerSubmitted') !== false;
+        $hasTextResultsHandler = strpos($practiceContent, 'results-review-answers') !== false;
+
+        self::assert(
+            $hasTextInputBranch && $hasInputField && $hasSubmitBtn && $hasTextHandler && $hasTextResultsHandler,
+            'testTextInputQuestionSupport',
+            'practice.php must support text questions with an input field, submit button, submission handler, and results review.'
+        );
+    }
+
+    public static function testReviewModeClassicExclusivityAndTeamMutualExclusion(): void {
+        $editContent = file_get_contents(__DIR__ . '/../../modules/quiz/edit.php');
+        $listContent = file_get_contents(__DIR__ . '/../../modules/quiz/list.php');
+        $rmContent = file_get_contents(__DIR__ . '/../../includes/ReviewManager.php');
+
+        // 1. In edit.php, enabling team mode disables review mode
+        $teamDisablesReview = strpos($editContent, 'ReviewManager::disableReviewMode($quizId, $creatorId)') !== false;
+        // 2. In edit.php, enabling review mode sets is_team_mode = 0
+        $reviewDisablesTeam = strpos($editContent, 'UPDATE quiz SET is_team_mode = 0 WHERE id_quiz = :q') !== false;
+        // 3. In edit.php, review mode option only rendered if $isClassicQuiz
+        $classicOnlyEdit = strpos($editContent, '<?php if ($isClassicQuiz): ?>') !== false;
+        // 4. In list.php, isReviewEligible checks isClassic and !isTeam
+        $eligibleList = strpos($listContent, '$isReviewEligible = ($isClassic && !$isTeam && !empty($q[\'is_review_mode\']));') !== false;
+        // 5. In ReviewManager.php, getQuizByPin checks is_team_mode = 0 and game_type = classic and mode = normal
+        $rmClassicGuard = strpos($rmContent, "q.game_type = 'classic'") !== false && strpos($rmContent, "q.is_team_mode = 0") !== false;
+
+        self::assert(
+            $teamDisablesReview && $reviewDisablesTeam && $classicOnlyEdit && $eligibleList && $rmClassicGuard,
+            'testReviewModeClassicExclusivityAndTeamMutualExclusion',
+            'Review Mode must only be available in Classic Mode and be mutually exclusive with Team Mode in edit.php, list.php, and ReviewManager.php.'
         );
     }
 }
