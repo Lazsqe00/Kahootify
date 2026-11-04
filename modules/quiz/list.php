@@ -480,7 +480,7 @@ document.addEventListener('DOMContentLoaded', function() {
         $displayJoinUrl = preg_replace('#^https?://#', '', $joinPageUrl);
     ?>
     <div class="modal fade" id="reviewModal_<?= $q['id_quiz'] ?>" tabindex="-1" role="dialog" aria-hidden="true">
-        <div class="modal-dialog modal-lg modal-dialog-centered" role="document" style="max-width: 820px;">
+        <div class="modal-dialog modal-lg modal-dialog-centered" role="document" style="max-width: 740px;">
             <div class="modal-content border-0 bg-transparent">
                 <!-- PURPLE OUTER CONTAINER -->
                 <div class="p-3 p-md-4 position-relative" style="background: #46178f; border-radius: 28px; box-shadow: 0 25px 50px -12px rgba(70, 23, 143, 0.45);">
@@ -489,38 +489,62 @@ document.addEventListener('DOMContentLoaded', function() {
                     </button>
 
                     <!-- INNER WHITE CARD -->
-                    <div class="bg-white text-dark py-4 px-3 px-md-4" style="border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.12);">
-                        <div class="row align-items-center m-0">
-                            <!-- LEFT COLUMN: Join at + Game PIN + Copy link -->
-                            <div class="col-md-7 text-center pr-md-4">
-                                <p class="font-weight-bold text-dark mb-1" style="font-size: 1.15rem; letter-spacing: 0.2px;">Join at</p>
-                                <a href="<?= htmlspecialchars($joinPageUrl) ?>" target="_blank" rel="noopener" class="font-weight-bold d-inline-block text-decoration-none mb-3" style="color: #1368ce; font-size: 1.05rem; word-break: break-all;">
-                                    <?= htmlspecialchars($displayJoinUrl) ?>
-                                </a>
+                    <div class="bg-white text-dark p-4" style="border-radius: 18px; box-shadow: 0 10px 25px rgba(0,0,0,0.12);">
+                        <!-- MODAL HEADER -->
+                        <div class="d-flex align-items-center justify-content-between mb-3 pb-3 border-bottom">
+                            <div>
+                                <span class="badge badge-warning text-dark font-weight-bold px-2 py-1 mr-2" style="font-size: 0.8rem; border-radius: 6px;">
+                                    <i class="fas fa-book-reader mr-1"></i> CHẾ ĐỘ ÔN TẬP
+                                </span>
+                                <h5 class="d-inline-block font-weight-bold text-dark mb-0" style="font-size: 1.15rem; vertical-align: middle;">
+                                    <?= htmlspecialchars($q['title']) ?>
+                                </h5>
+                            </div>
+                        </div>
 
-                                <p class="text-muted font-weight-bold text-uppercase mt-2 mb-1" style="letter-spacing: 3.5px; font-size: 0.95rem; color: #64748b;">GAME PIN</p>
-                                <div class="lobby-pin-number my-1" style="font-family: 'Montserrat', sans-serif; font-weight: 900; font-size: clamp(3rem, 6vw, 4.4rem); letter-spacing: 4px; color: #1e293b; line-height: 1.1;">
-                                    <?= htmlspecialchars($rPin) ?>
+                        <div class="row align-items-center">
+                            <!-- LEFT COLUMN: Practice Link & Open Button -->
+                            <div class="col-md-7 pr-md-4">
+                                <label class="small font-weight-bold text-muted text-uppercase mb-1" style="font-size: 0.75rem; letter-spacing: 0.5px;">
+                                    Đường link ôn tập
+                                </label>
+                                <div class="input-group mb-2 shadow-sm" style="border-radius: 10px; overflow: hidden; border: 1.5px solid #cbd5e1;">
+                                    <input type="text" class="form-control border-0 bg-light text-truncate font-weight-bold text-primary" value="<?= htmlspecialchars($rUrl) ?>" readonly onclick="window.open(this.value, '_blank')" style="cursor: pointer; font-size: 0.88rem; height: 42px;" title="Nhấp vào để mở trang ôn tập">
+                                    <div class="input-group-append">
+                                        <button type="button" class="btn btn-primary font-weight-bold px-3 d-flex align-items-center" onclick="copyTextToClipboard('<?= htmlspecialchars($rUrl) ?>', this)" style="background: #46178f; border-color: #46178f; font-size: 0.88rem;">
+                                            <i class="fas fa-copy mr-1"></i> Sao chép
+                                        </button>
+                                    </div>
                                 </div>
+                                <p class="text-muted small mb-3" style="font-size: 0.82rem;">
+                                    <i class="fas fa-info-circle text-info mr-1"></i> Nhấp vào link hoặc nút bên dưới để vào làm bài ngay.
+                                </p>
 
-                                <div class="mt-4">
-                                    <button type="button" class="btn btn-outline-dark font-weight-bold rounded-lg px-4 py-2 shadow-sm" onclick="copyTextToClipboard('<?= htmlspecialchars($rUrl) ?>', this)" style="border-radius: 10px; border-width: 1.5px; font-size: 1.05rem; border-color: #334155; color: #1e293b;">
-                                        <i class="fas fa-link mr-2"></i> Copy join link
-                                    </button>
+                                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 pt-2 border-top">
+                                    <a href="<?= htmlspecialchars($rUrl) ?>" target="_blank" rel="noopener" class="btn btn-outline-primary btn-sm font-weight-bold px-3 py-2 rounded-pill shadow-sm" style="border-color: #46178f; color: #46178f;">
+                                        <i class="fas fa-external-link-alt mr-1"></i> Vào trang ôn tập ngay
+                                    </a>
+                                    <div class="text-muted small">
+                                        Mã PIN: <strong class="text-dark px-2 py-1 bg-light rounded border font-monospace" style="font-size: 0.95rem; letter-spacing: 1px;"><?= htmlspecialchars($rPin) ?></strong>
+                                    </div>
                                 </div>
                             </div>
 
-                            <!-- RIGHT COLUMN: Or scan to join + QR + Click to enlarge -->
-                            <div class="col-md-5 text-center pl-md-4 mt-4 mt-md-0" style="border-left: 2px solid #f1f5f9;">
-                                <p class="font-weight-bold text-dark mb-3" style="font-size: 1.15rem; letter-spacing: 0.2px;">Or scan to join</p>
+                            <!-- RIGHT COLUMN: QR Code -->
+                            <div class="col-md-5 text-center pl-md-4 mt-4 mt-md-0" style="border-left: 1.5px solid #f1f5f9;">
+                                <p class="font-weight-bold text-dark mb-2" style="font-size: 0.95rem;">
+                                    <i class="fas fa-qrcode mr-1 text-primary"></i> Quét mã QR để vào ôn tập
+                                </p>
                                 <div class="d-flex justify-content-center">
-                                    <button type="button" class="border-0 bg-transparent p-0 qr-zoom-trigger" data-toggle="modal" data-target="#qrZoomModal_<?= $q['id_quiz'] ?>" title="Click QR code to enlarge" style="cursor: zoom-in; outline: none;">
-                                        <div id="reviewQrCode_<?= $q['id_quiz'] ?>" class="review-qr-code mx-auto" data-url="<?= htmlspecialchars($rUrl) ?>" style="width: 175px; height: 175px;">
+                                    <button type="button" class="border p-2 bg-white shadow-sm qr-zoom-trigger" data-toggle="modal" data-target="#qrZoomModal_<?= $q['id_quiz'] ?>" title="Nhấp để phóng to mã QR" style="cursor: zoom-in; outline: none; border-radius: 12px; border-color: #e2e8f0;">
+                                        <div id="reviewQrCode_<?= $q['id_quiz'] ?>" class="review-qr-code mx-auto" data-url="<?= htmlspecialchars($rUrl) ?>" style="width: 145px; height: 145px;">
                                             <div class="spinner-border text-primary" role="status"></div>
                                         </div>
                                     </button>
                                 </div>
-                                <p class="small text-muted mt-2 mb-0" style="font-size: 0.85rem; color: #94a3b8;">Click QR code to enlarge</p>
+                                <p class="small text-muted mt-2 mb-0" style="font-size: 0.8rem; color: #94a3b8;">
+                                    Nhấp mã QR để phóng to
+                                </p>
                             </div>
                         </div>
                     </div>
