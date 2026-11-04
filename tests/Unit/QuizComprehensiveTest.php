@@ -487,6 +487,8 @@ class QuizComprehensiveTest
     }
 }
 
-$suite = new QuizComprehensiveTest();
-$success = $suite->run();
-exit($success ? 0 : 1);
+if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') === 'QuizComprehensiveTest.php') {
+    $suite = new QuizComprehensiveTest();
+    $success = $suite->run();
+    exit($success ? 0 : 1);
+}

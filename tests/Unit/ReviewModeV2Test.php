@@ -252,4 +252,6 @@ class ReviewModeV2Test {
     }
 }
 
-ReviewModeV2Test::run();
+if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') === 'ReviewModeV2Test.php') {
+    ReviewModeV2Test::run();
+}
