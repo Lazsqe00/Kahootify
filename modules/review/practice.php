@@ -7,11 +7,24 @@ require_once __DIR__ . '/../../includes/ReviewManager.php';
 $pin = trim($_GET['pin'] ?? '');
 $quiz = null;
 $questions = [];
+$savedQuestionIds = [];
+$isUserLoggedIn = !empty($_SESSION['id_creator']);
 
 if ($pin !== '') {
     $quiz = ReviewManager::getQuizByPin($pin);
     if ($quiz) {
         $questions = ReviewManager::getReviewQuestions(intval($quiz['id_quiz']));
+        if ($isUserLoggedIn) {
+            try {
+                $sqRows = db_fetch_all(
+                    "SELECT id_question FROM saved_review_questions WHERE id_creator = :c",
+                    [':c' => (int)$_SESSION['id_creator']]
+                );
+                $savedQuestionIds = array_map('intval', array_column($sqRows, 'id_question'));
+            } catch (Throwable $e) {
+                $savedQuestionIds = [];
+            }
+        }
     }
 }
 
@@ -19,6 +32,7 @@ $pageTitle = $quiz ? ("Ôn tập: " . htmlspecialchars($quiz['name'])) : "Chế 
 $bodyClass = "review-practice-body";
 require_once __DIR__ . '/../../includes/header.php';
 ?>
+<link rel="stylesheet" href="<?= BASE_URL ?>assets/css/final-results.css?v=<?= file_exists(__DIR__ . '/../../assets/css/final-results.css') ? filemtime(__DIR__ . '/../../assets/css/final-results.css') : time() ?>">
 
 <style>
 .review-practice-body {
@@ -324,14 +338,7 @@ require_once __DIR__ . '/../../includes/header.php';
     margin-bottom: 28px;
 }
 
-.review-summary-item {
-    background: #ffffff;
-    border-radius: 16px;
-    border: 1px solid #e2e8f0;
-    padding: 18px 20px;
-    margin-bottom: 14px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.03);
-}
+/* Classic review results styling is provided by final-results.css */
 </style>
 
 <!-- TOPBAR -->
@@ -451,10 +458,7 @@ require_once __DIR__ . '/../../includes/header.php';
                 <i class="fas fa-award"></i>
             </span>
         </div>
-        <h3 class="font-weight-bold text-dark mb-1">Hoàn thành bài ôn tập!</h3>
-        <p class="text-muted mb-3" style="font-size: 1.1rem;">
-            Bạn đã hoàn thành phiên tự luyện bài <strong class="text-dark"><?= htmlspecialchars($quiz['name']) ?></strong>
-        </p>
+        <h3 class="font-weight-bold text-dark mb-3">Hoàn thành bài ôn tập!</h3>
         
         <div class="d-inline-block px-4 py-2 rounded-pill mb-4" style="background: #f1f5f9; border: 2px solid #e2e8f0;">
             <span class="h4 font-weight-bold mb-0" id="resultsScoreText" style="color: #0f172a;">
@@ -473,23 +477,39 @@ require_once __DIR__ . '/../../includes/header.php';
         </div>
     </div>
 
-    <!-- DETAILED REVIEW LIST -->
-    <div class="card border-0 shadow-sm rounded-xl p-4 bg-white" style="border-radius: 20px;">
-        <h5 class="font-weight-bold text-dark mb-3">
-            <i class="fas fa-clipboard-check text-success mr-2"></i> Chi tiết câu hỏi đã trả lời
-        </h5>
-        <div id="resultsDetailedList">
+    <!-- REVIEW YOUR ANSWERS (MATCHING CLASSIC FINAL RESULTS UI) -->
+    <section class="results-review" aria-labelledby="resultsReviewTitle">
+        <div class="results-review-heading">
+            <div>
+                <h2 id="resultsReviewTitle">Review your answers</h2>
+                <p>See your choice and the correct answer for each question you answered.</p>
+            </div>
+            <span id="resultsAnsweredCount">0 answered</span>
+        </div>
+
+        <section class="results-saved-review" aria-labelledby="resultsSavedReviewTitle">
+            <div class="results-saved-review-heading">
+                <h3 id="resultsSavedReviewTitle"><i class="far fa-bookmark" aria-hidden="true"></i> Saved questions</h3>
+                <span id="resultsSavedReviewCount">0</span>
+            </div>
+            <p class="results-saved-review-empty" id="resultsSavedReviewEmpty">Save questions here to revisit them later.</p>
+            <ul class="results-saved-review-list" id="resultsSavedReviewList"></ul>
+        </section>
+
+        <div class="results-review-list" id="resultsReviewList">
             <!-- Dynamically populated review cards -->
         </div>
-    </div>
+    </section>
 </main>
 
 <!-- DATA INJECTION & CLIENT LOGIC -->
 <script>
 const QUIZ_DATA = {
-    title: <?= json_encode($quiz['name'], JSON_UNESCAPED_UNICODE) ?>,
-    pin: <?= json_encode($quiz['review_pin'], JSON_UNESCAPED_UNICODE) ?>,
-    questions: <?= json_encode($questions, JSON_UNESCAPED_UNICODE) ?>
+    title: <?= json_encode($quiz['name'] ?? '', JSON_UNESCAPED_UNICODE) ?>,
+    pin: <?= json_encode($quiz['review_pin'] ?? '', JSON_UNESCAPED_UNICODE) ?>,
+    questions: <?= json_encode($questions, JSON_UNESCAPED_UNICODE) ?>,
+    isLoggedIn: <?= $isUserLoggedIn ? 'true' : 'false' ?>,
+    savedQuestionIds: <?= json_encode($savedQuestionIds) ?>
 };
 
 const SHAPES = [
@@ -703,76 +723,197 @@ function onNextClicked() {
     }
 }
 
+let savedQuestionsSet = new Set(QUIZ_DATA.savedQuestionIds || []);
+try {
+    const cachedSaved = JSON.parse(localStorage.getItem('kahootify_saved_review_' + QUIZ_DATA.pin) || '[]');
+    if (Array.isArray(cachedSaved)) {
+        cachedSaved.forEach(id => savedQuestionsSet.add(Number(id)));
+    }
+} catch (e) {}
+
+function updateSavedListUI() {
+    const countEl = document.getElementById('resultsSavedReviewCount');
+    const emptyEl = document.getElementById('resultsSavedReviewEmpty');
+    const listEl = document.getElementById('resultsSavedReviewList');
+    if (!countEl || !emptyEl || !listEl) return;
+
+    listEl.innerHTML = '';
+    let savedCount = 0;
+
+    QUIZ_DATA.questions.forEach((q, idx) => {
+        if (savedQuestionsSet.has(Number(q.id_question))) {
+            savedCount++;
+            const li = document.createElement('li');
+            li.dataset.savedQuestion = String(q.id_question);
+            const a = document.createElement('a');
+            a.href = '#review-question-' + q.id_question;
+            const strong = document.createElement('strong');
+            strong.textContent = `Question ${idx + 1}: `;
+            a.appendChild(strong);
+            a.appendChild(document.createTextNode(q.question_text || q.text || ''));
+            li.appendChild(a);
+            listEl.appendChild(li);
+        }
+    });
+
+    countEl.textContent = String(savedCount);
+    emptyEl.hidden = (savedCount > 0);
+}
+
+function toggleSaveQuestion(btn) {
+    const questionId = Number(btn.dataset.questionId);
+    const questionNumber = btn.dataset.questionNumber;
+    const isSaved = btn.getAttribute('aria-pressed') === 'true';
+    const shouldSave = !isSaved;
+
+    btn.setAttribute('aria-pressed', shouldSave ? 'true' : 'false');
+    btn.classList.toggle('is-saved', shouldSave);
+    const icon = btn.querySelector('i');
+    if (icon) icon.className = (shouldSave ? 'fas' : 'far') + ' fa-bookmark';
+    const label = btn.querySelector('span');
+    if (label) label.textContent = shouldSave ? 'Saved' : 'Save for review';
+
+    if (shouldSave) {
+        savedQuestionsSet.add(questionId);
+    } else {
+        savedQuestionsSet.delete(questionId);
+    }
+
+    try {
+        localStorage.setItem('kahootify_saved_review_' + QUIZ_DATA.pin, JSON.stringify(Array.from(savedQuestionsSet)));
+    } catch (e) {}
+
+    updateSavedListUI();
+
+    if (QUIZ_DATA.isLoggedIn) {
+        fetch('<?= BASE_URL ?>modules/api/toggle_saved_review_question.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                id_question: questionId,
+                saved: shouldSave
+            })
+        }).catch(err => console.error('Save error', err));
+    }
+}
+
 function showResults() {
     document.getElementById('practiceScreen').style.display = 'none';
     document.getElementById('resultsScreen').style.display = 'block';
 
     const total = QUIZ_DATA.questions.length;
     let correctCount = 0;
+    let answeredCount = 0;
+
     answersState.forEach(st => {
-        if (st && st.isCorrect) correctCount++;
+        if (st !== null) {
+            answeredCount++;
+            if (st.isCorrect) correctCount++;
+        }
     });
 
     const percent = total > 0 ? Math.round((correctCount / total) * 100) : 0;
     document.getElementById('resultsScoreText').textContent = `${correctCount} / ${total} Đúng (${percent}%)`;
+    document.getElementById('resultsAnsweredCount').textContent = `${answeredCount} answered`;
 
-    // Render detailed questions list
-    const container = document.getElementById('resultsDetailedList');
+    updateSavedListUI();
+
+    const container = document.getElementById('resultsReviewList');
     container.innerHTML = '';
+
+    const symbols = ['▲', '◆', '●', '■'];
 
     QUIZ_DATA.questions.forEach((q, idx) => {
         const state = answersState[idx];
         const isAnswered = (state !== null);
-        const isCorrect = isAnswered ? state.isCorrect : false;
+        const isCorrect = isAnswered ? Boolean(state.isCorrect) : false;
+        const qNum = idx + 1;
+        const qId = Number(q.id_question);
+        const isSaved = savedQuestionsSet.has(qId);
 
-        const item = document.createElement('div');
-        item.className = 'review-summary-item';
+        const card = document.createElement('article');
+        card.className = 'results-review-question';
+        card.id = `review-question-${qId}`;
 
-        let badge = '<span class="badge badge-secondary px-2 py-1"><i class="fas fa-minus-circle mr-1"></i> Chưa làm</span>';
-        if (isAnswered) {
-            badge = isCorrect
-                ? '<span class="badge badge-success px-2 py-1"><i class="fas fa-check-circle mr-1"></i> Đúng</span>'
-                : '<span class="badge badge-danger px-2 py-1"><i class="fas fa-times-circle mr-1"></i> Sai</span>';
+        let outcomeClass = 'is-incorrect';
+        let outcomeText = 'Incorrect';
+        if (isAnswered && isCorrect) {
+            outcomeClass = 'is-correct';
+            outcomeText = 'Correct';
+        } else if (!isAnswered) {
+            outcomeClass = 'is-incorrect';
+            outcomeText = 'Unanswered';
         }
 
-        let answersHtml = '<div class="mt-2" style="font-size: 0.95rem;">';
-        (q.answers || []).forEach(ans => {
-            const chosen = isAnswered && (ans.id_answer === state.selectedAnswerId);
-            const ansCorrect = (ans.is_correct === true);
-
-            let rowStyle = 'padding: 6px 12px; border-radius: 8px; margin-bottom: 4px; display: flex; align-items: center;';
-            let icon = '<i class="far fa-circle text-muted mr-2"></i>';
-
-            if (ansCorrect) {
-                rowStyle += 'background: #dcfce7; color: #166534; font-weight: 700;';
-                icon = '<i class="fas fa-check-circle text-success mr-2"></i>';
-            } else if (chosen && !ansCorrect) {
-                rowStyle += 'background: #fee2e2; color: #991b1b; font-weight: 700;';
-                icon = '<i class="fas fa-times-circle text-danger mr-2"></i>';
-            } else {
-                rowStyle += 'background: #f8fafc; color: #475569;';
-            }
-
-            answersHtml += `<div style="${rowStyle}">
-                ${icon}
-                <span class="flex-grow-1">${escapeHtml(ans.answer_text || ans.text || '(Ảnh đáp án)')}</span>
-                ${chosen ? '<span class="badge badge-light border ml-2">Lựa chọn của bạn</span>' : ''}
-                ${ansCorrect ? '<span class="badge badge-success ml-2">Đáp án chuẩn</span>' : ''}
-            </div>`;
-        });
-        answersHtml += '</div>';
-
-        item.innerHTML = `
-            <div class="d-flex justify-content-between align-items-center mb-1">
-                <span class="font-weight-bold text-dark" style="font-size: 1.05rem;">
-                    Câu ${idx + 1}: ${escapeHtml(q.question_text || q.text || '')}
-                </span>
-                <div>${badge}</div>
+        let cardHtml = `
+            <div class="results-review-question-heading">
+                <span class="results-review-number">Question ${qNum}</span>
+                <div class="results-review-question-actions">
+                    <span class="results-review-outcome ${outcomeClass}">${outcomeText}</span>
+                    <button class="results-review-save ${isSaved ? 'is-saved' : ''}" type="button"
+                        data-question-id="${qId}"
+                        data-question-number="${qNum}"
+                        aria-pressed="${isSaved ? 'true' : 'false'}">
+                        <i class="${isSaved ? 'fas' : 'far'} fa-bookmark" aria-hidden="true"></i>
+                        <span>${isSaved ? 'Saved' : 'Save for review'}</span>
+                    </button>
+                </div>
             </div>
-            ${answersHtml}
+            <h3>${escapeHtml(q.question_text || q.text || '')}</h3>
         `;
 
-        container.appendChild(item);
+        if (q.image) {
+            const mediaSrc = (q.image.startsWith('http://') || q.image.startsWith('https://')) ? q.image : ('<?= BASE_URL ?>' + q.image.replace(/^\//, ''));
+            cardHtml += `
+                <div class="results-review-media">
+                    <img src="${escapeHtml(mediaSrc)}" alt="Question illustration" loading="lazy">
+                </div>
+            `;
+        }
+
+        cardHtml += '<div class="results-review-answers">';
+        (q.answers || []).forEach((ans, aIdx) => {
+            const isCorrectAnswer = (ans.is_correct === true || ans.is_correct === 1);
+            const isPlayerChoice = isAnswered && (ans.id_answer === state.selectedAnswerId);
+            const symbol = symbols[aIdx % 4];
+
+            let ansClass = 'results-review-answer';
+            if (isCorrectAnswer) ansClass += ' is-correct-answer';
+            if (isPlayerChoice) ansClass += ' is-player-choice';
+
+            const ansText = ans.answer_text || ans.text || '';
+            let ansImgHtml = '';
+            if (ans.image) {
+                const aImgSrc = (ans.image.startsWith('http://') || ans.image.startsWith('https://')) ? ans.image : ('<?= BASE_URL ?>' + ans.image.replace(/^\//, ''));
+                ansImgHtml = `<img src="${escapeHtml(aImgSrc)}" alt="Answer illustration" loading="lazy">`;
+            }
+
+            cardHtml += `
+                <div class="${ansClass}">
+                    <span class="results-review-answer-symbol">${symbol}</span>
+                    <div class="results-review-answer-content">
+                        ${ansText ? `<span>${escapeHtml(ansText)}</span>` : ''}
+                        ${ansImgHtml}
+                    </div>
+                    <div class="results-review-answer-labels">
+                        ${isPlayerChoice ? '<span class="results-review-choice-label">Your answer</span>' : ''}
+                        ${isCorrectAnswer ? '<span class="results-review-correct-label">Correct answer</span>' : ''}
+                    </div>
+                </div>
+            `;
+        });
+        cardHtml += '</div>';
+
+        card.innerHTML = cardHtml;
+
+        const saveBtn = card.querySelector('.results-review-save');
+        if (saveBtn) {
+            saveBtn.addEventListener('click', function () {
+                toggleSaveQuestion(saveBtn);
+            });
+        }
+
+        container.appendChild(card);
     });
 
     window.scrollTo({ top: 0, behavior: 'smooth' });

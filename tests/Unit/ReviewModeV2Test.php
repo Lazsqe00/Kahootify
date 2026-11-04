@@ -114,11 +114,15 @@ class ReviewModeV2Test {
         $hasStickySkip = strpos($practiceContent, 'btnSkipToEnd') !== false;
         $hasInstantFeedback = strpos($practiceContent, 'highlight-correct') !== false && strpos($practiceContent, 'selected-incorrect') !== false;
         $hasRestartAndReturn = strpos($practiceContent, 'btnRestart') !== false && strpos($practiceContent, 'btnReturn') !== false;
+        $hasClassicReviewSection = strpos($practiceContent, 'class="results-review"') !== false;
+        $hasSavedReviewSection = strpos($practiceContent, 'class="results-saved-review"') !== false;
+        $hasSaveForReviewBtn = strpos($practiceContent, 'results-review-save') !== false;
+        $noOldCompletionLine = strpos($practiceContent, 'Bạn đã hoàn thành phiên tự luyện bài') === false;
 
         self::assert(
-            $has5ColGrid && $hasStickySkip && $hasInstantFeedback && $hasRestartAndReturn,
+            $has5ColGrid && $hasStickySkip && $hasInstantFeedback && $hasRestartAndReturn && $hasClassicReviewSection && $hasSavedReviewSection && $hasSaveForReviewBtn && $noOldCompletionLine,
             'testPracticeViewDomContracts',
-            'practice.php must contain 5-col grid, sticky Skip button, Instant Feedback, and Restart/Return buttons.'
+            'practice.php must contain 5-col grid, sticky Skip, Restart/Return, Classic results review section with Save button, and no old completion sentence.'
         );
     }
 
