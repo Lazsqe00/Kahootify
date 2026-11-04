@@ -705,15 +705,6 @@ $availableTeams = TeamManager::getTeamsForEntity($quiz);
                 <div class="dropdown-menu dropdown-menu-right shadow-sm border" aria-labelledby="quizOptionsDropdown" style="min-width: 230px; border-radius: 10px; padding: 6px;">
                     <div class="dropdown-header text-uppercase font-weight-bold text-muted px-2 py-1" style="font-size: 0.7rem; letter-spacing: 0.5px;">Game Settings</div>
 
-                    <?php if ($isObstacle): ?>
-                    <button class="dropdown-item d-flex align-items-center py-2 px-2 rounded" type="button" data-toggle="modal" data-target="#obstacleSettingsModal">
-                        <i class="fas fa-puzzle-piece mr-2 text-warning"></i>
-                        <span class="font-weight-bold">Secret Image &amp; Tiles</span>
-                        <span class="badge <?= count($questions) >= intval($quiz['total_pieces'] ?? 4) ? 'badge-success' : 'badge-warning text-dark' ?> ml-auto font-weight-bold">
-                            <?= count($questions) ?>/<?= intval($quiz['total_pieces'] ?? 4) ?>
-                        </span>
-                    </button>
-                    <?php endif; ?>
 
                     <?php if ($isClassicQuiz): ?>
                     <button class="dropdown-item d-flex align-items-center py-2 px-2 rounded mb-1" type="button" data-toggle="modal" data-target="#reviewModeModal" onclick="$('#reviewModeModal').modal('show')">
