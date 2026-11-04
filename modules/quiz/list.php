@@ -474,7 +474,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <!-- REVIEW MODE VIEW MODALS (KAHOOT LOBBY STYLE) -->
 <?php foreach ($quizzes as $q): ?>
     <?php if (!empty($q['is_review_mode']) && empty($q['is_team_mode']) && ($q['game_type'] ?? 'classic') === 'classic' && ($q['mode'] ?? 'normal') === 'normal'): 
-        $rPin = $q['review_pin'] ?? '';
+        $rPin = ReviewManager::getOrGeneratePin(intval($q['id_quiz']), $q['review_pin'] ?? null);
         $rUrl = ReviewManager::buildReviewUrl($rPin);
         $joinPageUrl = rtrim(BASE_URL, '/') . '/modules/player/join.php';
         $displayJoinUrl = preg_replace('#^https?://#', '', $joinPageUrl);

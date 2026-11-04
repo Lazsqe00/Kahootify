@@ -16,7 +16,7 @@ if (!$quiz) {
 }
 $isObstacle = (($quiz['game_type'] ?? 'classic') === 'obstacle');
 $isReviewMode = !empty($quiz['is_review_mode']);
-$reviewPin    = $quiz['review_pin'] ?? '';
+$reviewPin    = $isReviewMode ? ReviewManager::getOrGeneratePin($quizId, $quiz['review_pin'] ?? null) : ($quiz['review_pin'] ?? '');
 $reviewUrl    = ReviewManager::buildReviewUrl($reviewPin);
 
 function saveUploadedFile($fileKey) {

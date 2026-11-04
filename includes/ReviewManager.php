@@ -67,6 +67,19 @@ class ReviewManager {
             if (!$col) {
                 db_execute("ALTER TABLE `quiz` ADD COLUMN `review_pin` VARCHAR(10) NULL DEFAULT NULL AFTER `is_review_mode`");
             }
+
+            // Auto-heal: Ensure all existing quizzes with review mode enabled have a valid unique 6-digit PIN
+            $quizzesWithoutPin = db_fetch_all(
+                "SELECT id_quiz FROM quiz WHERE is_review_mode = 1 AND (review_pin IS NULL OR TRIM(review_pin) = '')"
+            );
+            foreach ($quizzesWithoutPin as $row) {
+                $newPin = self::generateUniqueReviewPin();
+                db_execute(
+                    "UPDATE quiz SET review_pin = :pin WHERE id_quiz = :q",
+                    [':pin' => $newPin, ':q' => $row['id_quiz']]
+                );
+            }
+
             $checked = true;
         } catch (Throwable $e) {
             // Silently continue if DB connection isn't available during offline static analysis
@@ -265,6 +278,21 @@ class ReviewManager {
      * @param string $pin
      * @return string
      */
+    /**
+     * Get existing PIN or generate and persist a new 6-digit PIN for a review quiz.
+     */
+    public static function getOrGeneratePin(int $quizId, ?string $existingPin = null): string {
+        $clean = trim((string)$existingPin);
+        if ($clean !== '') {
+            return $clean;
+        }
+        $newPin = self::generateUniqueReviewPin();
+        try {
+            db_execute("UPDATE quiz SET review_pin = :p WHERE id_quiz = :q", [':p' => $newPin, ':q' => $quizId]);
+        } catch (Throwable $e) {}
+        return $newPin;
+    }
+
     public static function buildReviewUrl(string $pin): string {
         $baseUrl = defined('BASE_URL') ? BASE_URL : '/';
         return rtrim($baseUrl, '/') . '/modules/review/practice.php?pin=' . urlencode(trim($pin));
