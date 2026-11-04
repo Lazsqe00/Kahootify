@@ -257,21 +257,70 @@ require_once __DIR__ . '/../../includes/navbar.php';
     width: 100%;
     height: 100%;
 }
-.tab-btn-clean {
-    color: #475569;
-    border-color: #cbd5e1;
+
+/* Back Button (Clean Human SaaS Style) */
+.report-back-btn {
+    display: inline-flex;
+    align-items: center;
     background: #ffffff;
-    transition: all 0.15s ease;
+    color: #334155;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 6px 14px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    transition: all 0.15s ease-in-out;
 }
-.tab-btn-clean:hover {
-    color: #1e293b;
+.report-back-btn:hover {
     background: #f8fafc;
-    border-color: #94a3b8;
+    color: #46178f;
+    border-color: #c4b5fd;
+    box-shadow: 0 2px 5px rgba(70, 23, 143, 0.12);
+    transform: translateX(-2px);
+    text-decoration: none;
 }
+
+/* Report Tab Navigation - Kahoot Purple Theme */
+.tab-btn-clean {
+    border: 1.5px solid #ddd6fe !important;
+    background-color: #ffffff !important;
+    color: #46178f !important;
+    font-weight: 700 !important;
+    border-radius: 8px !important;
+    padding: 8px 18px !important;
+    font-size: 0.92rem !important;
+    transition: all 0.15s ease-in-out !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+    outline: none !important;
+}
+
+.tab-btn-clean:hover {
+    background-color: #f5f3ff !important;
+    border-color: #c4b5fd !important;
+    color: #46178f !important;
+    transform: translateY(-1px);
+}
+
 .tab-btn-clean.active {
-    color: #ffffff !important;
     background: #46178f !important;
     border-color: #46178f !important;
+    color: #ffffff !important;
+    box-shadow: 0 3px 8px rgba(70, 23, 143, 0.28) !important;
+}
+
+.tab-btn-clean.active .badge {
+    background-color: rgba(255, 255, 255, 0.22) !important;
+    color: #ffffff !important;
+    border: 1px solid rgba(255, 255, 255, 0.4) !important;
+    font-weight: 700 !important;
+}
+
+.tab-btn-clean:not(.active) .badge {
+    background-color: #f5f3ff !important;
+    color: #46178f !important;
+    border: 1px solid #ddd6fe !important;
+    font-weight: 700 !important;
 }
 </style>
 
@@ -280,15 +329,15 @@ require_once __DIR__ . '/../../includes/navbar.php';
     <!-- 1. Header & Actions -->
     <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 pb-2 border-bottom">
         <div>
-            <div class="d-flex align-items-center mb-2" style="gap: 8px;">
-                <a href="<?= BASE_URL ?>modules/reports/list.php" class="btn btn-sm btn-outline-secondary font-weight-bold" style="border-radius: 6px; padding: 3px 10px; font-size: 0.82rem;">
-                    <i class="fas fa-arrow-left mr-1"></i> Quay lại danh sách
+            <div class="d-flex align-items-center flex-wrap mb-2" style="gap: 10px;">
+                <a href="<?= BASE_URL ?>modules/reports/list.php" class="report-back-btn text-decoration-none">
+                    <i class="fas fa-arrow-left mr-2"></i> Quay lại danh sách
                 </a>
-                <span class="badge badge-light border font-monospace text-dark font-weight-bold px-2 py-1" style="font-size: 0.85rem; letter-spacing: 1px;">
+                <span class="badge badge-light border font-monospace text-dark font-weight-bold px-2 py-1" style="font-size: 0.85rem; letter-spacing: 1px; border-radius: 6px;">
                     PIN: <?= htmlspecialchars($room['pin']) ?>
                 </span>
                 <?php if ($isTeamMode): ?>
-                    <span class="badge badge-info text-white font-weight-bold px-2 py-1" style="font-size: 0.8rem; border-radius: 6px;">
+                    <span class="badge text-white font-weight-bold px-2 py-1 shadow-sm" style="font-size: 0.82rem; background: #46178f; border-radius: 6px;">
                         <i class="fas fa-users mr-1"></i> Chế độ Đội (<?= $teamCount ?> Đội)
                     </span>
                 <?php endif; ?>
@@ -363,15 +412,15 @@ require_once __DIR__ . '/../../includes/navbar.php';
     <div class="d-flex justify-content-between align-items-center mb-3">
         <div class="d-flex flex-wrap" style="gap: 8px;">
             <?php if ($isTeamMode): ?>
-            <button class="btn btn-sm btn-outline-primary active font-weight-bold px-3 py-2 tab-btn-clean" id="tabBtnTeams" type="button" onclick="switchReportTab('teams')" style="border-radius: 8px;">
-                <i class="fas fa-users mr-1"></i> Bảng xếp hạng Đội <span class="badge badge-light border ml-1"><?= count($teamLeaderboard) ?></span>
+            <button class="btn btn-sm tab-btn-clean active" id="tabBtnTeams" type="button" onclick="switchReportTab('teams')">
+                <i class="fas fa-users mr-1"></i> Bảng xếp hạng Đội <span class="badge ml-1"><?= count($teamLeaderboard) ?></span>
             </button>
             <?php endif; ?>
-            <button class="btn btn-sm btn-outline-primary <?= $isTeamMode ? '' : 'active' ?> font-weight-bold px-3 py-2 tab-btn-clean" id="tabBtnPlayers" type="button" onclick="switchReportTab('players')" style="border-radius: 8px;">
-                <i class="fas fa-trophy mr-1"></i> Bảng xếp hạng cá nhân <span class="badge badge-light border ml-1"><?= $totalPlayers ?></span>
+            <button class="btn btn-sm tab-btn-clean <?= $isTeamMode ? '' : 'active' ?>" id="tabBtnPlayers" type="button" onclick="switchReportTab('players')">
+                <i class="fas fa-trophy mr-1"></i> Bảng xếp hạng cá nhân <span class="badge ml-1"><?= $totalPlayers ?></span>
             </button>
-            <button class="btn btn-sm btn-outline-primary font-weight-bold px-3 py-2 tab-btn-clean" id="tabBtnQuestions" type="button" onclick="switchReportTab('questions')" style="border-radius: 8px;">
-                <i class="fas fa-list mr-1"></i> Phân tích câu hỏi <span class="badge badge-light border ml-1"><?= $totalQuestions ?></span>
+            <button class="btn btn-sm tab-btn-clean" id="tabBtnQuestions" type="button" onclick="switchReportTab('questions')">
+                <i class="fas fa-list mr-1"></i> Phân tích câu hỏi <span class="badge ml-1"><?= $totalQuestions ?></span>
             </button>
         </div>
     </div>
@@ -889,22 +938,6 @@ document.addEventListener('DOMContentLoaded', function() {
         border: 1px solid #cbd5e1 !important;
         page-break-inside: avoid;
     }
-}
-.tab-btn-clean {
-    color: #475569;
-    border-color: #cbd5e1;
-    background: #ffffff;
-    transition: all 0.15s ease;
-}
-.tab-btn-clean:hover {
-    color: #1e293b;
-    background: #f8fafc;
-    border-color: #94a3b8;
-}
-.tab-btn-clean.active {
-    color: #ffffff !important;
-    background: #46178f !important;
-    border-color: #46178f !important;
 }
 </style>
 
