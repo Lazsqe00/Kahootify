@@ -998,7 +998,7 @@ $availableTeams = TeamManager::getTeamsForEntity($quiz);
                         <i class="fas fa-times mr-1"></i> Cancel
                     </button>
                     <button type="submit" class="btn-save" id="btnSaveQuestion">
-                        <i class="fas fa-plus mr-1"></i> Save &amp; Add Question
+                        Save
                     </button>
                 </div>
             </form>

@@ -456,7 +456,7 @@ function resetToNewMode() {
         document.getElementById('canvasModeLabel').textContent = 'New Question';
     }
     document.getElementById('btnCancelEdit').style.display  = 'none';
-    document.getElementById('btnSaveQuestion').innerHTML = '<i class="fas fa-plus mr-1"></i> Save &amp; Add Question';
+    document.getElementById('btnSaveQuestion').innerHTML = 'Save';
 
     document.getElementById('questionMediaFile').value       = '';
     document.getElementById('questionMediaPreview').innerHTML = '';
@@ -545,7 +545,7 @@ window.loadQuestionForEdit = function (questionId) {
         document.getElementById('canvasModeLabel').textContent = 'Editing Question ' + qIdx;
     }
     document.getElementById('btnCancelEdit').style.display = '';
-    document.getElementById('btnSaveQuestion').innerHTML   = '<i class="fas fa-check mr-1"></i> Update Question';
+    document.getElementById('btnSaveQuestion').innerHTML   = 'Save';
 
     var qType = q.question_type || 'multiple_choice';
     preferredQuestionType = qType;
