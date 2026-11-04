@@ -230,15 +230,12 @@ require_once __DIR__ . '/../../includes/header.php';
 }
 </style>
 
-<nav class="navbar navbar-dark bg-dark px-4 py-2 d-flex justify-content-between align-items-center">
+<nav class="navbar navbar-dark bg-dark px-4 py-3 d-flex justify-content-between align-items-center shadow-sm" style="min-height: 64px;">
     <div class="d-flex align-items-center">
-        <img src="<?= BASE_URL ?>assets/img/logo.png" alt="Logo" style="max-height: 32px; filter: brightness(100);" class="mr-3">
-        <span class="badge badge-light font-weight-bold mr-2">PIN: <?= htmlspecialchars($room['pin']) ?></span>
-        <span class="text-white font-weight-bold mr-2">LEADERBOARD</span>
-        <span class="badge badge-primary font-weight-bold mr-2">Question <?= $questionNumber ?> / <?= $totalQuestions ?></span>
-        <?php if ($isWagerQuestion): ?>
-            <span class="badge badge-warning text-dark font-weight-bold"><i class="fas fa-dice mr-1"></i> WAGER</span>
-        <?php endif; ?>
+        <img src="<?= BASE_URL ?>assets/img/logo.png" alt="Logo" style="max-height: 34px; filter: brightness(100);" class="mr-3">
+        <span class="badge badge-light font-weight-bold font-monospace px-3 py-2 mr-3" style="font-size: 0.95rem; border-radius: 8px; letter-spacing: 0.5px;">PIN: <?= htmlspecialchars($room['pin']) ?></span>
+        <span class="text-white font-weight-bold mr-3" style="font-size: 1.05rem;">LEADERBOARD</span>
+        <span class="badge badge-primary font-weight-bold px-3 py-2" style="font-size: 0.9rem; border-radius: 8px;">Question <?= $questionNumber ?> / <?= $totalQuestions ?></span>
     </div>
 </nav>
 

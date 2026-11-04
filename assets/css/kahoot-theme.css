@@ -114,6 +114,39 @@ h1, h2, h3, h4, h5, h6, .brand-font, .btn, .badge {
   box-shadow: 0 4px 0 #966e00;
 }
 
+.btn-kahoot:hover {
+  text-decoration: none !important;
+}
+
+.btn-kahoot-sm {
+  padding: 8px 18px !important;
+  font-size: 0.95rem !important;
+  border-radius: 6px !important;
+  line-height: 1.25;
+}
+
+.btn-kahoot-white {
+  background-color: #ffffff;
+  color: #1f2937 !important;
+  box-shadow: 0 4px 0 #d1d5db;
+}
+.btn-kahoot-white:hover {
+  background-color: #f3f4f6;
+  color: #111827 !important;
+}
+
+.btn-kahoot-secondary {
+  background-color: rgba(255, 255, 255, 0.15);
+  color: #ffffff !important;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+.btn-kahoot-secondary:hover {
+  background-color: rgba(255, 255, 255, 0.25);
+  color: #ffffff !important;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.55);
+}
+
 .btn-purple {
   background-color: var(--kahoot-purple);
   border-color: var(--kahoot-purple);

@@ -148,19 +148,18 @@ if ($phase === 'wager') {
     $bodyClass = "backgroundColorChanges";
     require_once __DIR__ . '/../../includes/header.php';
     ?>
-    <nav class="navbar navbar-dark bg-dark px-4 py-2 d-flex justify-content-between align-items-center">
+    <nav class="navbar navbar-dark bg-dark px-4 py-3 d-flex justify-content-between align-items-center shadow-sm" style="min-height: 64px;">
         <div class="d-flex align-items-center">
-            <img src="<?= BASE_URL ?>assets/img/logo.png" alt="Logo" style="max-height: 32px; filter: brightness(100);" class="mr-3">
-            <span class="badge badge-light font-weight-bold mr-2">PIN: <?= htmlspecialchars($room['pin']) ?></span>
-            <span class="text-white font-weight-bold mr-2">Question <?= $questionNumber ?> / <?= $totalQuestions ?></span>
-            <span class="badge badge-warning text-dark font-weight-bold"><i class="fas fa-dice mr-1"></i> WAGER</span>
+            <img src="<?= BASE_URL ?>assets/img/logo.png" alt="Logo" style="max-height: 34px; filter: brightness(100);" class="mr-3">
+            <span class="badge badge-light font-weight-bold font-monospace px-3 py-2 mr-3" style="font-size: 0.95rem; border-radius: 8px; letter-spacing: 0.5px;">PIN: <?= htmlspecialchars($room['pin']) ?></span>
+            <span class="text-white font-weight-bold" style="font-size: 1.05rem;">Question <?= $questionNumber ?> / <?= $totalQuestions ?></span>
         </div>
         <div class="d-flex align-items-center">
-            <a href="play.php?action=lock_wager" class="btn btn-warning font-weight-bold mr-2 shadow-sm">
-                <i class="fas fa-arrow-right mr-1"></i> Start Question Now &raquo;
+            <a href="play.php?action=lock_wager" class="btn btn-kahoot btn-kahoot-blue btn-kahoot-sm mr-2">
+                <i class="fas fa-play mr-1"></i> Start Question
             </a>
-            <a href="play.php?action=skip_question" class="btn btn-outline-light font-weight-bold" onclick="return confirm('Skip this question? Player scores will not change.');">
-                Skip Question &raquo;
+            <a href="play.php?action=skip_question" class="btn btn-kahoot btn-kahoot-secondary btn-kahoot-sm" onclick="return confirm('Skip this question? Player scores will not change.');">
+                Skip Question
             </a>
         </div>
     </nav>
@@ -317,39 +316,36 @@ require_once __DIR__ . '/../../includes/header.php';
 </audio>
 <?php endif; ?>
 
-<nav class="navbar navbar-dark bg-dark px-4 py-2 d-flex justify-content-between align-items-center">
+<nav class="navbar navbar-dark bg-dark px-4 py-3 d-flex justify-content-between align-items-center shadow-sm" style="min-height: 64px;">
     <div class="d-flex align-items-center">
-        <img src="<?= BASE_URL ?>assets/img/logo.png" alt="Logo" style="max-height: 32px; filter: brightness(100);" class="mr-3">
-        <span class="badge badge-light font-weight-bold mr-2">PIN: <?= htmlspecialchars($room['pin']) ?></span>
-        <span class="text-white font-weight-bold mr-2">Question <?= $questionNumber ?> / <?= $totalQuestions ?></span>
-        <?php if ($questionMode === 'wager'): ?>
-            <span class="badge badge-warning text-dark font-weight-bold"><i class="fas fa-dice mr-1"></i> WAGER</span>
-        <?php endif; ?>
+        <img src="<?= BASE_URL ?>assets/img/logo.png" alt="Logo" style="max-height: 34px; filter: brightness(100);" class="mr-3">
+        <span class="badge badge-light font-weight-bold font-monospace px-3 py-2 mr-3" style="font-size: 0.95rem; border-radius: 8px; letter-spacing: 0.5px;">PIN: <?= htmlspecialchars($room['pin']) ?></span>
+        <span class="text-white font-weight-bold" style="font-size: 1.05rem;">Question <?= $questionNumber ?> / <?= $totalQuestions ?></span>
     </div>
     <div class="d-flex align-items-center">
         <?php if ($questionAudioFile): ?>
-            <button type="button" id="audioToggleBtn" class="btn btn-sm btn-light font-weight-bold shadow-sm rounded-pill mr-2 px-3" onclick="toggleQuestionAudio()" title="Toggle countdown music">
+            <button type="button" id="audioToggleBtn" class="btn btn-kahoot btn-kahoot-white btn-kahoot-sm mr-2" onclick="toggleQuestionAudio()" title="Toggle countdown music">
                 <i class="fas fa-volume-up text-success mr-1" id="audioIcon"></i>
                 <span id="audioLabel">Music: ON</span>
             </button>
         <?php endif; ?>
 
         <?php if (($room['game_type'] ?? 'classic') === 'obstacle'): ?>
-            <a href="play.php?action=show_result" onclick="stopQuestionAudio()" class="btn btn-warning font-weight-bold mr-2">
-                <i class="fas fa-chart-bar mr-1"></i> View Results &raquo;
+            <a href="play.php?action=show_result" onclick="stopQuestionAudio()" class="btn btn-kahoot btn-kahoot-blue btn-kahoot-sm mr-2">
+                <i class="fas fa-chart-bar mr-1"></i> View Results
             </a>
-            <a href="play.php?action=return_to_board" onclick="stopQuestionAudio()" class="btn btn-outline-light font-weight-bold mr-2">
+            <a href="play.php?action=return_to_board" onclick="stopQuestionAudio()" class="btn btn-kahoot btn-kahoot-secondary btn-kahoot-sm mr-2">
                 <i class="fas fa-th mr-1"></i> Return to Board
             </a>
-            <a href="play.php?action=skip_question" onclick="stopQuestionAudio(); return confirm('Skip this question? Player scores will not change.');" class="btn btn-sm btn-outline-warning font-weight-bold">
-                Skip Question &raquo;
+            <a href="play.php?action=skip_question" onclick="stopQuestionAudio(); return confirm('Skip this question? Player scores will not change.');" class="btn btn-kahoot btn-kahoot-secondary btn-kahoot-sm">
+                Skip Question
             </a>
         <?php else: ?>
-            <a href="play.php?action=show_result" onclick="stopQuestionAudio()" class="btn btn-outline-light font-weight-bold mr-2">
-                Skip to Leaderboard &raquo;
+            <a href="play.php?action=show_result" onclick="stopQuestionAudio()" class="btn btn-kahoot btn-kahoot-blue btn-kahoot-sm mr-2">
+                Leaderboard
             </a>
-            <a href="play.php?action=skip_question" onclick="stopQuestionAudio(); return confirm('Skip this question? Player scores will not change.');" class="btn btn-sm btn-outline-warning font-weight-bold">
-                Skip Question &raquo;
+            <a href="play.php?action=skip_question" onclick="stopQuestionAudio(); return confirm('Skip this question? Player scores will not change.');" class="btn btn-kahoot btn-kahoot-secondary btn-kahoot-sm">
+                Skip Question
             </a>
         <?php endif; ?>
     </div>
