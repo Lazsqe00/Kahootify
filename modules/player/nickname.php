@@ -61,9 +61,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $canJoin) {
                 $_SESSION['player_team_name'] = $result['team_name'] ?? '';
             }
 
-            if (!empty($room['is_review_mode'])) {
-                redirect('modules/player/play.php?pid=' . $playerId . '&token=' . $playerToken);
-            }
             redirect('modules/player/waiting.php?pid=' . $playerId . '&token=' . $playerToken);
         } else {
             $error = $result['message'];

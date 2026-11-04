@@ -4,35 +4,10 @@ require_once __DIR__ . '/../../includes/auth_check.php';
 require_once __DIR__ . '/../../config/database.php';
 
 $creatorId = intval($_SESSION['id_creator']);
-if (isset($_GET['end_review'])) {
-    $endRoomId = intval($_GET['end_review']);
-    $r = db_fetch_one("SELECT id_quiz FROM room WHERE id_room = :r AND id_creator = :c AND is_review_mode = 1", [':r' => $endRoomId, ':c' => $creatorId]);
-    if ($r) {
-        db_execute("UPDATE room SET status = 'finished' WHERE id_room = :r", [':r' => $endRoomId]);
-        db_execute("UPDATE quiz SET is_review_mode = 0, review_start_time = NULL, review_end_time = NULL WHERE id_quiz = :q AND id_creator = :c", [':q' => $r['id_quiz'], ':c' => $creatorId]);
-    }
-    set_flash_message('success', 'Review session ended successfully.');
-    redirect('modules/quiz/list.php');
-}
-
-// Auto-finalize any expired review sessions and synchronize quiz review status
-db_execute("
-    UPDATE room r 
-    JOIN quiz q ON r.id_quiz = q.id_quiz 
-    SET r.status = 'finished', q.is_review_mode = 0, q.review_start_time = NULL, q.review_end_time = NULL 
-    WHERE r.is_review_mode = 1 AND r.status = 'review_active' AND r.review_end_time IS NOT NULL AND r.review_end_time < NOW()
-");
-db_execute("
-    UPDATE quiz 
-    SET is_review_mode = 0, review_start_time = NULL, review_end_time = NULL 
-    WHERE is_review_mode = 1 AND (SELECT COUNT(*) FROM room WHERE id_quiz = quiz.id_quiz AND is_review_mode = 1 AND status = 'review_active') = 0
-");
 
 $quizzes = db_fetch_all(
     "SELECT q.*, 
-            (SELECT COUNT(*) FROM questions WHERE id_quiz = q.id_quiz) as question_count,
-            (SELECT id_room FROM room WHERE id_quiz = q.id_quiz AND is_review_mode = 1 AND status = 'review_active' ORDER BY id_room DESC LIMIT 1) as active_review_room_id,
-            (SELECT pin FROM room WHERE id_quiz = q.id_quiz AND is_review_mode = 1 AND status = 'review_active' ORDER BY id_room DESC LIMIT 1) as active_review_pin
+            (SELECT COUNT(*) FROM questions WHERE id_quiz = q.id_quiz) as question_count
      FROM quiz q
      WHERE q.id_creator = :c
      ORDER BY q.id_quiz DESC",
@@ -284,9 +259,6 @@ $flash = get_flash_message();
                                             <i class="fas fa-puzzle-piece mr-1"></i> Obstacle Puzzle
                                         </span>
                                     </div>
-                                    <?php if (!empty($q['active_review_room_id'])): ?>
-                                        <div class="mb-1"><span class="badge badge-warning text-dark font-weight-bold px-2 py-1 shadow-sm"><i class="fas fa-book-reader mr-1"></i> Review Active</span></div>
-                                    <?php endif; ?>
                                     <h5 class="quiz-card-title text-truncate" title="<?= htmlspecialchars($q['name']) ?>">
                                         <?= htmlspecialchars($q['name']) ?>
                                     </h5>
@@ -311,9 +283,6 @@ $flash = get_flash_message();
                                             <i class="fas fa-coins mr-1 text-warning"></i> WAGER MODE
                                         </span>
                                     </div>
-                                    <?php if (!empty($q['active_review_room_id'])): ?>
-                                        <div class="mb-1"><span class="badge badge-warning text-dark font-weight-bold px-2 py-1 shadow-sm"><i class="fas fa-book-reader mr-1"></i> Review Active</span></div>
-                                    <?php endif; ?>
                                     <h5 class="quiz-card-title text-truncate" title="<?= htmlspecialchars($q['name']) ?>">
                                         <?= htmlspecialchars($q['name']) ?>
                                     </h5>
@@ -334,9 +303,6 @@ $flash = get_flash_message();
                                             <i class="fas fa-gamepad mr-1 text-primary"></i> CLASSIC QUIZ
                                         </span>
                                     </div>
-                                    <?php if (!empty($q['active_review_room_id'])): ?>
-                                        <div class="mb-1"><span class="badge badge-warning text-dark font-weight-bold px-2 py-1 shadow-sm"><i class="fas fa-book-reader mr-1"></i> Review Active</span></div>
-                                    <?php endif; ?>
                                     <h5 class="quiz-card-title text-truncate" title="<?= htmlspecialchars($q['name']) ?>">
                                         <?= htmlspecialchars($q['name']) ?>
                                     </h5>
@@ -356,41 +322,20 @@ $flash = get_flash_message();
                             <div class="d-flex justify-content-between align-items-center pt-2 border-top">
                                 <small class="text-muted"><?= date('M d, Y', strtotime($q['quizadd'] ?? $q['created_at'] ?? 'now')) ?></small>
                                 <div class="d-flex align-items-center">
-                                    <?php if (!empty($q['active_review_room_id'])): ?>
-                                        <a href="<?= BASE_URL ?>modules/host/review_lobby.php?id_room=<?= $q['active_review_room_id'] ?>" class="btn btn-sm btn-warning text-dark font-weight-bold mr-2 shadow-sm" title="Review Room (Join Info)">
-                                            <i class="fas fa-qrcode mr-1"></i> Join Info
-                                        </a>
-                                    <?php else: ?>
-                                        <a href="<?= BASE_URL ?>modules/host/create_room.php?id_quiz=<?= $q['id_quiz'] ?>" class="btn btn-sm btn-primary font-weight-bold mr-2" title="Play">
-                                            <i class="fas fa-play mr-1"></i> Play
-                                        </a>
-                                    <?php endif; ?>
+                                    <a href="<?= BASE_URL ?>modules/host/create_room.php?id_quiz=<?= $q['id_quiz'] ?>" class="btn btn-sm btn-primary font-weight-bold mr-2" title="Play">
+                                        <i class="fas fa-play mr-1"></i> Play
+                                    </a>
                                     <div class="dropdown">
                                         <button class="btn btn-sm btn-outline-secondary font-weight-bold dropdown-toggle" type="button" id="quizActions_<?= $q['id_quiz'] ?>" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" title="Actions">
                                             <i class="fas fa-ellipsis-v mr-1"></i> Actions
                                         </button>
                                         <div class="dropdown-menu dropdown-menu-right shadow-sm" aria-labelledby="quizActions_<?= $q['id_quiz'] ?>">
-                                            <?php if (!empty($q['active_review_room_id'])): ?>
-                                                <button type="button" class="dropdown-item text-muted disabled" style="cursor: not-allowed;" onclick="alert('This quiz currently has an active review room. Please end the review session before editing questions.');">
-                                                    <i class="fas fa-edit mr-2"></i> Edit <span class="badge badge-light border ml-1">Locked</span>
-                                                </button>
-                                            <?php else: ?>
-                                                <a class="dropdown-item" href="<?= BASE_URL ?>modules/quiz/edit.php?id=<?= $q['id_quiz'] ?>">
-                                                    <i class="fas fa-edit text-success mr-2"></i> Edit
-                                                </a>
-                                            <?php endif; ?>
+                                            <a class="dropdown-item" href="<?= BASE_URL ?>modules/quiz/edit.php?id=<?= $q['id_quiz'] ?>">
+                                                <i class="fas fa-edit text-success mr-2"></i> Edit
+                                            </a>
                                             <a class="dropdown-item" href="<?= BASE_URL ?>modules/quiz/duplicate.php?id=<?= $q['id_quiz'] ?>">
                                                 <i class="fas fa-copy text-info mr-2"></i> Duplicate
                                             </a>
-                                            <?php if (!empty($q['active_review_room_id'])): ?>
-                                                <div class="dropdown-divider"></div>
-                                                <a class="dropdown-item text-primary font-weight-medium" href="<?= BASE_URL ?>modules/reports/detail.php?id_room=<?= $q['active_review_room_id'] ?>">
-                                                    <i class="fas fa-chart-line mr-2"></i> View Live Report
-                                                </a>
-                                                <a class="dropdown-item text-warning font-weight-bold" href="list.php?end_review=<?= $q['active_review_room_id'] ?>" onclick="return confirm('Are you sure you want to end this review session early?');">
-                                                    <i class="fas fa-stop-circle mr-2"></i> End Review Session
-                                                </a>
-                                            <?php endif; ?>
                                             <div class="dropdown-divider"></div>
                                             <a class="dropdown-item text-danger" href="<?= BASE_URL ?>modules/quiz/delete.php?id=<?= $q['id_quiz'] ?>" onclick="return confirm('Are you sure you want to delete this quiz?');">
                                                 <i class="fas fa-trash-alt mr-2"></i> Delete

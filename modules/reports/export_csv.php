@@ -37,8 +37,7 @@ if (is_array($selectedQIds) && !empty($selectedQIds)) {
 
 // Fetch ranked player scores
 $sql = "SELECT p.*,
-        (SELECT COUNT(*) FROM votes v JOIN answers a ON v.id_answer = a.id_answer WHERE v.id_player = p.id_player AND a.is_correct = 1) as correct_count,
-        COALESCE(p.finished_at, (SELECT MAX(rankingadd) FROM votes v WHERE v.id_player = p.id_player AND p.is_finished = 1)) as review_completed_at
+        (SELECT COUNT(*) FROM votes v JOIN answers a ON v.id_answer = a.id_answer WHERE v.id_player = p.id_player AND a.is_correct = 1) as correct_count
         FROM players p
         WHERE p.id_room = :id_room
         ORDER BY p.score DESC, p.playeradd ASC";
@@ -101,41 +100,23 @@ if ($isTeamMode) {
         ]);
     }
 } else {
-    $isReview = !empty($room['is_review_mode']);
     // English CSV Column Headers
-    if ($isReview) {
-        fputcsv($output, ['Rank', 'Student Nickname', 'Completed At', 'Total Score', 'Correct Answers', 'Total Questions', 'Accuracy Rate (%)']);
-    } else {
-        fputcsv($output, ['Rank', 'Student Nickname', 'Total Score', 'Correct Answers', 'Total Questions', 'Accuracy Rate (%)']);
-    }
+    fputcsv($output, ['Rank', 'Student Nickname', 'Total Score', 'Correct Answers', 'Total Questions', 'Accuracy Rate (%)']);
 
     // Output student records
     foreach ($players as $idx => $p) {
         $rank = $idx + 1;
         $correct = intval($p['correct_count'] ?? $p['answers_correct'] ?? 0);
         $accuracy = $totalQuestions > 0 ? round(($correct / $totalQuestions) * 100, 1) : 0;
-        $completedAt = (!empty($p['is_finished']) && !empty($p['review_completed_at'])) ? $p['review_completed_at'] : 'In Progress';
 
-        if ($isReview) {
-            fputcsv($output, [
-                $rank,
-                $p['nickname'],
-                $completedAt,
-                intval($p['score']),
-                $correct,
-                $totalQuestions,
-                $accuracy . '%'
-            ]);
-        } else {
-            fputcsv($output, [
-                $rank,
-                $p['nickname'],
-                intval($p['score']),
-                $correct,
-                $totalQuestions,
-                $accuracy . '%'
-            ]);
-        }
+        fputcsv($output, [
+            $rank,
+            $p['nickname'],
+            intval($p['score']),
+            $correct,
+            $totalQuestions,
+            $accuracy . '%'
+        ]);
     }
 }
 

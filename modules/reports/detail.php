@@ -55,11 +55,10 @@ $sqlPlayers = "
             JOIN answers a ON v.id_answer = a.id_answer 
             WHERE v.id_player = p.id_player AND a.is_correct = 1) as correct_count,
            (SELECT COUNT(*) FROM votes v 
-            WHERE v.id_player = p.id_player) as total_answered,
-           COALESCE(p.finished_at, (SELECT MAX(rankingadd) FROM votes v WHERE v.id_player = p.id_player AND p.is_finished = 1)) as review_completed_at
+            WHERE v.id_player = p.id_player) as total_answered
     FROM players p
     WHERE p.id_room = :r
-    ORDER BY " . (!empty($room['is_review_mode']) ? "p.answers_correct DESC, p.playeradd ASC" : "p.score DESC, p.playeradd ASC") . "
+    ORDER BY p.score DESC, p.playeradd ASC
 ";
 $rawPlayers = db_fetch_all($sqlPlayers, [':r' => $roomId]);
 $players = function_exists('filter_room_players') ? filter_room_players($roomId, $rawPlayers) : $rawPlayers;
@@ -283,11 +282,6 @@ require_once __DIR__ . '/../../includes/navbar.php';
 
             <h2 class="font-weight-bold mb-1" style="font-size: 24px; color: #0f172a; letter-spacing: -0.02em;">
                 <?= htmlspecialchars($room['quiz_name']) ?>
-                <?php if (!empty($room['is_review_mode'])): ?>
-                    <span class="badge badge-info ml-2" style="font-size: 13px; vertical-align: middle;">
-                        <i class="fas fa-book-reader mr-1"></i> Review Mode
-                    </span>
-                <?php endif; ?>
             </h2>
 
             <div class="d-flex flex-wrap align-items-center" style="gap: 14px; font-size: 13px; color: #64748b; margin-top: 4px;">
@@ -616,9 +610,6 @@ require_once __DIR__ . '/../../includes/navbar.php';
                                 <?php if ($isTeamMode): ?>
                                     <th class="text-left" style="width: 170px;">Team</th>
                                 <?php endif; ?>
-                                <?php if (!empty($room['is_review_mode'])): ?>
-                                    <th class="text-center" style="width: 180px;">Completed At</th>
-                                <?php endif; ?>
                                 <th class="text-right" style="width: 150px;">Total Score</th>
                                 <th class="text-right" style="width: 150px;">Correct Answers</th>
                                 <th class="text-left" style="width: 260px;">Accuracy Rate</th>
@@ -667,22 +658,6 @@ require_once __DIR__ . '/../../includes/navbar.php';
                                     <?php if ($isTeamMode): ?>
                                     <td class="text-left">
                                         <?= TeamManager::renderTeamBadge(intval($p['team_id'] ?? 0), $p['team_name'] ?? null) ?>
-                                    </td>
-                                    <?php endif; ?>
-                                    <?php if (!empty($room['is_review_mode'])): ?>
-                                    <td class="text-center">
-                                        <?php if (!empty($p['is_finished']) && !empty($p['review_completed_at'])): ?>
-                                            <div class="font-weight-bold" style="color: #0f172a; font-size: 13.5px;">
-                                                <i class="fas fa-check-circle text-success mr-1"></i><?= date('M d, Y', strtotime($p['review_completed_at'])) ?>
-                                            </div>
-                                            <div style="font-size: 11.5px; color: #64748b; margin-top: 2px;">
-                                                <?= date('H:i:s', strtotime($p['review_completed_at'])) ?>
-                                            </div>
-                                        <?php else: ?>
-                                            <span class="badge badge-warning text-dark px-2 py-1" style="font-size: 11px; font-weight: 600; border-radius: 6px;">
-                                                <i class="fas fa-spinner fa-spin mr-1"></i> In Progress
-                                            </span>
-                                        <?php endif; ?>
                                     </td>
                                     <?php endif; ?>
                                     <td class="text-right">

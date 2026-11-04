@@ -52,97 +52,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
         redirect('modules/quiz/edit.php?id=' . $quizId);
     }
 
-    if ($action === 'update_review_settings') {
-        $isClassic = (($quiz['game_type'] ?? 'classic') === 'classic') && (($quiz['mode'] ?? 'normal') === 'normal');
-        if (!$isClassic) {
-            set_flash_message('danger', 'Review Mode can only be enabled for Classic mode quizzes!');
-            redirect('modules/quiz/edit.php?id=' . $quizId);
-        }
-
-        $isReview = !empty($_POST['is_review_mode']) ? 1 : 0;
-        $startTime = !empty($_POST['review_start_time']) ? date('Y-m-d H:i:s', strtotime($_POST['review_start_time'])) : null;
-        $endTime   = !empty($_POST['review_end_time'])   ? date('Y-m-d H:i:s', strtotime($_POST['review_end_time']))   : null;
-
-        if ($isReview) {
-            // When Review Mode is enabled: automatically disable Team Mode
-            db_execute(
-                "UPDATE quiz SET is_review_mode = 1, review_start_time = :st, review_end_time = :et, is_team_mode = 0 WHERE id_quiz = :q AND id_creator = :c",
-                [
-                    ':st' => $startTime,
-                    ':et' => $endTime,
-                    ':q'  => $quizId,
-                    ':c'  => $creatorId
-                ]
-            );
-
-            // Check active review session for this quiz
-            $activeRoom = db_fetch_one(
-                "SELECT * FROM room WHERE id_quiz = :q AND is_review_mode = 1 AND status = 'review_active' LIMIT 1",
-                [':q' => $quizId]
-            );
-
-            // If old review room has expired, finish it to create a new session
-            if ($activeRoom && !empty($activeRoom['review_end_time']) && strtotime($activeRoom['review_end_time']) < time()) {
-                db_execute("UPDATE room SET status = 'finished' WHERE id_room = :r", [':r' => $activeRoom['id_room']]);
-                $activeRoom = null;
-            }
-
-            if ($activeRoom) {
-                // Still active -> Update time in this review room instance
-                db_execute(
-                    "UPDATE room SET review_start_time = :st, review_end_time = :et WHERE id_room = :r",
-                    [
-                        ':st' => $startTime,
-                        ':et' => $endTime,
-                        ':r'  => $activeRoom['id_room']
-                    ]
-                );
-                set_flash_message('success', 'Review Mode settings updated for this quiz (Game PIN: ' . $activeRoom['pin'] . '). Report will continue updating.');
-            } else {
-                // No room or previous room closed -> Create new review room instance
-                do {
-                    $newPin = sprintf("%06d", mt_rand(100000, 999999));
-                    $existing = db_fetch_one("SELECT id_room FROM room WHERE pin = :pin AND status != 'finished'", [':pin' => $newPin]);
-                } while ($existing);
-
-                $newRoomId = db_insert(
-                    "INSERT INTO room (id_quiz, id_creator, pin, status, game_type, is_review_mode, review_start_time, review_end_time, is_team_mode) 
-                     VALUES (:q, :c, :pin, 'review_active', 'classic', 1, :st, :et, 0)",
-                    [
-                        ':q'   => $quizId,
-                        ':c'   => $creatorId,
-                        ':pin' => $newPin,
-                        ':st'  => $startTime,
-                        ':et'  => $endTime
-                    ]
-                );
-                set_flash_message('success', 'Review Mode enabled! New review session created (Game PIN: ' . $newPin . ') and listed in Reports.');
-            }
-        } else {
-            // When disabling Review Mode -> Close active review room
-            db_execute(
-                "UPDATE room SET status = 'finished' WHERE id_quiz = :q AND is_review_mode = 1 AND status = 'review_active'",
-                [':q' => $quizId]
-            );
-            db_execute(
-                "UPDATE quiz SET is_review_mode = 0, review_start_time = NULL, review_end_time = NULL WHERE id_quiz = :q AND id_creator = :c",
-                [
-                    ':q'  => $quizId,
-                    ':c'  => $creatorId
-                ]
-            );
-            set_flash_message('success', 'Review Mode has been disabled. The review session has been ended and finalized in Reports.');
-        }
-        redirect('modules/quiz/edit.php?id=' . $quizId);
-    }
-
     if ($action === 'update_team_settings') {
         $isTeam = !empty($_POST['is_team_mode']) ? 1 : 0;
-        // Do not allow Team Mode if Review Mode is active
-        if (!empty($quiz['is_review_mode']) && $isTeam) {
-            set_flash_message('danger', 'Cannot enable Team Mode while Review Mode is active. Please disable Review Mode first.');
-            redirect('modules/quiz/edit.php?id=' . $quizId);
-        }
         $teamCount = max(2, min(10, intval($_POST['team_count'] ?? 2)));
         $playerLimit = max(0, intval($_POST['team_player_limit'] ?? 0));
 
@@ -497,15 +408,7 @@ $flash = get_flash_message();
 $isObstacle = ($quiz['game_type'] ?? 'classic') === 'obstacle';
 $isClassicQuiz = (($quiz['game_type'] ?? 'classic') === 'classic') && (($quiz['mode'] ?? 'normal') === 'normal') && empty($hasWagerInQuiz);
 
-// If not Classic quiz, disable Review Mode completely
-if (!$isClassicQuiz && !empty($quiz['is_review_mode'])) {
-    db_execute("UPDATE quiz SET is_review_mode = 0, review_start_time = NULL, review_end_time = NULL WHERE id_quiz = :q", [':q' => $quizId]);
-    $quiz['is_review_mode'] = 0;
-}
-$isReviewMode = $isClassicQuiz && !empty($quiz['is_review_mode']);
-$reviewStartTime = !empty($quiz['review_start_time']) ? date('Y-m-d\TH:i', strtotime($quiz['review_start_time'])) : '';
-$reviewEndTime   = !empty($quiz['review_end_time'])   ? date('Y-m-d\TH:i', strtotime($quiz['review_end_time']))   : '';
-$isTeamMode = empty($isReviewMode) && !empty($quiz['is_team_mode']);
+$isTeamMode = !empty($quiz['is_team_mode']);
 $teamCount = TeamManager::getTeamCount($quiz);
 $teamLimit = TeamManager::getTeamPlayerLimit($quiz);
 $availableTeams = TeamManager::getTeamsForEntity($quiz);
@@ -560,11 +463,6 @@ $availableTeams = TeamManager::getTeamsForEntity($quiz);
             </div>
             <?php endif; ?>
 
-            <?php if ($isReviewMode): ?>
-                <span class="badge badge-warning text-dark px-2 py-1 font-weight-bold d-none d-md-inline-flex align-items-center shadow-sm" style="font-size: 0.8rem; border-radius: 8px;">
-                    <i class="fas fa-book-reader mr-1"></i> Review Mode (Active)
-                </span>
-            <?php endif; ?>
             <?php if ($isTeamMode): ?>
                 <span class="badge badge-success px-2 py-1 font-weight-bold d-none d-md-inline-flex align-items-center" style="font-size: 0.8rem; border-radius: 8px;">
                     <i class="fas fa-users mr-1"></i> Team Mode (<?= $teamCount ?> Teams)
@@ -580,25 +478,12 @@ $availableTeams = TeamManager::getTeamsForEntity($quiz);
                     <button class="dropdown-item d-flex align-items-center py-2 px-2 rounded" type="button" data-toggle="modal" data-target="#teamModeModal" onclick="$('#teamModeModal').modal('show')">
                         <i class="fas fa-users mr-2 text-primary"></i>
                         <span class="font-weight-bold">Team Mode</span>
-                        <?php if ($isReviewMode): ?>
-                            <span class="badge badge-light border ml-auto text-danger font-weight-bold" title="Locked due to Review Mode">Locked</span>
-                        <?php elseif ($isTeamMode): ?>
+                        <?php if ($isTeamMode): ?>
                             <span class="badge badge-success ml-auto font-weight-bold">ON (<?= $teamCount ?>)</span>
                         <?php else: ?>
                             <span class="badge badge-light border ml-auto text-muted font-weight-bold">OFF</span>
                         <?php endif; ?>
                     </button>
-                    <?php if ($isClassicQuiz): ?>
-                    <button class="dropdown-item d-flex align-items-center py-2 px-2 rounded mt-1" type="button" data-toggle="modal" data-target="#reviewModeModal" onclick="$('#reviewModeModal').modal('show')">
-                        <i class="fas fa-book-reader mr-2 text-warning"></i>
-                        <span class="font-weight-bold">Review Mode</span>
-                        <?php if ($isReviewMode): ?>
-                            <span class="badge badge-warning text-dark ml-auto font-weight-bold">ON</span>
-                        <?php else: ?>
-                            <span class="badge badge-light border ml-auto text-muted font-weight-bold">OFF</span>
-                        <?php endif; ?>
-                    </button>
-                    <?php endif; ?>
                 </div>
             </div>
 
@@ -988,93 +873,6 @@ $availableTeams = TeamManager::getTeamsForEntity($quiz);
 </div>
 <?php endif; ?>
 
-<?php if ($isClassicQuiz): ?>
-<!-- MODAL REVIEW MODE SETTINGS -->
-<div class="modal fade" id="reviewModeModal" tabindex="-1" role="dialog" aria-labelledby="reviewModeModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered" role="document">
-        <div class="modal-content border-0 shadow" style="border-radius: 16px; overflow: hidden;">
-            <div class="modal-header text-white" style="background: linear-gradient(135deg, #f59f00, #d9480f);">
-                <h5 class="modal-title font-weight-bold" id="reviewModeModalLabel">
-                    <i class="fas fa-book-reader mr-2"></i>Review Mode Settings (Self-Paced Study)
-                </h5>
-                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-            <form action="" method="POST">
-                <input type="hidden" name="action" value="update_review_settings">
-                <div class="modal-body p-4">
-                    <div class="d-flex align-items-center justify-content-between p-3 mb-3 rounded" style="background-color: #fff9db; border: 1px solid #ffe066; cursor: pointer;" onclick="toggleReviewModeCheckbox(event)">
-                        <div style="max-width: 75%;">
-                            <h6 class="font-weight-bold mb-1 text-dark">
-                                Enable review mode
-                            </h6>
-                            <p class="text-muted small mb-0">
-                                Allow players to study at their own pace without needing a live host.
-                            </p>
-                        </div>
-                        <div class="custom-control custom-switch pl-4" style="font-size: 1.25rem;">
-                            <input type="checkbox" class="custom-control-input" id="is_review_mode" name="is_review_mode" value="1" <?= $isReviewMode ? 'checked' : '' ?> onchange="toggleReviewModeInputs(this.checked)">
-                            <label class="custom-control-label" for="is_review_mode" style="cursor: pointer;"></label>
-                        </div>
-                    </div>
-
-                    <div class="alert alert-warning py-2 px-3 small mb-3" style="border-radius: 8px; border-left: 4px solid #f59f00;">
-                        <i class="fas fa-info-circle mr-1"></i>
-                        <strong>Note:</strong> Review Mode is only available for <strong>Classic</strong> quizzes. When Review Mode is enabled, <strong>Team Mode is automatically disabled</strong> and cannot be enabled until Review Mode is turned off.
-                    </div>
-
-                    <div id="reviewModeFields" style="<?= $isReviewMode ? '' : 'opacity: 0.45; pointer-events: none;' ?>">
-                        <div class="form-group mb-3">
-                            <label class="font-weight-bold text-dark">
-                                <i class="far fa-clock text-primary mr-1"></i> Start time (optional):
-                            </label>
-                            <input type="datetime-local" name="review_start_time" id="review_start_time" class="form-control font-weight-bold" value="<?= $reviewStartTime ?>">
-                            <small class="text-muted">Leave blank to open immediately when created.</small>
-                        </div>
-
-                        <div class="form-group mb-0">
-                            <label class="font-weight-bold text-dark">
-                                <i class="fas fa-hourglass-end text-danger mr-1"></i> End / Closing time (optional):
-                            </label>
-                            <input type="datetime-local" name="review_end_time" id="review_end_time" class="form-control font-weight-bold" value="<?= $reviewEndTime ?>">
-                            <small class="text-muted">Leave blank for no expiration.</small>
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer bg-light py-2">
-                    <button type="button" class="btn btn-secondary font-weight-bold rounded-pill px-3" data-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-warning font-weight-bold rounded-pill px-4 text-dark" style="background-color: #ffd43b; border-color: #fcc419;">
-                        <i class="fas fa-save mr-1"></i> Save Settings
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<script>
-function toggleReviewModeCheckbox(e) {
-    if (e && e.target && (e.target.id === 'is_review_mode' || e.target.classList.contains('custom-control-label'))) {
-        return;
-    }
-    const chk = document.getElementById('is_review_mode');
-    if (chk) {
-        chk.checked = !chk.checked;
-        toggleReviewModeInputs(chk.checked);
-    }
-}
-
-function toggleReviewModeInputs(enabled) {
-    const fields = document.getElementById('reviewModeFields');
-    if (fields) {
-        fields.style.opacity = enabled ? '1' : '0.45';
-        fields.style.pointerEvents = enabled ? 'auto' : 'none';
-    }
-}
-</script>
-<?php endif; ?>
-
 <!-- MODAL TEAM MODE SETTINGS -->
 <div class="modal fade" id="teamModeModal" tabindex="-1" role="dialog" aria-labelledby="teamModeModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered" role="document">
@@ -1090,13 +888,7 @@ function toggleReviewModeInputs(enabled) {
             <form action="" method="POST">
                 <input type="hidden" name="action" value="update_team_settings">
                 <div class="modal-body p-4">
-                    <?php if ($isReviewMode): ?>
-                        <div class="alert alert-warning py-2 px-3 small mb-3 shadow-sm" style="border-radius: 8px;">
-                            <i class="fas fa-exclamation-triangle mr-1"></i>
-                            <strong>Team Mode is locked:</strong> This quiz has <strong>Review Mode</strong> enabled. Team Mode is disabled until Review Mode is turned off.
-                        </div>
-                    <?php endif; ?>
-                    <div class="d-flex align-items-center justify-content-between p-3 mb-3 rounded" style="background-color: #f3f0fb; border: 1px solid #e0d7f5; <?= $isReviewMode ? 'opacity: 0.6; cursor: not-allowed;' : 'cursor: pointer;' ?>" <?= $isReviewMode ? '' : 'onclick="toggleTeamModeCheckbox(event)"' ?>>
+                    <div class="d-flex align-items-center justify-content-between p-3 mb-3 rounded" style="background-color: #f3f0fb; border: 1px solid #e0d7f5; cursor: pointer;" onclick="toggleTeamModeCheckbox(event)">
                         <div style="max-width: 75%;">
                             <h6 class="font-weight-bold mb-1 text-dark">
                                 <i class="fas fa-users text-primary mr-1"></i> Enable Team Mode
@@ -1106,8 +898,8 @@ function toggleReviewModeInputs(enabled) {
                             </p>
                         </div>
                         <div class="custom-control custom-switch pl-4" style="font-size: 1.25rem;">
-                            <input type="checkbox" class="custom-control-input" id="is_team_mode" name="is_team_mode" value="1" <?= ($isTeamMode && !$isReviewMode) ? 'checked' : '' ?> <?= $isReviewMode ? 'disabled' : '' ?> onchange="toggleTeamModeInputs(this.checked)">
-                            <label class="custom-control-label" for="is_team_mode" style="<?= $isReviewMode ? 'cursor: not-allowed;' : 'cursor: pointer;' ?>"></label>
+                            <input type="checkbox" class="custom-control-input" id="is_team_mode" name="is_team_mode" value="1" <?= $isTeamMode ? 'checked' : '' ?> onchange="toggleTeamModeInputs(this.checked)">
+                            <label class="custom-control-label" for="is_team_mode" style="cursor: pointer;"></label>
                         </div>
                     </div>
 
@@ -1161,10 +953,6 @@ function toggleReviewModeInputs(enabled) {
 const ALL_TEAMS_CATALOG = <?= json_encode(array_values(TeamManager::getTeamsForEntity(['team_count' => 10]))) ?>;
 
 function toggleTeamModeCheckbox(e) {
-    if (<?= $isReviewMode ? 'true' : 'false' ?>) {
-        alert('Cannot enable Team Mode while Review Mode is active. Please disable Review Mode first.');
-        return;
-    }
     if (e && e.target && (e.target.id === 'is_team_mode' || e.target.classList.contains('custom-control-label'))) {
         return;
     }
