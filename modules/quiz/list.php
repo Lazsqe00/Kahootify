@@ -487,11 +487,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     <!-- INNER WHITE CARD -->
                     <div class="bg-white text-dark p-4" style="border-radius: 18px; box-shadow: 0 10px 25px rgba(0,0,0,0.12);">
                         <!-- MODAL HEADER WITH VISIBLE CLOSE (X) BUTTON ON TOP RIGHT OF FORM -->
-                        <div class="d-flex align-items-center justify-content-between mb-3 pb-3 border-bottom">
-                            <h5 class="font-weight-bold text-dark mb-0" style="font-size: 1.25rem;">
-                                <?= htmlspecialchars($q['name'] ?? '') ?>
-                            </h5>
-                            <button type="button" class="close text-secondary" data-dismiss="modal" aria-label="Close" style="font-size: 32px; font-weight: 300; opacity: 0.75; outline: none; line-height: 0.8; padding: 4px; margin: -6px -4px 0 0;" title="Đóng">
+                        <div class="d-flex justify-content-end mb-2">
+                            <button type="button" class="close text-secondary" data-dismiss="modal" aria-label="Close" style="font-size: 32px; font-weight: 300; opacity: 0.75; outline: none; line-height: 0.8; padding: 4px; margin: -4px -4px 0 0;" title="Đóng">
                                 <span aria-hidden="true">&times;</span>
                             </button>
                         </div>
