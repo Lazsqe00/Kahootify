@@ -486,12 +486,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="p-3 p-md-4 position-relative" style="background: #46178f; border-radius: 26px; box-shadow: 0 25px 50px -12px rgba(70, 23, 143, 0.45);">
                     <!-- INNER WHITE CARD -->
                     <div class="bg-white text-dark p-4" style="border-radius: 18px; box-shadow: 0 10px 25px rgba(0,0,0,0.12);">
-                        <!-- MODAL HEADER WITH VISIBLE CLOSE (X) BUTTON ON TOP RIGHT OF FORM -->
-                        <div class="d-flex justify-content-end mb-2">
-                            <button type="button" class="close text-secondary" data-dismiss="modal" aria-label="Close" style="font-size: 32px; font-weight: 300; opacity: 0.75; outline: none; line-height: 0.8; padding: 4px; margin: -4px -4px 0 0;" title="Đóng">
-                                <span aria-hidden="true">&times;</span>
-                            </button>
-                        </div>
+
 
                         <div class="row align-items-center">
                             <!-- LEFT COLUMN: Practice Link & Open Button -->
