@@ -2,37 +2,13 @@
 
 require_once __DIR__ . '/../../includes/auth_check.php';
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../includes/ReviewManager.php';
 
 $creatorId = intval($_SESSION['id_creator']);
-if (isset($_GET['end_review'])) {
-    $endRoomId = intval($_GET['end_review']);
-    $r = db_fetch_one("SELECT id_quiz FROM room WHERE id_room = :r AND id_creator = :c AND is_review_mode = 1", [':r' => $endRoomId, ':c' => $creatorId]);
-    if ($r) {
-        db_execute("UPDATE room SET status = 'finished' WHERE id_room = :r", [':r' => $endRoomId]);
-        db_execute("UPDATE quiz SET is_review_mode = 0, review_start_time = NULL, review_end_time = NULL WHERE id_quiz = :q AND id_creator = :c", [':q' => $r['id_quiz'], ':c' => $creatorId]);
-    }
-    set_flash_message('success', 'Review session ended successfully.');
-    redirect('modules/quiz/list.php');
-}
-
-// Auto-finalize any expired review sessions and synchronize quiz review status
-db_execute("
-    UPDATE room r 
-    JOIN quiz q ON r.id_quiz = q.id_quiz 
-    SET r.status = 'finished', q.is_review_mode = 0, q.review_start_time = NULL, q.review_end_time = NULL 
-    WHERE r.is_review_mode = 1 AND r.status = 'review_active' AND r.review_end_time IS NOT NULL AND r.review_end_time < NOW()
-");
-db_execute("
-    UPDATE quiz 
-    SET is_review_mode = 0, review_start_time = NULL, review_end_time = NULL 
-    WHERE is_review_mode = 1 AND (SELECT COUNT(*) FROM room WHERE id_quiz = quiz.id_quiz AND is_review_mode = 1 AND status = 'review_active') = 0
-");
 
 $quizzes = db_fetch_all(
     "SELECT q.*, 
-            (SELECT COUNT(*) FROM questions WHERE id_quiz = q.id_quiz) as question_count,
-            (SELECT id_room FROM room WHERE id_quiz = q.id_quiz AND is_review_mode = 1 AND status = 'review_active' ORDER BY id_room DESC LIMIT 1) as active_review_room_id,
-            (SELECT pin FROM room WHERE id_quiz = q.id_quiz AND is_review_mode = 1 AND status = 'review_active' ORDER BY id_room DESC LIMIT 1) as active_review_pin
+            (SELECT COUNT(*) FROM questions WHERE id_quiz = q.id_quiz) as question_count
      FROM quiz q
      WHERE q.id_creator = :c
      ORDER BY q.id_quiz DESC",
@@ -325,6 +301,9 @@ $flash = get_flash_message();
                 $quizMode = $q['mode'] ?? 'normal';
                 $isObstacle = ($gameType === 'obstacle');
                 $isWager = ($quizMode === 'wager');
+                $isClassic = (!$isObstacle && !$isWager);
+                $isTeam = !empty($q['is_team_mode']);
+                $isReviewEligible = ($isClassic && !$isTeam && !empty($q['is_review_mode']));
 
                 $totalPieces = intval($q['total_pieces'] ?? 4);
                 if (!in_array($totalPieces, [4, 6, 8, 9, 10, 12, 15, 16, 20, 25])) $totalPieces = 4;
@@ -368,7 +347,7 @@ $flash = get_flash_message();
                                         </div>
                                     <?php endfor; ?>
                                 </div>
-                            <?php elseif ($isWager): ?>
+<?php elseif ($isWager): ?>
                                 <!-- Wager Background -->
                                 <div class="quiz-cover-bg" style="background-image: url('<?= BASE_URL ?>assets/img/mode-wager.jpg');"></div>
                                 <div class="quiz-cover-overlay" style="background: linear-gradient(180deg, rgba(80, 20, 5, 0.35) 0%, rgba(50, 12, 3, 0.85) 100%);"></div>
@@ -412,8 +391,8 @@ $flash = get_flash_message();
                                     </span>
                                 <?php endif; ?>
 
-                                <?php if (!empty($q['active_review_room_id'])): ?>
-                                    <span class="quiz-badge badge-review" title="Self-paced review room is currently open">
+                                <?php if ($isReviewEligible): ?>
+                                    <span class="quiz-badge badge-review" title="Self-paced review mode is active">
                                         <i class="fas fa-book-reader mr-1"></i> Review Active
                                     </span>
                                 <?php endif; ?>
@@ -437,10 +416,10 @@ $flash = get_flash_message();
                                     <?= date('M d, Y', strtotime($q['quizadd'] ?? $q['created_at'] ?? 'now')) ?>
                                 </small>
                                 <div class="d-flex align-items-center">
-                                    <?php if (!empty($q['active_review_room_id'])): ?>
-                                        <a href="<?= BASE_URL ?>modules/host/review_lobby.php?id_room=<?= $q['active_review_room_id'] ?>" class="btn btn-sm btn-warning text-dark font-weight-bold mr-2 shadow-sm" title="Review Room (Join Info)">
-                                            <i class="fas fa-qrcode mr-1"></i> Join Info
-                                        </a>
+                                    <?php if ($isReviewEligible): ?>
+                                        <button type="button" class="btn btn-sm btn-warning font-weight-bold mr-2 text-dark" data-toggle="modal" data-target="#reviewModal_<?= $q['id_quiz'] ?>" title="View Review Mode">
+                                            <i class="fas fa-eye mr-1"></i> View
+                                        </button>
                                     <?php else: ?>
                                         <a href="<?= BASE_URL ?>modules/host/create_room.php?id_quiz=<?= $q['id_quiz'] ?>" class="btn btn-sm btn-primary font-weight-bold mr-2" style="background-color: var(--kahoot-purple); border-color: var(--kahoot-purple);" title="Play">
                                             <i class="fas fa-play mr-1"></i> Play
@@ -452,28 +431,13 @@ $flash = get_flash_message();
                                         <button class="btn btn-sm btn-outline-secondary font-weight-bold dropdown-toggle quiz-actions-btn" type="button" id="quizActions_<?= $q['id_quiz'] ?>" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" title="Actions">
                                             <i class="fas fa-ellipsis-v mr-1"></i> Actions
                                         </button>
-                                        <div class="dropdown-menu dropdown-menu-right" aria-labelledby="quizActions_<?= $q['id_quiz'] ?>">
-                                            <?php if (!empty($q['active_review_room_id'])): ?>
-                                                <button type="button" class="dropdown-item text-muted disabled" style="cursor: not-allowed;" onclick="alert('This quiz currently has an active review room. Please end the review session before editing questions.');">
-                                                    <i class="fas fa-edit mr-2"></i> Edit <span class="badge badge-light border ml-1">Locked</span>
-                                                </button>
-                                            <?php else: ?>
-                                                <a class="dropdown-item" href="<?= BASE_URL ?>modules/quiz/edit.php?id=<?= $q['id_quiz'] ?>">
-                                                    <i class="fas fa-edit text-success mr-2"></i> Edit
-                                                </a>
-                                            <?php endif; ?>
+<div class="dropdown-menu dropdown-menu-right shadow-sm" aria-labelledby="quizActions_<?= $q['id_quiz'] ?>">
+                                            <a class="dropdown-item" href="<?= BASE_URL ?>modules/quiz/edit.php?id=<?= $q['id_quiz'] ?>">
+                                                <i class="fas fa-edit text-success mr-2"></i> Edit
+                                            </a>
                                             <a class="dropdown-item" href="<?= BASE_URL ?>modules/quiz/duplicate.php?id=<?= $q['id_quiz'] ?>">
                                                 <i class="fas fa-copy text-info mr-2"></i> Duplicate
                                             </a>
-                                            <?php if (!empty($q['active_review_room_id'])): ?>
-                                                <div class="dropdown-divider"></div>
-                                                <a class="dropdown-item text-primary font-weight-medium" href="<?= BASE_URL ?>modules/reports/detail.php?id_room=<?= $q['active_review_room_id'] ?>">
-                                                    <i class="fas fa-chart-line mr-2"></i> View Live Report
-                                                </a>
-                                                <a class="dropdown-item text-warning font-weight-bold" href="list.php?end_review=<?= $q['active_review_room_id'] ?>" onclick="return confirm('Are you sure you want to end this review session early?');">
-                                                    <i class="fas fa-stop-circle mr-2"></i> End Review Session
-                                                </a>
-                                            <?php endif; ?>
                                             <div class="dropdown-divider"></div>
                                             <a class="dropdown-item text-danger" href="<?= BASE_URL ?>modules/quiz/delete.php?id=<?= $q['id_quiz'] ?>" onclick="return confirm('Are you sure you want to delete this quiz?');">
                                                 <i class="fas fa-trash-alt mr-2"></i> Delete
@@ -503,6 +467,150 @@ document.addEventListener('DOMContentLoaded', function() {
             $(this).closest('.quiz-card').removeClass('is-dropdown-open');
         });
     }
+});
+</script>
+
+
+<!-- REVIEW MODE VIEW MODALS (KAHOOT LOBBY STYLE) -->
+<?php foreach ($quizzes as $q): ?>
+    <?php if (!empty($q['is_review_mode']) && empty($q['is_team_mode']) && ($q['game_type'] ?? 'classic') === 'classic' && ($q['mode'] ?? 'normal') === 'normal'): 
+        $rPin = $q['review_pin'] ?? '';
+        $rUrl = ReviewManager::buildReviewUrl($rPin);
+        $joinPageUrl = rtrim(BASE_URL, '/') . '/modules/player/join.php';
+        $displayJoinUrl = preg_replace('#^https?://#', '', $joinPageUrl);
+    ?>
+    <div class="modal fade" id="reviewModal_<?= $q['id_quiz'] ?>" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered" role="document" style="max-width: 820px;">
+            <div class="modal-content border-0 bg-transparent">
+                <!-- PURPLE OUTER CONTAINER -->
+                <div class="p-3 p-md-4 position-relative" style="background: #46178f; border-radius: 28px; box-shadow: 0 25px 50px -12px rgba(70, 23, 143, 0.45);">
+                    <button type="button" class="close text-white position-absolute" data-dismiss="modal" aria-label="Close" style="top: 14px; right: 20px; font-size: 32px; opacity: 0.85; z-index: 10; outline: none;">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+
+                    <!-- INNER WHITE CARD -->
+                    <div class="bg-white text-dark py-4 px-3 px-md-4" style="border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.12);">
+                        <div class="row align-items-center m-0">
+                            <!-- LEFT COLUMN: Join at + Game PIN + Copy link -->
+                            <div class="col-md-7 text-center pr-md-4">
+                                <p class="font-weight-bold text-dark mb-1" style="font-size: 1.15rem; letter-spacing: 0.2px;">Join at</p>
+                                <a href="<?= htmlspecialchars($joinPageUrl) ?>" target="_blank" rel="noopener" class="font-weight-bold d-inline-block text-decoration-none mb-3" style="color: #1368ce; font-size: 1.05rem; word-break: break-all;">
+                                    <?= htmlspecialchars($displayJoinUrl) ?>
+                                </a>
+
+                                <p class="text-muted font-weight-bold text-uppercase mt-2 mb-1" style="letter-spacing: 3.5px; font-size: 0.95rem; color: #64748b;">GAME PIN</p>
+                                <div class="lobby-pin-number my-1" style="font-family: 'Montserrat', sans-serif; font-weight: 900; font-size: clamp(3rem, 6vw, 4.4rem); letter-spacing: 4px; color: #1e293b; line-height: 1.1;">
+                                    <?= htmlspecialchars($rPin) ?>
+                                </div>
+
+                                <div class="mt-4">
+                                    <button type="button" class="btn btn-outline-dark font-weight-bold rounded-lg px-4 py-2 shadow-sm" onclick="copyTextToClipboard('<?= htmlspecialchars($rUrl) ?>', this)" style="border-radius: 10px; border-width: 1.5px; font-size: 1.05rem; border-color: #334155; color: #1e293b;">
+                                        <i class="fas fa-link mr-2"></i> Copy join link
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- RIGHT COLUMN: Or scan to join + QR + Click to enlarge -->
+                            <div class="col-md-5 text-center pl-md-4 mt-4 mt-md-0" style="border-left: 2px solid #f1f5f9;">
+                                <p class="font-weight-bold text-dark mb-3" style="font-size: 1.15rem; letter-spacing: 0.2px;">Or scan to join</p>
+                                <div class="d-flex justify-content-center">
+                                    <button type="button" class="border-0 bg-transparent p-0 qr-zoom-trigger" data-toggle="modal" data-target="#qrZoomModal_<?= $q['id_quiz'] ?>" title="Click QR code to enlarge" style="cursor: zoom-in; outline: none;">
+                                        <div id="reviewQrCode_<?= $q['id_quiz'] ?>" class="review-qr-code mx-auto" data-url="<?= htmlspecialchars($rUrl) ?>" style="width: 175px; height: 175px;">
+                                            <div class="spinner-border text-primary" role="status"></div>
+                                        </div>
+                                    </button>
+                                </div>
+                                <p class="small text-muted mt-2 mb-0" style="font-size: 0.85rem; color: #94a3b8;">Click QR code to enlarge</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ENLARGE QR MODAL -->
+    <div class="modal fade" id="qrZoomModal_<?= $q['id_quiz'] ?>" tabindex="-1" role="dialog" aria-hidden="true" style="z-index: 1070;">
+        <div class="modal-dialog modal-dialog-centered" role="document" style="max-width: 460px;">
+            <div class="modal-content border-0 p-4 text-center shadow-lg" style="border-radius: 24px;">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="font-weight-bold text-dark mb-0"><i class="fas fa-qrcode mr-2 text-primary"></i> Quét mã để ôn tập</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close" style="outline: none;">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div id="reviewQrCodeLarge_<?= $q['id_quiz'] ?>" class="mx-auto my-2" data-url="<?= htmlspecialchars($rUrl) ?>" style="width: 320px; height: 320px;">
+                    <div class="spinner-border text-primary mt-5" role="status"></div>
+                </div>
+                <p class="small text-muted mt-2 mb-3">Mã PIN: <strong class="text-dark font-monospace" style="font-size: 1.1rem;"><?= htmlspecialchars($rPin) ?></strong></p>
+                <button type="button" class="btn btn-secondary font-weight-bold rounded-pill px-4 mx-auto" data-dismiss="modal">Đóng</button>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+<?php endforeach; ?>
+
+<script src="<?= BASE_URL ?>assets/js/qrcodegen.js"></script>
+<script>
+function renderQrSvg(containerId, url) {
+    const el = document.getElementById(containerId);
+    if (!el || !window.qrcodegen) return;
+    try {
+        const qr = qrcodegen.QrCode.encodeText(url, qrcodegen.QrCode.Ecc.MEDIUM);
+        const border = 4;
+        const size = qr.size + border * 2;
+        const namespace = "http://www.w3.org/2000/svg";
+        const svg = document.createElementNS(namespace, "svg");
+        svg.setAttribute("viewBox", "0 0 " + size + " " + size);
+        svg.setAttribute("shape-rendering", "crispEdges");
+        svg.setAttribute("role", "img");
+
+        const background = document.createElementNS(namespace, "rect");
+        background.setAttribute("width", "100%");
+        background.setAttribute("height", "100%");
+        background.setAttribute("fill", "#fff");
+        svg.appendChild(background);
+
+        const modules = [];
+        for (let y = 0; y < qr.size; y++) {
+            for (let x = 0; x < qr.size; x++) {
+                if (qr.getModule(x, y)) {
+                    modules.push("M" + (x + border) + "," + (y + border) + "h1v1h-1z");
+                }
+            }
+        }
+        const path = document.createElementNS(namespace, "path");
+        path.setAttribute("d", modules.join(""));
+        path.setAttribute("fill", "#000");
+        svg.appendChild(path);
+
+        el.replaceChildren(svg);
+    } catch (e) {
+        console.error("QR Error", e);
+    }
+}
+
+function copyTextToClipboard(text, btn) {
+    navigator.clipboard.writeText(text).then(() => {
+        const origHtml = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check text-success mr-1"></i> Copied!';
+        setTimeout(() => { btn.innerHTML = origHtml; }, 2000);
+    }).catch(() => {
+        alert("Copied: " + text);
+    });
+}
+
+window.addEventListener("DOMContentLoaded", function () {
+    $(".modal").on("shown.bs.modal", function () {
+        const qrBox = this.querySelector("[id^='reviewQrCode_']");
+        if (qrBox && qrBox.dataset.url) {
+            renderQrSvg(qrBox.id, qrBox.dataset.url);
+        }
+        const qrBoxLarge = this.querySelector("[id^='reviewQrCodeLarge_']");
+        if (qrBoxLarge && qrBoxLarge.dataset.url) {
+            renderQrSvg(qrBoxLarge.id, qrBoxLarge.dataset.url);
+        }
+    });
 });
 </script>
 

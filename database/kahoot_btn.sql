@@ -55,6 +55,7 @@ CREATE TABLE `quiz` (
   `team_count` int(11) NOT NULL DEFAULT 2,
   `team_player_limit` int(11) NOT NULL DEFAULT 0,
   `is_review_mode` tinyint(1) NOT NULL DEFAULT 0,
+  `review_pin` varchar(10) DEFAULT NULL,
   `review_start_time` datetime DEFAULT NULL,
   `review_end_time` datetime DEFAULT NULL,
   `quizadd` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

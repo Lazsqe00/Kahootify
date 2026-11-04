@@ -4,6 +4,7 @@ require_once __DIR__ . '/../../includes/auth_check.php';
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../includes/modes/QuestionModeRegistry.php';
 require_once __DIR__ . '/../../includes/TeamManager.php';
+require_once __DIR__ . '/../../includes/ReviewManager.php';
 
 $creatorId = intval($_SESSION['id_creator']);
 $quizId    = intval($_GET['id'] ?? 0);
@@ -14,6 +15,9 @@ if (!$quiz) {
     redirect('modules/quiz/list.php');
 }
 $isObstacle = (($quiz['game_type'] ?? 'classic') === 'obstacle');
+$isReviewMode = !empty($quiz['is_review_mode']);
+$reviewPin    = $quiz['review_pin'] ?? '';
+$reviewUrl    = ReviewManager::buildReviewUrl($reviewPin);
 
 function saveUploadedFile($fileKey) {
     if (!isset($_FILES[$fileKey]) || $_FILES[$fileKey]['error'] !== UPLOAD_ERR_OK) return null;
@@ -52,97 +56,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
         redirect('modules/quiz/edit.php?id=' . $quizId);
     }
 
-    if ($action === 'update_review_settings') {
-        $isClassic = (($quiz['game_type'] ?? 'classic') === 'classic') && (($quiz['mode'] ?? 'normal') === 'normal');
-        if (!$isClassic) {
-            set_flash_message('danger', 'Review Mode can only be enabled for Classic mode quizzes!');
-            redirect('modules/quiz/edit.php?id=' . $quizId);
-        }
-
-        $isReview = !empty($_POST['is_review_mode']) ? 1 : 0;
-        $startTime = !empty($_POST['review_start_time']) ? date('Y-m-d H:i:s', strtotime($_POST['review_start_time'])) : null;
-        $endTime   = !empty($_POST['review_end_time'])   ? date('Y-m-d H:i:s', strtotime($_POST['review_end_time']))   : null;
-
-        if ($isReview) {
-            // When Review Mode is enabled: automatically disable Team Mode
-            db_execute(
-                "UPDATE quiz SET is_review_mode = 1, review_start_time = :st, review_end_time = :et, is_team_mode = 0 WHERE id_quiz = :q AND id_creator = :c",
-                [
-                    ':st' => $startTime,
-                    ':et' => $endTime,
-                    ':q'  => $quizId,
-                    ':c'  => $creatorId
-                ]
-            );
-
-            // Check active review session for this quiz
-            $activeRoom = db_fetch_one(
-                "SELECT * FROM room WHERE id_quiz = :q AND is_review_mode = 1 AND status = 'review_active' LIMIT 1",
-                [':q' => $quizId]
-            );
-
-            // If old review room has expired, finish it to create a new session
-            if ($activeRoom && !empty($activeRoom['review_end_time']) && strtotime($activeRoom['review_end_time']) < time()) {
-                db_execute("UPDATE room SET status = 'finished' WHERE id_room = :r", [':r' => $activeRoom['id_room']]);
-                $activeRoom = null;
-            }
-
-            if ($activeRoom) {
-                // Still active -> Update time in this review room instance
-                db_execute(
-                    "UPDATE room SET review_start_time = :st, review_end_time = :et WHERE id_room = :r",
-                    [
-                        ':st' => $startTime,
-                        ':et' => $endTime,
-                        ':r'  => $activeRoom['id_room']
-                    ]
-                );
-                set_flash_message('success', 'Review Mode settings updated for this quiz (Game PIN: ' . $activeRoom['pin'] . '). Report will continue updating.');
-            } else {
-                // No room or previous room closed -> Create new review room instance
-                do {
-                    $newPin = sprintf("%06d", mt_rand(100000, 999999));
-                    $existing = db_fetch_one("SELECT id_room FROM room WHERE pin = :pin AND status != 'finished'", [':pin' => $newPin]);
-                } while ($existing);
-
-                $newRoomId = db_insert(
-                    "INSERT INTO room (id_quiz, id_creator, pin, status, game_type, is_review_mode, review_start_time, review_end_time, is_team_mode) 
-                     VALUES (:q, :c, :pin, 'review_active', 'classic', 1, :st, :et, 0)",
-                    [
-                        ':q'   => $quizId,
-                        ':c'   => $creatorId,
-                        ':pin' => $newPin,
-                        ':st'  => $startTime,
-                        ':et'  => $endTime
-                    ]
-                );
-                set_flash_message('success', 'Review Mode enabled! New review session created (Game PIN: ' . $newPin . ') and listed in Reports.');
-            }
-        } else {
-            // When disabling Review Mode -> Close active review room
-            db_execute(
-                "UPDATE room SET status = 'finished' WHERE id_quiz = :q AND is_review_mode = 1 AND status = 'review_active'",
-                [':q' => $quizId]
-            );
-            db_execute(
-                "UPDATE quiz SET is_review_mode = 0, review_start_time = NULL, review_end_time = NULL WHERE id_quiz = :q AND id_creator = :c",
-                [
-                    ':q'  => $quizId,
-                    ':c'  => $creatorId
-                ]
-            );
-            set_flash_message('success', 'Review Mode has been disabled. The review session has been ended and finalized in Reports.');
-        }
-        redirect('modules/quiz/edit.php?id=' . $quizId);
-    }
-
     if ($action === 'update_team_settings') {
         $isTeam = !empty($_POST['is_team_mode']) ? 1 : 0;
-        // Do not allow Team Mode if Review Mode is active
-        if (!empty($quiz['is_review_mode']) && $isTeam) {
-            set_flash_message('danger', 'Cannot enable Team Mode while Review Mode is active. Please disable Review Mode first.');
-            redirect('modules/quiz/edit.php?id=' . $quizId);
-        }
         $teamCount = max(2, min(10, intval($_POST['team_count'] ?? 2)));
         $playerLimit = max(0, intval($_POST['team_player_limit'] ?? 0));
 
@@ -156,7 +71,30 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
                 ':c'   => $creatorId
             ]
         );
-        set_flash_message('success', 'Team Mode settings saved successfully!');
+
+        if ($isTeam) {
+            ReviewManager::disableReviewMode($quizId, $creatorId);
+        }
+
+        set_flash_message('success', 'Team Mode settings saved successfully!' . ($isTeam ? ' (Review Mode has been disabled)' : ''));
+        redirect('modules/quiz/edit.php?id=' . $quizId);
+    }
+
+    if ($action === 'update_review_settings') {
+        if (!$isClassicQuiz) {
+            set_flash_message('danger', 'Review Mode is only available in Classic Mode.');
+            redirect('modules/quiz/edit.php?id=' . $quizId);
+        }
+
+        $enable = !empty($_POST['is_review_mode']) ? 1 : 0;
+        if ($enable) {
+            db_execute("UPDATE quiz SET is_team_mode = 0 WHERE id_quiz = :q AND id_creator = :c", [':q' => $quizId, ':c' => $creatorId]);
+            $res = ReviewManager::enableReviewMode($quizId, $creatorId);
+            set_flash_message('success', 'Review Mode enabled! PIN: ' . $res['pin'] . ' (Team Mode has been disabled)');
+        } else {
+            ReviewManager::disableReviewMode($quizId, $creatorId);
+            set_flash_message('success', 'Review Mode disabled successfully.');
+        }
         redirect('modules/quiz/edit.php?id=' . $quizId);
     }
 
@@ -712,15 +650,8 @@ $flash = get_flash_message();
 $isObstacle = ($quiz['game_type'] ?? 'classic') === 'obstacle';
 $isClassicQuiz = (($quiz['game_type'] ?? 'classic') === 'classic') && (($quiz['mode'] ?? 'normal') === 'normal') && empty($hasWagerInQuiz);
 
-// If not Classic quiz, disable Review Mode completely
-if (!$isClassicQuiz && !empty($quiz['is_review_mode'])) {
-    db_execute("UPDATE quiz SET is_review_mode = 0, review_start_time = NULL, review_end_time = NULL WHERE id_quiz = :q", [':q' => $quizId]);
-    $quiz['is_review_mode'] = 0;
-}
-$isReviewMode = $isClassicQuiz && !empty($quiz['is_review_mode']);
-$reviewStartTime = !empty($quiz['review_start_time']) ? date('Y-m-d\TH:i', strtotime($quiz['review_start_time'])) : '';
-$reviewEndTime   = !empty($quiz['review_end_time'])   ? date('Y-m-d\TH:i', strtotime($quiz['review_end_time']))   : '';
-$isTeamMode = empty($isReviewMode) && !empty($quiz['is_team_mode']);
+$isTeamMode = !empty($quiz['is_team_mode']);
+$isReviewEligible = ($isClassicQuiz && !$isTeamMode && !empty($quiz['is_review_mode']));
 $teamCount = TeamManager::getTeamCount($quiz);
 $teamLimit = TeamManager::getTeamPlayerLimit($quiz);
 $availableTeams = TeamManager::getTeamsForEntity($quiz);
@@ -784,30 +715,35 @@ $availableTeams = TeamManager::getTeamsForEntity($quiz);
                     </button>
                     <?php endif; ?>
 
-                    <button class="dropdown-item d-flex align-items-center py-2 px-2 rounded" type="button" data-toggle="modal" data-target="#teamModeModal" onclick="$('#teamModeModal').modal('show')">
-                        <i class="fas fa-users mr-2 text-primary"></i>
-                        <span class="font-weight-bold">Team Mode</span>
-                        <?php if ($isReviewMode): ?>
-                            <span class="badge badge-light border ml-auto text-danger font-weight-bold" title="Locked due to Review Mode">Locked</span>
-                        <?php elseif ($isTeamMode): ?>
-                            <span class="badge badge-success ml-auto font-weight-bold">ON (<?= $teamCount ?>)</span>
-                        <?php else: ?>
-                            <span class="badge badge-light border ml-auto text-muted font-weight-bold">OFF</span>
-                        <?php endif; ?>
-                    </button>
                     <?php if ($isClassicQuiz): ?>
-                    <button class="dropdown-item d-flex align-items-center py-2 px-2 rounded mt-1" type="button" data-toggle="modal" data-target="#reviewModeModal" onclick="$('#reviewModeModal').modal('show')">
+                    <button class="dropdown-item d-flex align-items-center py-2 px-2 rounded mb-1" type="button" data-toggle="modal" data-target="#reviewModeModal" onclick="$('#reviewModeModal').modal('show')">
                         <i class="fas fa-book-reader mr-2 text-warning"></i>
                         <span class="font-weight-bold">Review Mode</span>
-                        <?php if ($isReviewMode): ?>
-                            <span class="badge badge-warning text-dark ml-auto font-weight-bold">ON</span>
+                        <?php if ($isReviewEligible): ?>
+                            <span class="badge badge-warning ml-auto font-weight-bold text-dark">ON</span>
                         <?php else: ?>
                             <span class="badge badge-light border ml-auto text-muted font-weight-bold">OFF</span>
                         <?php endif; ?>
                     </button>
                     <?php endif; ?>
+
+                    <button class="dropdown-item d-flex align-items-center py-2 px-2 rounded" type="button" data-toggle="modal" data-target="#teamModeModal" onclick="$('#teamModeModal').modal('show')">
+                        <i class="fas fa-users mr-2 text-primary"></i>
+                        <span class="font-weight-bold">Team Mode</span>
+                        <?php if ($isTeamMode): ?>
+                            <span class="badge badge-success ml-auto font-weight-bold">ON (<?= $teamCount ?>)</span>
+                        <?php else: ?>
+                            <span class="badge badge-light border ml-auto text-muted font-weight-bold">OFF</span>
+                        <?php endif; ?>
+                    </button>
                 </div>
             </div>
+
+            <?php if ($isReviewEligible): ?>
+                <button type="button" class="btn btn-sm font-weight-bold btn-warning text-dark px-3 shadow-sm mr-2" data-toggle="modal" data-target="#reviewViewModal" title="View Review Link & QR Code">
+                    <i class="fas fa-qrcode mr-1"></i> Review QR
+                </button>
+            <?php endif; ?>
 
             <?php if ($isObstacle && count($questions) < intval($quiz['total_pieces'] ?? 4)): ?>
                 <button type="button" class="btn btn-sm btn-host-game disabled" onclick="alert('This Puzzle quiz requires exactly <?= intval($quiz['total_pieces'] ?? 4) ?> questions for all <?= intval($quiz['total_pieces'] ?? 4) ?> tiles before hosting! Currently has <?= count($questions) ?> questions.')" title="Complete all tiles to host">
@@ -1208,63 +1144,53 @@ $availableTeams = TeamManager::getTeamsForEntity($quiz);
 </div>
 <?php endif; ?>
 
-<?php if ($isClassicQuiz): ?>
 <!-- MODAL REVIEW MODE SETTINGS -->
 <div class="modal fade" id="reviewModeModal" tabindex="-1" role="dialog" aria-labelledby="reviewModeModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered" role="document">
         <div class="modal-content border-0 shadow" style="border-radius: 16px; overflow: hidden;">
-            <div class="modal-header text-white" style="background: linear-gradient(135deg, #f59f00, #d9480f);">
+            <div class="modal-header text-dark" style="background: linear-gradient(135deg, #fef3c7, #fde68a); border-bottom: 1px solid #fcd34d;">
                 <h5 class="modal-title font-weight-bold" id="reviewModeModalLabel">
-                    <i class="fas fa-book-reader mr-2"></i>Review Mode Settings (Self-Paced Study)
+                    <i class="fas fa-book-reader mr-2 text-warning"></i>Review Mode Settings
                 </h5>
-                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                <button type="button" class="close text-dark" data-dismiss="modal" aria-label="Close">
                     <span aria-hidden="true">&times;</span>
                 </button>
             </div>
             <form action="" method="POST">
                 <input type="hidden" name="action" value="update_review_settings">
                 <div class="modal-body p-4">
-                    <div class="d-flex align-items-center justify-content-between p-3 mb-3 rounded" style="background-color: #fff9db; border: 1px solid #ffe066; cursor: pointer;" onclick="toggleReviewModeCheckbox(event)">
+                    <div class="d-flex align-items-center justify-content-between p-3 mb-3 rounded" style="background-color: #fffbeb; border: 1px solid #fef3c7; cursor: pointer;" onclick="toggleReviewCheckbox(event)">
                         <div style="max-width: 75%;">
                             <h6 class="font-weight-bold mb-1 text-dark">
-                                Enable review mode
+                                <i class="fas fa-toggle-on text-warning mr-1"></i> Enable Review Mode
                             </h6>
                             <p class="text-muted small mb-0">
-                                Allow players to study at their own pace without needing a live host.
+                                When enabled, students can practice independently at their own pace without host control, timer, or leaderboard.
                             </p>
                         </div>
                         <div class="custom-control custom-switch pl-4" style="font-size: 1.25rem;">
-                            <input type="checkbox" class="custom-control-input" id="is_review_mode" name="is_review_mode" value="1" <?= $isReviewMode ? 'checked' : '' ?> onchange="toggleReviewModeInputs(this.checked)">
+                            <input type="checkbox" class="custom-control-input" id="is_review_mode" name="is_review_mode" value="1" <?= $isReviewMode ? 'checked' : '' ?>>
                             <label class="custom-control-label" for="is_review_mode" style="cursor: pointer;"></label>
                         </div>
                     </div>
 
-                    <div class="alert alert-warning py-2 px-3 small mb-3" style="border-radius: 8px; border-left: 4px solid #f59f00;">
-                        <i class="fas fa-info-circle mr-1"></i>
-                        <strong>Note:</strong> Review Mode is only available for <strong>Classic</strong> quizzes. When Review Mode is enabled, <strong>Team Mode is automatically disabled</strong> and cannot be enabled until Review Mode is turned off.
-                    </div>
-
-                    <div id="reviewModeFields" style="<?= $isReviewMode ? '' : 'opacity: 0.45; pointer-events: none;' ?>">
-                        <div class="form-group mb-3">
-                            <label class="font-weight-bold text-dark">
-                                <i class="far fa-clock text-primary mr-1"></i> Start time (optional):
-                            </label>
-                            <input type="datetime-local" name="review_start_time" id="review_start_time" class="form-control font-weight-bold" value="<?= $reviewStartTime ?>">
-                            <small class="text-muted">Leave blank to open immediately when created.</small>
+                    <?php if ($isReviewMode && !empty($reviewPin)): ?>
+                    <div class="p-3 bg-light rounded" style="border: 1px solid #e2e8f0;">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="small font-weight-bold text-muted text-uppercase">Current Game PIN:</span>
+                            <span class="h5 font-weight-bold text-dark font-monospace mb-0"><?= htmlspecialchars($reviewPin) ?></span>
                         </div>
-
-                        <div class="form-group mb-0">
-                            <label class="font-weight-bold text-dark">
-                                <i class="fas fa-hourglass-end text-danger mr-1"></i> End / Closing time (optional):
-                            </label>
-                            <input type="datetime-local" name="review_end_time" id="review_end_time" class="form-control font-weight-bold" value="<?= $reviewEndTime ?>">
-                            <small class="text-muted">Leave blank for no expiration.</small>
+                        <div class="text-right">
+                            <button type="button" class="btn btn-sm btn-outline-warning text-dark font-weight-bold" onclick="$('#reviewModeModal').modal('hide'); $('#reviewViewModal').modal('show');">
+                                <i class="fas fa-qrcode mr-1"></i> View PIN & QR Code
+                            </button>
                         </div>
                     </div>
+                    <?php endif; ?>
                 </div>
                 <div class="modal-footer bg-light py-2">
                     <button type="button" class="btn btn-secondary font-weight-bold rounded-pill px-3" data-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-warning font-weight-bold rounded-pill px-4 text-dark" style="background-color: #ffd43b; border-color: #fcc419;">
+                    <button type="submit" class="btn btn-warning font-weight-bold rounded-pill px-4 text-dark shadow-sm">
                         <i class="fas fa-save mr-1"></i> Save Settings
                     </button>
                 </div>
@@ -1273,27 +1199,79 @@ $availableTeams = TeamManager::getTeamsForEntity($quiz);
     </div>
 </div>
 
-<script>
-function toggleReviewModeCheckbox(e) {
-    if (e && e.target && (e.target.id === 'is_review_mode' || e.target.classList.contains('custom-control-label'))) {
-        return;
-    }
-    const chk = document.getElementById('is_review_mode');
-    if (chk) {
-        chk.checked = !chk.checked;
-        toggleReviewModeInputs(chk.checked);
-    }
-}
+<!-- MODAL REVIEW VIEW (KAHOOT LOBBY STYLE) -->
+<?php 
+$joinPageUrl = rtrim(BASE_URL, '/') . '/modules/player/join.php';
+$displayJoinUrl = preg_replace('#^https?://#', '', $joinPageUrl);
+?>
+<div class="modal fade" id="reviewViewModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered" role="document" style="max-width: 820px;">
+        <div class="modal-content border-0 bg-transparent">
+            <!-- PURPLE OUTER CONTAINER -->
+            <div class="p-3 p-md-4 position-relative" style="background: #46178f; border-radius: 28px; box-shadow: 0 25px 50px -12px rgba(70, 23, 143, 0.45);">
+                <button type="button" class="close text-white position-absolute" data-dismiss="modal" aria-label="Close" style="top: 14px; right: 20px; font-size: 32px; opacity: 0.85; z-index: 10; outline: none;">
+                    <span aria-hidden="true">&times;</span>
+                </button>
 
-function toggleReviewModeInputs(enabled) {
-    const fields = document.getElementById('reviewModeFields');
-    if (fields) {
-        fields.style.opacity = enabled ? '1' : '0.45';
-        fields.style.pointerEvents = enabled ? 'auto' : 'none';
-    }
-}
-</script>
-<?php endif; ?>
+                <!-- INNER WHITE CARD -->
+                <div class="bg-white text-dark py-4 px-3 px-md-4" style="border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.12);">
+                    <div class="row align-items-center m-0">
+                        <!-- LEFT COLUMN: Join at + Game PIN + Copy link -->
+                        <div class="col-md-7 text-center pr-md-4">
+                            <p class="font-weight-bold text-dark mb-1" style="font-size: 1.15rem; letter-spacing: 0.2px;">Join at</p>
+                            <a href="<?= htmlspecialchars($joinPageUrl) ?>" target="_blank" rel="noopener" class="font-weight-bold d-inline-block text-decoration-none mb-3" style="color: #1368ce; font-size: 1.05rem; word-break: break-all;">
+                                <?= htmlspecialchars($displayJoinUrl) ?>
+                            </a>
+
+                            <p class="text-muted font-weight-bold text-uppercase mt-2 mb-1" style="letter-spacing: 3.5px; font-size: 0.95rem; color: #64748b;">GAME PIN</p>
+                            <div class="lobby-pin-number my-1" style="font-family: 'Montserrat', sans-serif; font-weight: 900; font-size: clamp(3rem, 6vw, 4.4rem); letter-spacing: 4px; color: #1e293b; line-height: 1.1;">
+                                <?= htmlspecialchars($reviewPin) ?>
+                            </div>
+
+                            <div class="mt-4">
+                                <button type="button" class="btn btn-outline-dark font-weight-bold rounded-lg px-4 py-2 shadow-sm" onclick="copyTextToClipboard('<?= htmlspecialchars($reviewUrl) ?>', this)" style="border-radius: 10px; border-width: 1.5px; font-size: 1.05rem; border-color: #334155; color: #1e293b;">
+                                    <i class="fas fa-link mr-2"></i> Copy join link
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- RIGHT COLUMN: Or scan to join + QR + Click to enlarge -->
+                        <div class="col-md-5 text-center pl-md-4 mt-4 mt-md-0" style="border-left: 2px solid #f1f5f9;">
+                            <p class="font-weight-bold text-dark mb-3" style="font-size: 1.15rem; letter-spacing: 0.2px;">Or scan to join</p>
+                            <div class="d-flex justify-content-center">
+                                <button type="button" class="border-0 bg-transparent p-0 qr-zoom-trigger" data-toggle="modal" data-target="#qrZoomModalEdit" title="Click QR code to enlarge" style="cursor: zoom-in; outline: none;">
+                                    <div id="reviewViewQrCode" class="review-qr-code mx-auto" data-url="<?= htmlspecialchars($reviewUrl) ?>" style="width: 175px; height: 175px;">
+                                        <div class="spinner-border text-primary" role="status"></div>
+                                    </div>
+                                </button>
+                            </div>
+                            <p class="small text-muted mt-2 mb-0" style="font-size: 0.85rem; color: #94a3b8;">Click QR code to enlarge</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ENLARGE QR MODAL EDIT -->
+<div class="modal fade" id="qrZoomModalEdit" tabindex="-1" role="dialog" aria-hidden="true" style="z-index: 1070;">
+    <div class="modal-dialog modal-dialog-centered" role="document" style="max-width: 460px;">
+        <div class="modal-content border-0 p-4 text-center shadow-lg" style="border-radius: 24px;">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="font-weight-bold text-dark mb-0"><i class="fas fa-qrcode mr-2 text-primary"></i> Quét mã để ôn tập</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close" style="outline: none;">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div id="reviewViewQrCodeLarge" class="mx-auto my-2" data-url="<?= htmlspecialchars($reviewUrl) ?>" style="width: 320px; height: 320px;">
+                <div class="spinner-border text-primary mt-5" role="status"></div>
+            </div>
+            <p class="small text-muted mt-2 mb-3">Mã PIN: <strong class="text-dark font-monospace" style="font-size: 1.1rem;"><?= htmlspecialchars($reviewPin) ?></strong></p>
+            <button type="button" class="btn btn-secondary font-weight-bold rounded-pill px-4 mx-auto" data-dismiss="modal">Đóng</button>
+        </div>
+    </div>
+</div>
 
 <!-- MODAL TEAM MODE SETTINGS -->
 <div class="modal fade" id="teamModeModal" tabindex="-1" role="dialog" aria-labelledby="teamModeModalLabel" aria-hidden="true">
@@ -1310,13 +1288,7 @@ function toggleReviewModeInputs(enabled) {
             <form action="" method="POST">
                 <input type="hidden" name="action" value="update_team_settings">
                 <div class="modal-body p-4">
-                    <?php if ($isReviewMode): ?>
-                        <div class="alert alert-warning py-2 px-3 small mb-3 shadow-sm" style="border-radius: 8px;">
-                            <i class="fas fa-exclamation-triangle mr-1"></i>
-                            <strong>Team Mode is locked:</strong> This quiz has <strong>Review Mode</strong> enabled. Team Mode is disabled until Review Mode is turned off.
-                        </div>
-                    <?php endif; ?>
-                    <div class="d-flex align-items-center justify-content-between p-3 mb-3 rounded" style="background-color: #f3f0fb; border: 1px solid #e0d7f5; <?= $isReviewMode ? 'opacity: 0.6; cursor: not-allowed;' : 'cursor: pointer;' ?>" <?= $isReviewMode ? '' : 'onclick="toggleTeamModeCheckbox(event)"' ?>>
+                    <div class="d-flex align-items-center justify-content-between p-3 mb-3 rounded" style="background-color: #f3f0fb; border: 1px solid #e0d7f5; cursor: pointer;" onclick="toggleTeamModeCheckbox(event)">
                         <div style="max-width: 75%;">
                             <h6 class="font-weight-bold mb-1 text-dark">
                                 <i class="fas fa-users text-primary mr-1"></i> Enable Team Mode
@@ -1326,8 +1298,8 @@ function toggleReviewModeInputs(enabled) {
                             </p>
                         </div>
                         <div class="custom-control custom-switch pl-4" style="font-size: 1.25rem;">
-                            <input type="checkbox" class="custom-control-input" id="is_team_mode" name="is_team_mode" value="1" <?= ($isTeamMode && !$isReviewMode) ? 'checked' : '' ?> <?= $isReviewMode ? 'disabled' : '' ?> onchange="toggleTeamModeInputs(this.checked)">
-                            <label class="custom-control-label" for="is_team_mode" style="<?= $isReviewMode ? 'cursor: not-allowed;' : 'cursor: pointer;' ?>"></label>
+                            <input type="checkbox" class="custom-control-input" id="is_team_mode" name="is_team_mode" value="1" <?= $isTeamMode ? 'checked' : '' ?> onchange="toggleTeamModeInputs(this.checked)">
+                            <label class="custom-control-label" for="is_team_mode" style="cursor: pointer;"></label>
                         </div>
                     </div>
 
@@ -1381,10 +1353,6 @@ function toggleReviewModeInputs(enabled) {
 const ALL_TEAMS_CATALOG = <?= json_encode(array_values(TeamManager::getTeamsForEntity(['team_count' => 10]))) ?>;
 
 function toggleTeamModeCheckbox(e) {
-    if (<?= $isReviewMode ? 'true' : 'false' ?>) {
-        alert('Cannot enable Team Mode while Review Mode is active. Please disable Review Mode first.');
-        return;
-    }
     if (e && e.target && (e.target.id === 'is_team_mode' || e.target.classList.contains('custom-control-label'))) {
         return;
     }
@@ -1459,5 +1427,79 @@ window.KAHOOT_EDIT = {
 </script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <script src="<?= BASE_URL ?>assets/js/edit-quiz.js?v=<?= file_exists(__DIR__ . '/../../assets/js/edit-quiz.js') ? filemtime(__DIR__ . '/../../assets/js/edit-quiz.js') : time() ?>"></script>
+
+<script src="<?= BASE_URL ?>assets/js/qrcodegen.js"></script>
+<script>
+function renderQrSvg(containerId, url) {
+    const el = document.getElementById(containerId);
+    if (!el || !window.qrcodegen) return;
+    try {
+        const qr = qrcodegen.QrCode.encodeText(url, qrcodegen.QrCode.Ecc.MEDIUM);
+        const border = 4;
+        const size = qr.size + border * 2;
+        const namespace = "http://www.w3.org/2000/svg";
+        const svg = document.createElementNS(namespace, "svg");
+        svg.setAttribute("viewBox", "0 0 " + size + " " + size);
+        svg.setAttribute("shape-rendering", "crispEdges");
+        svg.setAttribute("role", "img");
+
+        const background = document.createElementNS(namespace, "rect");
+        background.setAttribute("width", "100%");
+        background.setAttribute("height", "100%");
+        background.setAttribute("fill", "#fff");
+        svg.appendChild(background);
+
+        const modules = [];
+        for (let y = 0; y < qr.size; y++) {
+            for (let x = 0; x < qr.size; x++) {
+                if (qr.getModule(x, y)) {
+                    modules.push("M" + (x + border) + "," + (y + border) + "h1v1h-1z");
+                }
+            }
+        }
+        const path = document.createElementNS(namespace, "path");
+        path.setAttribute("d", modules.join(""));
+        path.setAttribute("fill", "#000");
+        svg.appendChild(path);
+
+        el.replaceChildren(svg);
+    } catch (e) {
+        console.error("QR Error", e);
+    }
+}
+
+function copyTextToClipboard(text, btn) {
+    navigator.clipboard.writeText(text).then(() => {
+        const origHtml = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check text-success mr-1"></i> Copied!';
+        setTimeout(() => { btn.innerHTML = origHtml; }, 2000);
+    }).catch(() => {
+        alert("Copied: " + text);
+    });
+}
+
+function toggleReviewCheckbox(e) {
+    if (e && e.target && (e.target.id === 'is_review_mode' || e.target.classList.contains('custom-control-label'))) {
+        return;
+    }
+    const chk = document.getElementById('is_review_mode');
+    if (chk) chk.checked = !chk.checked;
+}
+
+window.addEventListener("DOMContentLoaded", function () {
+    $("#reviewViewModal").on("shown.bs.modal", function () {
+        const qrBox = document.getElementById("reviewViewQrCode");
+        if (qrBox && qrBox.dataset.url) {
+            renderQrSvg("reviewViewQrCode", qrBox.dataset.url);
+        }
+    });
+    $("#qrZoomModalEdit").on("shown.bs.modal", function () {
+        const qrBoxLarge = document.getElementById("reviewViewQrCodeLarge");
+        if (qrBoxLarge && qrBoxLarge.dataset.url) {
+            renderQrSvg("reviewViewQrCodeLarge", qrBoxLarge.dataset.url);
+        }
+    });
+});
+</script>
 
 <?php require_once __DIR__ . '/../../includes/footer.php'; ?>

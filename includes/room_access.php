@@ -82,7 +82,7 @@ function room_question_counts($room, $questionId, $state = null) {
             "SELECT l.id_player 
              FROM player_question_logs l
              JOIN players p ON p.id_player = l.id_player
-             WHERE l.id_room = :r AND l.id_question = :q AND l.is_sitting_out = 0 AND p.is_kicked = 0 AND p.status = 'ACTIVE'",
+             WHERE l.id_room = :r AND l.id_question = :q AND l.is_sitting_out = 0 AND p.is_kicked = 0",
             [':r' => $roomId, ':q' => $questionId]
         );
         $playerIds = array_column($participants, 'id_player');
@@ -167,23 +167,6 @@ function room_join_error($room, $isLocked = null) {
     if (!$room || $room['status'] === 'finished') {
         return 'Invalid Game PIN or room has closed!';
     }
-    if (!empty($room['is_review_mode'])) {
-        $now = time();
-        $start = !empty($room['review_start_time']) ? strtotime($room['review_start_time']) : 0;
-        $end = !empty($room['review_end_time']) ? strtotime($room['review_end_time']) : PHP_INT_MAX;
-        if ($start > 0 && $now < $start) {
-            return 'Review room is not open yet. Opening time: ' . date('H:i d/m/Y', $start);
-        }
-        if ($end > 0 && $now > $end) {
-            if ($room['status'] !== 'finished') {
-                db_execute("UPDATE room SET status = 'finished' WHERE id_room = :r", [':r' => $room['id_room']]);
-                if (!empty($room['id_quiz'])) {
-                    db_execute("UPDATE quiz SET is_review_mode = 0, review_start_time = NULL, review_end_time = NULL WHERE id_quiz = :q", [':q' => $room['id_quiz']]);
-                }
-            }
-            return 'Review room has ended at: ' . date('H:i d/m/Y', $end);
-        }
-    }
     if ($isLocked ?? room_is_locked($room)) {
         return 'This game is locked. Please wait for the host to unlock it.';
     }
@@ -218,9 +201,8 @@ function join_room_player($roomId, $pin, $nickname, $characterId = null, $access
         }
 
         $isWaiting = ($currentRoom['status'] === 'waiting');
-        $isReview = !empty($currentRoom['is_review_mode']);
         $allowLate = !empty($currentRoom['allow_late_join']);
-        $playerStatus = ($isWaiting || $isReview || $allowLate) ? 'ACTIVE' : 'SPECTATOR';
+        $playerStatus = ($isWaiting || $allowLate) ? 'ACTIVE' : 'SPECTATOR';
         $initialScore = ($playerStatus === 'ACTIVE') ? intval($currentRoom['starting_score'] ?? 0) : 0;
 
         $assignedTeamId = null;

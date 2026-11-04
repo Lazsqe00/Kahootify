@@ -14,10 +14,6 @@ if (!$room) {
     redirect('modules/quiz/list.php');
 }
 
-if (!empty($room['is_review_mode']) || $room['status'] === 'review_active') {
-    redirect('modules/reports/detail.php?id_room=' . $roomId);
-}
-
 $status = $room['status'];
 
 if (isset($_GET['action']) && $_GET['action'] === 'return_to_board') {
@@ -270,6 +266,11 @@ if (!empty($currentQuestion['image'])) {
 $counts = room_question_counts($room, $qId);
 $totalPlayers = $counts['total_players'];
 $votedCount = $counts['voted_count'];
+$activeCount = (int)db_count('players', "id_room = :r AND status = 'ACTIVE' AND is_kicked = 0", [':r' => $roomId]);
+if ($activeCount === 0 && ($room['game_type'] ?? 'classic') !== 'obstacle' && $phase === 'question') {
+    GameStateManager::finalizeQuestionPhase($roomId, $qId);
+    redirect('modules/host/leaderboard.php?qid=' . $qId);
+}
 
 $timeLimit = intval($currentQuestion['time_limit'] ?? 20);
 
@@ -639,7 +640,9 @@ const pollInterval = setInterval(function() {
             }
 
             if (!isPausedByBuzzer) {
-                if ((data.total_players > 0 && data.voted_count >= data.total_players) || (data.status && data.status.startsWith('res_'))) {
+                const allAnswered = (data.total_players > 0 && data.voted_count >= data.total_players);
+                const allEliminated = (data.active_players !== undefined && data.active_players === 0);
+                if (allAnswered || allEliminated || (data.status && data.status.startsWith('res_'))) {
                     clearInterval(pollInterval);
                     clearInterval(timerInterval);
                     stopQuestionAudio();
