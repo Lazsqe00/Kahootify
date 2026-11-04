@@ -348,6 +348,35 @@ require_once __DIR__ . '/../../includes/header.php';
     margin-top: auto;
 }
 
+#btnNextQuestion {
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 800;
+    font-size: 1.05rem;
+    color: #ffffff;
+    background: #1368ce;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 28px;
+    box-shadow: 0 4px 0 #0a468c;
+    transition: all 0.12s ease-in-out;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    outline: none;
+}
+
+#btnNextQuestion:hover {
+    background: #1976d2;
+    box-shadow: 0 4px 0 #0a468c;
+    transform: translateY(-2px);
+}
+
+#btnNextQuestion:active {
+    box-shadow: 0 1px 0 #0a468c;
+    transform: translateY(3px);
+}
+
 /* Results Screen */
 .results-container {
     max-width: 860px;
@@ -375,14 +404,6 @@ require_once __DIR__ . '/../../includes/header.php';
         <a href="<?= BASE_URL ?>" class="mr-3">
             <img src="<?= BASE_URL ?>assets/img/logo.png" alt="Logo Kahootify" class="review-logo">
         </a>
-        <div class="d-none d-sm-block">
-            <span class="review-title-badge">
-                <i class="fas fa-book-reader mr-1"></i> Chế độ Ôn tập
-            </span>
-            <div class="font-weight-bold text-dark text-truncate" style="max-width: 320px; font-size: 1.05rem;">
-                <?= $quiz ? htmlspecialchars($quiz['name']) : 'Phiên ôn tập' ?>
-            </div>
-        </div>
     </div>
 
     <?php if ($quiz && !empty($questions)): ?>
@@ -432,22 +453,9 @@ require_once __DIR__ . '/../../includes/header.php';
                 </button>
             </div>
 
-            <div class="p-2 border-bottom bg-light text-center small text-muted font-weight-bold d-flex justify-content-center" style="gap: 16px;">
-                <span><span class="d-inline-block rounded-circle mr-1" style="width: 10px; height: 10px; background: #22c55e;"></span> Đúng</span>
-                <span><span class="d-inline-block rounded-circle mr-1" style="width: 10px; height: 10px; background: #ef4444;"></span> Sai</span>
-                <span><span class="d-inline-block rounded-circle mr-1" style="width: 10px; height: 10px; background: #cbd5e1;"></span> Chưa làm</span>
-            </div>
-
             <!-- 5 COLUMNS SCROLLABLE GRID -->
             <div class="palette-grid" id="paletteGrid">
                 <!-- Dynamically generated buttons 1..N -->
-            </div>
-
-            <!-- STICKY BOTTOM SKIP BUTTON -->
-            <div class="palette-sticky-footer">
-                <button type="button" class="btn btn-secondary btn-block font-weight-bold py-2 rounded-pill shadow-sm" id="btnSkipToEnd">
-                    <i class="fas fa-forward mr-1"></i> Skip tới cuối (Hoàn thành bài)
-                </button>
             </div>
         </div>
     </div>
@@ -472,7 +480,7 @@ require_once __DIR__ . '/../../includes/header.php';
 
     <!-- BOTTOM BAR: NEXT BUTTON -->
     <div class="bottom-action-bar">
-        <button type="button" class="btn btn-primary font-weight-bold rounded-pill px-4 py-2 shadow" id="btnNextQuestion" style="display: none; font-size: 1.1rem;">
+        <button type="button" id="btnNextQuestion" style="display: none;">
             <span>Câu tiếp theo</span> <i class="fas fa-arrow-right ml-1"></i>
         </button>
     </div>
@@ -556,10 +564,13 @@ document.addEventListener('DOMContentLoaded', function () {
     loadQuestion(0);
 
     document.getElementById('btnNextQuestion').addEventListener('click', onNextClicked);
-    document.getElementById('btnSkipToEnd').addEventListener('click', function () {
-        $('#paletteModal').modal('hide');
-        showResults();
-    });
+    const skipBtn = document.getElementById('btnSkipToEnd');
+    if (skipBtn) {
+        skipBtn.addEventListener('click', function () {
+            $('#paletteModal').modal('hide');
+            showResults();
+        });
+    }
     document.getElementById('btnRestart').addEventListener('click', restartReview);
 });
 

@@ -113,7 +113,6 @@ class ReviewModeV2Test {
     public static function testPracticeViewDomContracts(): void {
         $practiceContent = file_get_contents(__DIR__ . '/../../modules/review/practice.php');
         $has5ColGrid = strpos($practiceContent, 'repeat(5, 1fr)') !== false;
-        $hasStickySkip = strpos($practiceContent, 'btnSkipToEnd') !== false;
         $hasInstantFeedback = strpos($practiceContent, 'highlight-correct') !== false && strpos($practiceContent, 'selected-incorrect') !== false;
         $hasRestartAndReturn = strpos($practiceContent, 'btnRestart') !== false && strpos($practiceContent, 'btnReturn') !== false;
         $hasClassicReviewSection = strpos($practiceContent, 'class="results-review"') !== false;
@@ -122,9 +121,9 @@ class ReviewModeV2Test {
         $noOldCompletionLine = strpos($practiceContent, 'Bạn đã hoàn thành phiên tự luyện bài') === false;
 
         self::assert(
-            $has5ColGrid && $hasStickySkip && $hasInstantFeedback && $hasRestartAndReturn && $hasClassicReviewSection && $hasSavedReviewSection && $hasSaveForReviewBtn && $noOldCompletionLine,
+            $has5ColGrid && $hasInstantFeedback && $hasRestartAndReturn && $hasClassicReviewSection && $hasSavedReviewSection && $hasSaveForReviewBtn && $noOldCompletionLine,
             'testPracticeViewDomContracts',
-            'practice.php must contain 5-col grid, sticky Skip, Restart/Return, Classic results review section with Save button, and no old completion sentence.'
+            'practice.php must contain 5-col grid, Restart/Return, Classic results review section with Save button, and no old completion sentence.'
         );
     }
 
