@@ -327,7 +327,11 @@ require_once __DIR__ . '/header.php';
 
 <!-- STICKY BUZZER BUTTON AT BOTTOM -->
 <div class="bottom-buzz-bar">
-    <?php if ($isDisqualified && !$allOpened): ?>
+    <?php if (empty($openedPieces)): ?>
+        <button type="button" class="btn btn-buzz btn-buzz-disabled" disabled id="btnBuzz" title="At least one piece must be revealed before guessing">
+            <i class="fas fa-lock mr-2"></i> GUESS LOCKED (NO PIECES REVEALED YET)
+        </button>
+    <?php elseif ($isDisqualified && !$allOpened): ?>
         <button type="button" class="btn btn-buzz btn-buzz-disabled" disabled id="btnBuzz">
             <i class="fas fa-lock mr-2"></i> BUZZER LOCKED (WAIT FOR ALL PIECES)
         </button>
@@ -440,6 +444,10 @@ function playBuzzerSound() {
 
 function claimBuzzer() {
     if (isDisqualified) return;
+    if ($('#btnBuzz').hasClass('btn-buzz-disabled') || $('#btnBuzz').prop('disabled')) {
+        alert('Cannot guess yet! At least one puzzle piece must be revealed first.');
+        return;
+    }
 
     $.post('<?= BASE_URL ?>modules/api/obstacle_action.php?action=buzz&id_room=' + roomId, {
         id_player: playerId,
@@ -644,10 +652,19 @@ const pollInterval = setInterval(function() {
                 $('#unlockedCountBadge').text(data.my_unlocked_pieces.length + ' / ' + data.total_pieces + ' Pieces Unlocked');
             }
 
-            // Sync buzzer locked status during piece reveal phase
-            if (data.my_is_disqualified && !isDisqualified) {
+            const hasAnyPieceRevealed = Array.isArray(data.opened_pieces) && data.opened_pieces.length > 0;
+            if (!hasAnyPieceRevealed) {
+                if (!$('#btnBuzz').hasClass('btn-buzz-disabled')) {
+                    $('#btnBuzz').replaceWith('<button type="button" class="btn btn-buzz btn-buzz-disabled" disabled id="btnBuzz" title="At least one piece must be revealed before guessing"><i class="fas fa-lock mr-2"></i> GUESS LOCKED (NO PIECES REVEALED YET)</button>');
+                }
+            } else if (data.my_is_disqualified && !isDisqualified) {
                 isDisqualified = true;
                 $('#btnBuzz').replaceWith('<button type="button" class="btn btn-buzz btn-buzz-disabled" disabled id="btnBuzz"><i class="fas fa-lock mr-2"></i> BUZZER LOCKED (WAIT FOR ALL PIECES)</button>');
+            } else if (!data.my_is_disqualified && isDisqualified) {
+                isDisqualified = false;
+                $('#btnBuzz').replaceWith('<button type="button" class="btn btn-buzz" id="btnBuzz" onclick="claimBuzzer()"><i class="fas fa-bell mr-2"></i> GUESS SECRET PICTURE</button>');
+            } else if (!data.my_is_disqualified && !isDisqualified && $('#btnBuzz').hasClass('btn-buzz-disabled')) {
+                $('#btnBuzz').replaceWith('<button type="button" class="btn btn-buzz" id="btnBuzz" onclick="claimBuzzer()"><i class="fas fa-bell mr-2"></i> GUESS SECRET PICTURE</button>');
             }
         }
     });

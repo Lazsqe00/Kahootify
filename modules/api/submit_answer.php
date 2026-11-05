@@ -104,6 +104,12 @@ try {
         $startTime  = intval($ans['question_start_time'] ?: time());
         $elapsed    = max(0, time() - $startTime);
 
+        $getReadyDuration = 3;
+        if ($elapsed < $getReadyDuration) {
+            return ['success' => false, 'message' => 'Please wait for the Get Ready countdown to finish!'];
+        }
+        $answerElapsed = max(0, $elapsed - $getReadyDuration);
+
         $pointsEarned = 0;
         $streakBonus  = 0;
         $newStreak    = 0;
@@ -188,7 +194,7 @@ try {
                 'is_correct'     => $isCorrect,
                 'points'         => intval($ans['points'] ?: 1000),
                 'time_limit'     => $timeLimit,
-                'time_elapsed'   => $elapsed,
+                'time_elapsed'   => $answerElapsed,
                 'current_streak' => $currentStreak,
             ]);
 

@@ -83,7 +83,13 @@ if ($action === 'get_room_status') {
         $gameConfig = !empty($room['game_config']) ? json_decode($room['game_config'], true) : [];
         if (!is_array($gameConfig)) $gameConfig = [];
 
+        $openedPieces = !empty($room['opened_pieces']) ? json_decode($room['opened_pieces'], true) : [];
+        if (!is_array($openedPieces)) $openedPieces = [];
+        $hasOpenedAny = (count($openedPieces) > 0);
+
         $response = [
+            'opened_pieces'             => $openedPieces,
+            'has_opened_any'            => $hasOpenedAny,
             'success'                   => true,
             'status'                    => $room['status'],
             'game_type'                 => $room['game_type'] ?? 'classic',

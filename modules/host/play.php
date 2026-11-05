@@ -393,8 +393,12 @@ if (!in_array($timeLimit, [10, 20, 30, 60])) {
 }
 
 $startTime = !empty($room['question_start_time']) ? intval($room['question_start_time']) : time();
-$elapsed = time() - $startTime;
-$remainingSeconds = max(0, $timeLimit - $elapsed);
+$elapsed = max(0, time() - $startTime);
+$getReadyDuration = 3;
+$getReadyRemaining = max(0, $getReadyDuration - $elapsed);
+$isGetReadyActive = ($getReadyRemaining > 0);
+$answerElapsed = max(0, $elapsed - $getReadyDuration);
+$remainingSeconds = max(0, $timeLimit - $answerElapsed);
 
 $questionAudioFile = null;
 $audioDir = __DIR__ . '/../../assets/audio';
@@ -421,6 +425,65 @@ $bodyClass = "backgroundColorChanges";
 
 require_once __DIR__ . '/../../includes/header.php';
 ?>
+<style>
+.get-ready-wrapper {
+    max-width: 900px;
+    margin: 25px auto;
+}
+.get-ready-card {
+    background: #ffffff;
+    border-radius: 24px;
+    padding: 38px 32px 30px;
+    border-bottom: 6px solid #cbd5e1;
+    box-shadow: 0 16px 45px rgba(0,0,0,0.35);
+}
+.get-ready-top-pill {
+    display: inline-block;
+    background: #46178f;
+    color: #ffffff;
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 800;
+    font-size: 0.85rem;
+    letter-spacing: 1.5px;
+    padding: 6px 22px;
+    border-radius: 50px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 12px rgba(70,23,143,0.25);
+}
+.get-ready-question-text {
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 800;
+    font-size: 2.15rem;
+    color: #1e1136;
+    line-height: 1.35;
+    margin-bottom: 15px;
+}
+.get-ready-circle {
+    width: 96px;
+    height: 96px;
+    border-radius: 50%;
+    background: #46178f;
+    color: #ffffff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 900;
+    font-size: 3.2rem;
+    box-shadow: 0 6px 22px rgba(70,23,143,0.35);
+    border: 4px solid #ffffff;
+    outline: 4px solid #46178f;
+    transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.get-ready-subheading {
+    color: #64748b;
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 700;
+    font-size: 1.15rem;
+    margin-top: 14px;
+}
+</style>
+
 
 <?php if ($questionAudioFile): ?>
 <audio id="questionAudio" preload="auto">
@@ -518,6 +581,41 @@ require_once __DIR__ . '/../../includes/header.php';
 
 <div class="container my-3" style="max-width: 1050px;">
 
+    <!-- GET READY 3-2-1 SCREEN -->
+    <div id="hostGetReadyView" class="get-ready-wrapper text-center" style="<?= $isGetReadyActive ? '' : 'display: none;' ?>">
+        <div class="get-ready-card shadow-lg mx-auto">
+            <div class="get-ready-top-pill">
+                QUESTION <?= $questionNumber ?> OF <?= $totalQuestions ?>
+            </div>
+            
+            <h1 class="get-ready-question-text">
+                <?= htmlspecialchars($currentQuestion['text']) ?>
+            </h1>
+
+            <?php if (!empty($questionMediaUrl)): ?>
+                <div class="my-3 text-center">
+                    <?php if ($questionMediaType === 'video'): ?>
+                        <video src="<?= htmlspecialchars($questionMediaUrl) ?>" autoplay muted loop class="rounded shadow-sm" style="max-height: 250px; max-width: 100%; border-radius: 14px;"></video>
+                    <?php else: ?>
+                        <img src="<?= htmlspecialchars($questionMediaUrl) ?>" alt="Question Media" class="img-fluid rounded shadow-sm" style="max-height: 250px; max-width: 100%; object-fit: contain; border-radius: 14px;">
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
+
+            <div class="my-3">
+                <div class="get-ready-circle" id="hostGetReadyCircle">
+                    <span id="hostGetReadyNum"><?= $getReadyRemaining ?></span>
+                </div>
+            </div>
+
+            <div class="get-ready-subheading">
+                Get Ready! Answers are loading...
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN QUESTION ANSWERING VIEW -->
+    <div id="hostQuestionView" style="<?= $isGetReadyActive ? 'display: none;' : '' ?>">
     <details class="text-white mb-3">
         <summary class="font-weight-bold">Manage players</summary>
         <div class="text-center mt-3"><?php $reloadAfterKick = true; require __DIR__ . '/../../includes/host_players.php'; ?></div>
@@ -584,6 +682,7 @@ require_once __DIR__ . '/../../includes/header.php';
                 </div>
             </div>
         <?php endforeach; ?>
+    </div>
     </div>
 </div>
 
@@ -665,36 +764,90 @@ function stopQuestionAudio() {
     }
 }
 
-$(document).ready(function() {
-    playQuestionAudio();
-});
-
+let getReadyRemaining = <?= $isGetReadyActive ? $getReadyRemaining : 0 ?>;
 let remaining = <?= $remainingSeconds ?>;
 const roomId = <?= $roomId ?>;
 const qId = <?= $qId ?>;
 const isObstacleGame = <?= ($room['game_type'] ?? 'classic') === 'obstacle' ? 'true' : 'false' ?>;
 const finishQuestionUrl = 'play.php?action=show_result';
 let isPausedByBuzzer = false;
+let mainTimerStarted = false;
+let timerInterval = null;
 
-// Countdown timer: when time runs out, auto-transition immediately to leaderboard
-const timerInterval = setInterval(function() {
-    if (isPausedByBuzzer) return; // Freeze countdown during buzzer
+function playBeepSound(isGo) {
+    try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(isGo ? 880 : 540, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + (isGo ? 0.35 : 0.18));
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + (isGo ? 0.35 : 0.18));
+    } catch(e) {}
+}
 
-    remaining--;
-    if (remaining <= 0) {
-        clearInterval(timerInterval);
-        clearInterval(pollInterval);
-        stopQuestionAudio();
-        $('#timerSeconds').text('0');
+function startQuestionAnsweringPhase() {
+    $('#hostGetReadyView').fadeOut(250, function() {
+        $('#hostQuestionView').fadeIn(250);
+        playQuestionAudio();
+        startMainTimer();
+    });
+}
 
-        window.location.href = finishQuestionUrl;
-    } else {
-        $('#timerSeconds').text(remaining);
-        if (remaining <= 5) {
-            $('#timerBox').addClass('warning');
+function startMainTimer() {
+    if (mainTimerStarted) return;
+    mainTimerStarted = true;
+
+    timerInterval = setInterval(function() {
+        if (isPausedByBuzzer) return;
+
+        remaining--;
+        if (remaining <= 0) {
+            clearInterval(timerInterval);
+            clearInterval(pollInterval);
+            stopQuestionAudio();
+            $('#timerSeconds').text('0');
+            window.location.href = finishQuestionUrl;
+        } else {
+            $('#timerSeconds').text(remaining);
+            if (remaining <= 5) {
+                $('#timerBox').addClass('warning');
+            }
         }
+    }, 1000);
+}
+
+$(document).ready(function() {
+    if (getReadyRemaining > 0) {
+        playBeepSound(false);
+        const getReadyInterval = setInterval(function() {
+            getReadyRemaining--;
+            if (getReadyRemaining <= 0) {
+                clearInterval(getReadyInterval);
+                playBeepSound(true);
+                $('#hostGetReadyCircle').css('transform', 'scale(1.2)');
+                $('#hostGetReadyNum').text('GO!');
+                setTimeout(function() {
+                    startQuestionAnsweringPhase();
+                }, 400);
+            } else {
+                playBeepSound(false);
+                $('#hostGetReadyCircle').css('transform', 'scale(1.2)');
+                $('#hostGetReadyNum').text(getReadyRemaining);
+                setTimeout(function() {
+                    $('#hostGetReadyCircle').css('transform', 'scale(1)');
+                }, 200);
+            }
+        }, 1000);
+    } else {
+        playQuestionAudio();
+        startMainTimer();
     }
-}, 1000);
+});
 
 // Polling: sync answer counts and obstacle buzzer status
 const pollInterval = setInterval(function() {

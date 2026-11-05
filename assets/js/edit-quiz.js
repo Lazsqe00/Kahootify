@@ -332,7 +332,13 @@ function initAnswerTiles() {
             });
 
             correctCb.addEventListener('change', function () {
-                tile.classList.toggle('is-correct', this.checked);
+                for (var k = 0; k < 4; k++) {
+                    var otherTile = document.getElementById('answerTile_' + k);
+                    if (otherTile) {
+                        var otherCb = document.getElementById('answerCorrect_' + k);
+                        otherTile.classList.toggle('is-correct', !!(otherCb && otherCb.checked));
+                    }
+                }
             });
         })(i);
     }
@@ -408,13 +414,19 @@ function initFormValidation() {
             alert('Please fill in at least 2 answer choices.');
             return;
         }
-        var hasCorrect = false;
+        var correctCount = 0;
         for (var j = 0; j < 4; j++) {
-            if (document.getElementById('answerCorrect_' + j).checked) { hasCorrect = true; break; }
+            if (document.getElementById('answerCorrect_' + j).checked) { correctCount++; }
         }
-        if (!hasCorrect) {
+        if (correctCount === 0) {
             e.preventDefault();
-            alert('Please mark at least one answer as correct.');
+            alert('Please mark 1 answer as correct.');
+            return;
+        }
+        if (correctCount > 1) {
+            e.preventDefault();
+            alert('Only 1 answer can be marked as correct.');
+            return;
         }
     });
 }
@@ -603,9 +615,11 @@ window.loadQuestionForEdit = function (questionId) {
         document.getElementById('textAnswerInput').value          = txt;
         document.getElementById('textAnswerUnderscores').textContent = Array.from(txt).map(function () { return '_'; }).join(' ');
     } else {
+        var foundCorrect = false;
         (q.answers || []).forEach(function (ans, i) {
             if (i > 3) return;
-            var isCorr = ans.is_correct == 1;
+            var isCorr = (ans.is_correct == 1 && !foundCorrect);
+            if (isCorr) foundCorrect = true;
             document.getElementById('answerCorrect_' + i).checked = isCorr;
             document.getElementById('answerTile_' + i).classList.toggle('is-correct', isCorr);
             if (ans.image_path) {

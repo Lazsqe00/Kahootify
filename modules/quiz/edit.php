@@ -171,6 +171,20 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
                 set_flash_message('danger', 'Please enter the correct answer for the text question.');
                 redirect('modules/quiz/edit.php?id=' . $quizId);
             }
+        } else {
+            $rawCorrect = $_POST['correct_answer_idx'] ?? [];
+            if (!is_array($rawCorrect)) {
+                $rawCorrect = strlen((string)$rawCorrect) > 0 ? [$rawCorrect] : [];
+            }
+            $correctIdxs = array_map('intval', $rawCorrect);
+            // Strictly enforce only 1 correct answer per question
+            if (count($correctIdxs) > 1) {
+                $correctIdxs = [reset($correctIdxs)];
+            }
+            if (empty($correctIdxs)) {
+                set_flash_message('danger', 'Please mark exactly one answer as correct.');
+                redirect('modules/quiz/edit.php?id=' . $quizId);
+            }
         }
 
         $oldImg  = null;
@@ -243,7 +257,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
             db_execute("DELETE FROM answers WHERE id_question = :qid", [':qid' => $qId]);
         }
 
-        $correctIdxs = array_map('intval', $_POST['correct_answer_idx'] ?? []);
+        // $correctIdxs is already parsed and validated to contain strictly 1 correct answer
         $useImgArr   = $_POST['answer_use_image']  ?? [];
         $keepImgArr  = $_POST['answer_keep_image'] ?? [];
         $textArr     = $_POST['answer_text']       ?? [];
@@ -625,9 +639,13 @@ require_once __DIR__ . '/../../includes/navbar.php';
     border-radius: 8px;
     display: inline-flex;
     align-items: center;
+    gap: 8px;
     box-shadow: 0 2px 4px rgba(70, 23, 143, 0.2);
     transition: all 0.15s ease;
     text-decoration: none !important;
+}
+.btn-host-game i {
+    margin-right: 6px;
 }
 .btn-host-game:hover {
     background: #391177 !important;
@@ -738,11 +756,11 @@ $availableTeams = TeamManager::getTeamsForEntity($quiz);
 
             <?php if ($isObstacle && count($questions) < intval($quiz['total_pieces'] ?? 4)): ?>
                 <button type="button" class="btn btn-sm btn-host-game disabled" onclick="alert('This Puzzle quiz requires exactly <?= intval($quiz['total_pieces'] ?? 4) ?> questions for all <?= intval($quiz['total_pieces'] ?? 4) ?> tiles before hosting! Currently has <?= count($questions) ?> questions.')" title="Complete all tiles to host">
-                    <i class="fas fa-play mr-1.5"></i> Host Game
+                    <i class="fas fa-play mr-2"></i> Host Game
                 </button>
             <?php else: ?>
                 <a href="<?= BASE_URL ?>modules/host/create_room.php?id_quiz=<?= $quiz['id_quiz'] ?>" class="btn btn-sm btn-host-game" title="Host live game session">
-                    <i class="fas fa-play mr-1.5"></i> Host Game
+                    <i class="fas fa-play mr-2"></i> Host Game
                 </a>
             <?php endif; ?>
         </div>
@@ -949,11 +967,11 @@ $availableTeams = TeamManager::getTeamsForEntity($quiz);
                                         <span style="opacity:0.75;font-weight:400;font-size:11px;">(optional)</span>
                                         <?php endif; ?>
                                     </span>
-                                    <input type="checkbox" class="answer-correct-cb"
-                                           name="correct_answer_idx[]"
+                                    <input type="radio" class="answer-correct-cb"
+                                           name="correct_answer_idx"
                                            value="<?= $i ?>"
                                            id="answerCorrect_<?= $i ?>"
-                                           title="Mark as correct">
+                                           title="Mark as correct (only 1 answer)">
                                 </div>
                                 <div class="answer-tile-body">
                                     <input type="hidden" name="answer_use_image[<?= $i ?>]"  id="answerUseImage_<?= $i ?>"  value="0">

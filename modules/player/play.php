@@ -63,6 +63,9 @@ $isSpectator = ($playerStatus === 'SPECTATOR');
 $currentScore = intval($player['score'] ?? 0);
 $isObstacleMode = (($room['game_type'] ?? 'classic') === 'obstacle');
 $isBuzzerLocked = ($isObstacleMode && !empty($player['is_disqualified_obstacle']));
+$openedPieces = !empty($room['opened_pieces']) ? json_decode($room['opened_pieces'], true) : [];
+if (!is_array($openedPieces)) $openedPieces = [];
+$hasOpenedAnyPiece = (count($openedPieces) > 0);
 $isDisqualified = false;
 
 $currentQuestion = db_fetch_one("SELECT * FROM questions WHERE id_question = :qid", [':qid' => $qId]);
@@ -87,7 +90,11 @@ if ($timeLimit <= 0) {
 
 $startTime = !empty($room['question_start_time']) ? intval($room['question_start_time']) : time();
 $elapsed = max(0, time() - $startTime);
-$remainingSeconds = max(0, $timeLimit - $elapsed);
+$getReadyDuration = 3;
+$getReadyRemaining = max(0, $getReadyDuration - $elapsed);
+$isGetReadyActive = ($getReadyRemaining > 0);
+$answerElapsed = max(0, $elapsed - $getReadyDuration);
+$remainingSeconds = max(0, $timeLimit - $answerElapsed);
 
 $showOnDevice = !empty($room['show_questions_on_players']);
 
@@ -193,6 +200,74 @@ $pageTitle = "Question " . $questionNumber . "/" . $totalQuestions . " - Kahoot!
 $bodyClass = "backgroundColorChanges";
 require_once __DIR__ . '/../../includes/header.php';
 ?>
+<style>
+.player-get-ready-wrapper {
+    max-width: 580px;
+    margin: 25px auto;
+    padding: 0 15px;
+}
+.player-get-ready-card {
+    background: #ffffff;
+    border-radius: 20px;
+    padding: 30px 24px 25px;
+    border-bottom: 5px solid #cbd5e1;
+    box-shadow: 0 12px 35px rgba(0,0,0,0.25);
+}
+.player-get-ready-pill {
+    display: inline-block;
+    background: #46178f;
+    color: #ffffff;
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 800;
+    font-size: 0.8rem;
+    letter-spacing: 1.5px;
+    padding: 5px 18px;
+    border-radius: 50px;
+    margin-bottom: 15px;
+}
+.player-get-ready-circle {
+    width: 85px;
+    height: 85px;
+    border-radius: 50%;
+    background: #46178f;
+    color: #ffffff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 900;
+    font-size: 2.8rem;
+    box-shadow: 0 6px 20px rgba(70,23,143,0.35);
+    border: 4px solid #ffffff;
+    outline: 4px solid #46178f;
+    transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.player-get-ready-title {
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 900;
+    font-size: 1.8rem;
+    color: #1e1136;
+    margin-top: 15px;
+    margin-bottom: 6px;
+    letter-spacing: 0.5px;
+}
+.player-get-ready-desc {
+    color: #64748b;
+    font-weight: 600;
+    font-size: 1rem;
+    margin-bottom: 12px;
+}
+.player-get-ready-qtext {
+    background: #f8fafc;
+    border: 2px dashed #cbd5e1;
+    border-radius: 12px;
+    padding: 14px 18px;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #334155;
+    margin-top: 15px;
+}
+</style>
 
 <audio id="submitSfx" preload="auto" src="<?= BASE_URL ?>assets/audio/<?= rawurlencode('submit_answer_tension_002.mp3') ?>"></audio>
 
@@ -863,6 +938,31 @@ elseif ($phase === 'question'):
 
     <?php else: ?>
         <!-- ACTIVE PARTICIPANT ANSWERING VIEW -->
+        <!-- PLAYER GET READY 3-2-1 SCREEN -->
+        <div id="playerGetReadyView" class="player-get-ready-wrapper text-center my-4" style="<?= $isGetReadyActive ? '' : 'display: none;' ?>">
+            <div class="player-get-ready-card shadow-lg mx-auto">
+                <div class="player-get-ready-pill">
+                    QUESTION <?= $questionNumber ?> OF <?= $totalQuestions ?>
+                </div>
+                
+                <div class="my-3">
+                    <div class="player-get-ready-circle" id="playerGetReadyCircle">
+                        <span id="playerGetReadyNum"><?= $getReadyRemaining ?></span>
+                    </div>
+                </div>
+
+                <h2 class="player-get-ready-title">GET READY!</h2>
+                <p class="player-get-ready-desc">Look up at the screen to read the question...</p>
+                
+                <?php if ($showOnDevice): ?>
+                    <div class="player-get-ready-qtext">
+                        <?= htmlspecialchars($currentQuestion['text'] ?? '') ?>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <div id="playerAnswersView" style="<?= $isGetReadyActive ? 'display: none;' : '' ?>">
         <?php if ($questionMode === 'wager'): ?>
             <div class="container mt-2 mb-0" style="max-width: 1050px;">
                 <div class="alert alert-warning text-center font-weight-bold py-2 mb-2 shadow-sm" style="border-radius: 12px; font-size: 1.05rem;">
@@ -961,55 +1061,11 @@ elseif ($phase === 'question'):
                 </div>
             </div>
         <?php endif; ?>
-
+        </div> <!-- Closing playerAnswersView -->
 
     <?php endif; ?>
 
     <?php if ($isObstacleMode): ?>
-        <div class="text-center my-4">
-            <?php if ($isBuzzerLocked): ?>
-                <button type="button" class="btn btn-secondary font-weight-bold shadow-sm rounded-pill px-4 py-2" disabled id="btnBuzzQuestion">
-                    <i class="fas fa-lock mr-1"></i> BUZZER LOCKED (WAIT FOR ALL PIECES)
-                </button>
-            <?php else: ?>
-                <button type="button" class="btn btn-danger font-weight-bold shadow rounded-pill px-4 py-3" style="font-size: 1.2rem; font-family: 'Montserrat', sans-serif;" onclick="claimBuzzerFromQuestion()" id="btnBuzzQuestion">
-                    <i class="fas fa-bell mr-2"></i> GUESS SECRET PICTURE
-                </button>
-            <?php endif; ?>
-        </div>
-
-        <!-- GUESS MODAL IN QUESTION -->
-        <div class="player-modal-backdrop" id="obstacleGuessModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px); z-index: 99999; align-items: center; justify-content: center; padding: 20px;">
-            <div class="player-modal-card" style="background: #1e1136; border-radius: 24px; border: 3px solid #794bc4; max-width: 520px; width: 100%; padding: 30px; color: #fff; text-align: center; box-shadow: 0 24px 60px rgba(0,0,0,0.7);">
-                <h3 class="font-weight-bold text-warning mb-1" style="color: #f2994a !important;">
-                    🔔 YOUR TURN TO GUESS!
-                </h3>
-                <p class="text-white-50 small mb-2">Enter the secret picture keyword:</p>
-
-
-                <form id="obstacleGuessForm" onsubmit="submitObstacleGuess(event)">
-                    <div class="form-group mb-3">
-                        <input type="text" id="obstacleGuessInput" class="form-control form-control-lg text-center font-weight-bold" 
-                               placeholder="Enter answer keyword..." autocomplete="off" required style="border-radius: 12px; height: 55px; font-size: 1.25rem; font-weight: bold;">
-                    </div>
-                    <button type="submit" class="btn btn-success btn-lg btn-block font-weight-bold shadow mb-2" id="btnConfirmGuess" style="background: #28a745; border-bottom: 4px solid #1e7e34; border-radius: 12px; height: 55px; font-size: 1.25rem; font-weight: 800; color: #fff;">
-                        <i class="fas fa-paper-plane mr-2"></i> CONFIRM ANSWER
-                    </button>
-                    <button type="button" class="btn btn-sm btn-link text-white-50 font-weight-bold" onclick="cancelObstacleGuess()" style="text-decoration: underline;">
-                        <i class="fas fa-times-circle mr-1"></i> Skip answering (Forfeit guess)
-                    </button>
-                </form>
-
-                <div id="guessWaitingHost" style="display: none;" class="py-3">
-                    <div class="spinner-border text-warning mb-3" style="width: 3.2rem; height: 3.2rem;" role="status"></div>
-                    <h4 class="font-weight-bold text-white mb-2">ANSWER SUBMITTED!</h4>
-                    <div class="p-2 mb-2 rounded bg-dark border border-secondary text-warning font-weight-bold" id="submittedGuessDisplay" style="font-size: 1.3rem; word-break: break-word;">
-                        ...
-                    </div>
-                    <p class="text-white-50 small mb-0">Waiting for Host to verify your answer...</p>
-                </div>
-            </div>
-        </div>
 
         <!-- MODAL NOTIFYING PAUSE TO OTHER PLAYERS -->
         <div class="player-modal-backdrop" id="obstacleRoomLockedModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px); z-index: 99999; align-items: center; justify-content: center; padding: 20px;">
@@ -1045,72 +1101,7 @@ function refreshPlayerPage() {
 
 let isPausedByBuzzer = false;
 
-function claimBuzzerFromQuestion() {
-    if (isBuzzerLocked) {
-        alert('Your buzzer is temporarily locked during these pieces!');
-        return;
-    }
-    $.post('<?= BASE_URL ?>modules/api/obstacle_action.php?action=buzz&id_room=' + roomId, {
-        id_player: playerId,
-        token: playerToken
-    }, function(res) {
-        if (res && res.success && res.your_turn) {
-            openObstacleGuessModal();
-        } else {
-            alert(res.message || 'Cannot buzz in at this time');
-        }
-    }, 'json').fail(function() {
-        alert('Server connection error');
-    });
-}
 
-function openObstacleGuessModal() {
-    isPausedByBuzzer = true;
-    $('#obstacleGuessForm').show();
-    $('#guessWaitingHost').hide();
-    $('#obstacleGuessInput').val('').focus();
-    $('#btnConfirmGuess').prop('disabled', false).html('<i class="fas fa-paper-plane mr-2"></i> CONFIRM ANSWER');
-    $('#obstacleGuessModal').css('display', 'flex');
-}
-
-function submitObstacleGuess(e) {
-    e.preventDefault();
-    const guessText = $('#obstacleGuessInput').val().trim();
-    if (!guessText) return;
-
-    $('#btnConfirmGuess').prop('disabled', true).html('<i class="fas fa-spinner fa-spin mr-1"></i> Sending...');
-
-    $.post('<?= BASE_URL ?>modules/api/obstacle_action.php?action=submit_guess&id_room=' + roomId, {
-        id_player: playerId,
-        token: playerToken,
-        guess: guessText
-    }, function(res) {
-        if (res && res.success && res.pending_review) {
-            $('#obstacleGuessForm').hide();
-            $('#submittedGuessDisplay').text(guessText);
-            $('#guessWaitingHost').show();
-        } else {
-            alert(res.message || 'Error submitting answer');
-            $('#obstacleGuessModal').hide();
-            refreshPlayerPage();
-        }
-    }, 'json').fail(function() {
-        alert('Server connection error');
-        $('#obstacleGuessModal').hide();
-    });
-}
-
-function cancelObstacleGuess() {
-    $.post('<?= BASE_URL ?>modules/api/obstacle_action.php?action=cancel_or_timeout_guess&id_room=' + roomId, {
-        id_player: playerId,
-        token: playerToken
-    }, function() {
-        alert('You did not provide an answer and lost buzzer rights until all pieces are revealed!');
-        refreshPlayerPage();
-    }, 'json').fail(function() {
-        refreshPlayerPage();
-    });
-}
 
 function submitAnswer(answerId) {
     if (!answerId) return;
@@ -1146,32 +1137,72 @@ function submitAnswer(answerId) {
     });
 }
 
-<?php if ($showOnDevice && $phase === 'question' && !$myVote && !$isSittingOut && !$isEliminated && !$isSpectator): ?>
+let playerGetReadyRemaining = <?= intval($getReadyRemaining) ?>;
 let playerSeconds = <?= intval($remainingSeconds) ?>;
-const timerEl = document.getElementById('playerTimer');
-const timerBox = document.getElementById('playerTimerBox');
+let playerTimerStarted = false;
 
-if (playerSeconds <= 0) {
-    $('.answer-box, .player-btn').css('pointer-events', 'none').css('opacity', '0.6');
-} else if (timerEl) {
-    const playerCountdown = setInterval(function() {
-        if (isPausedByBuzzer) return; // Freeze player countdown during buzzer
+function startPlayerTimer() {
+    if (playerTimerStarted) return;
+    playerTimerStarted = true;
+    const timerEl = document.getElementById('playerTimer');
+    const timerBox = document.getElementById('playerTimerBox');
 
-        playerSeconds--;
-        if (playerSeconds <= 0) {
-            playerSeconds = 0;
-            clearInterval(playerCountdown);
-            timerEl.textContent = '0';
-            $('.answer-box, .player-btn').css('pointer-events', 'none').css('opacity', '0.6');
-        } else {
-            timerEl.textContent = playerSeconds;
-            if (playerSeconds <= 5 && timerBox) {
-                timerBox.classList.add('warning');
+    if (playerSeconds <= 0) {
+        $('.answer-box, .player-btn').css('pointer-events', 'none').css('opacity', '0.6');
+    } else if (timerEl) {
+        const playerCountdown = setInterval(function() {
+            if (isPausedByBuzzer) return; // Freeze player countdown during buzzer
+
+            playerSeconds--;
+            if (playerSeconds <= 0) {
+                playerSeconds = 0;
+                clearInterval(playerCountdown);
+                timerEl.textContent = '0';
+                $('.answer-box, .player-btn').css('pointer-events', 'none').css('opacity', '0.6');
+            } else {
+                timerEl.textContent = playerSeconds;
+                if (playerSeconds <= 5 && timerBox) {
+                    timerBox.classList.add('warning');
+                }
             }
-        }
-    }, 1000);
+        }, 1000);
+    }
 }
-<?php endif; ?>
+
+function startPlayerQuestionPhase() {
+    $('#playerGetReadyView').fadeOut(200, function() {
+        $('#playerAnswersView').fadeIn(200);
+        <?php if ($showOnDevice && $phase === 'question' && !$myVote && !$isSittingOut && !$isEliminated && !$isSpectator): ?>
+        startPlayerTimer();
+        <?php endif; ?>
+    });
+}
+
+$(document).ready(function() {
+    if (playerGetReadyRemaining > 0) {
+        const pGrInterval = setInterval(function() {
+            playerGetReadyRemaining--;
+            if (playerGetReadyRemaining <= 0) {
+                clearInterval(pGrInterval);
+                $('#playerGetReadyCircle').css('transform', 'scale(1.2)');
+                $('#playerGetReadyNum').text('GO!');
+                setTimeout(function() {
+                    startPlayerQuestionPhase();
+                }, 350);
+            } else {
+                $('#playerGetReadyCircle').css('transform', 'scale(1.2)');
+                $('#playerGetReadyNum').text(playerGetReadyRemaining);
+                setTimeout(function() {
+                    $('#playerGetReadyCircle').css('transform', 'scale(1)');
+                }, 200);
+            }
+        }, 1000);
+    } else {
+        <?php if ($showOnDevice && $phase === 'question' && !$myVote && !$isSittingOut && !$isEliminated && !$isSpectator): ?>
+        startPlayerTimer();
+        <?php endif; ?>
+    }
+});
 
 setInterval(function() {
     $.getJSON('<?= BASE_URL ?>modules/api/game_state.php?action=get_room_status&id_room=' + roomId + '&pid=' + playerId + '&token=' + encodeURIComponent(playerToken), function(res) {

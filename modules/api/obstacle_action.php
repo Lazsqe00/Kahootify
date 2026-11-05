@@ -175,6 +175,15 @@ if ($action === 'buzz') {
     $totalPieces = intval($room['total_pieces'] ?? 4);
     $allPiecesOpened = (count($openedPieces) >= $totalPieces);
 
+    // Disallow guessing when no puzzle pieces have been revealed yet
+    if (empty($openedPieces)) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'No puzzle piece has been revealed yet! You must wait until at least one piece is opened to guess.'
+        ]);
+        exit;
+    }
+
     if (!empty($player['is_disqualified_obstacle'])) {
         if (!$allPiecesOpened) {
             echo json_encode(['success' => false, 'message' => 'Your buzzer is temporarily locked during piece reveals. Buzzer will unlock once all pieces are opened!']);
