@@ -173,6 +173,10 @@ class TeamManager {
         $room = db_fetch_one("SELECT * FROM room WHERE id_room = :r", [':r' => $roomId]);
         if (!$room) return [];
 
+        if (function_exists('cleanup_stale_waiting_players') && ($room['status'] ?? '') === 'waiting') {
+            cleanup_stale_waiting_players($roomId);
+        }
+
         $teamCount = self::getTeamCount($room);
         $limit = self::getTeamPlayerLimit($room);
 
@@ -208,6 +212,10 @@ class TeamManager {
         $room = db_fetch_one("SELECT * FROM room WHERE id_room = :r", [':r' => $roomId]);
         if (!$room) {
             return ['valid' => false, 'message' => 'Room not found.'];
+        }
+
+        if (function_exists('cleanup_stale_waiting_players') && ($room['status'] ?? '') === 'waiting') {
+            cleanup_stale_waiting_players($roomId);
         }
 
         if (!self::isTeamMode($room)) {

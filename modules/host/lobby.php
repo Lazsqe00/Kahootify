@@ -37,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['set_room_lock'])) {
     }
 }
 $isLocked = room_is_locked($room);
-$questions = db_fetch_all("SELECT id_question FROM questions WHERE id_quiz = :q ORDER BY id_question ASC", [':q' => $room['id_quiz']]);
+$questions = db_fetch_all("SELECT id_question FROM questions WHERE id_quiz = :q ORDER BY (CASE WHEN sort_order > 0 THEN sort_order ELSE 999999 END) ASC, id_question ASC", [':q' => $room['id_quiz']]);
 $totalQuizQuestions = count($questions);
 $hasWagerInQuiz = (($room['quiz_mode'] ?? '') === 'wager')
     || (db_count('questions', "id_quiz = :q AND mode = 'wager'", [':q' => $room['id_quiz']]) > 0);

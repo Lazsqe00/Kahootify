@@ -311,7 +311,7 @@ if (isset($_GET['delete_question'])) {
     redirect('modules/quiz/edit.php?id=' . $quizId);
 }
 
-$questions = db_fetch_all("SELECT * FROM questions WHERE id_quiz = :q ORDER BY sort_order ASC, id_question ASC", [':q' => $quizId]);
+$questions = db_fetch_all("SELECT * FROM questions WHERE id_quiz = :q ORDER BY (CASE WHEN sort_order > 0 THEN sort_order ELSE 999999 END) ASC, id_question ASC", [':q' => $quizId]);
 if ($isObstacle) {
     foreach ($questions as $idx => &$q) {
         $expected = $idx + 1;
@@ -326,6 +326,25 @@ if ($isObstacle) {
         }
     }
     unset($q);
+} else {
+    $needsSortFix = false;
+    foreach ($questions as $qCheck) {
+        if (intval($qCheck['sort_order'] ?? 0) <= 0) {
+            $needsSortFix = true;
+            break;
+        }
+    }
+    if ($needsSortFix) {
+        foreach ($questions as $idx => &$qFix) {
+            $expected = $idx + 1;
+            db_execute("UPDATE questions SET sort_order = :so WHERE id_question = :qid", [
+                ':so'  => $expected,
+                ':qid' => $qFix['id_question']
+            ]);
+            $qFix['sort_order'] = $expected;
+        }
+        unset($qFix);
+    }
 }
 foreach ($questions as &$q) {
     $q['answers'] = db_fetch_all("SELECT * FROM answers WHERE id_question = :qid ORDER BY id_answer ASC", [':qid' => $q['id_question']]);

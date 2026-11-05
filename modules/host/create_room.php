@@ -12,7 +12,7 @@ if (!$quiz) {
     redirect('modules/quiz/list.php');
 }
 
-$questions = db_fetch_all("SELECT id_question FROM questions WHERE id_quiz = :q ORDER BY id_question ASC", [':q' => $quizId]);
+$questions = db_fetch_all("SELECT id_question FROM questions WHERE id_quiz = :q ORDER BY (CASE WHEN sort_order > 0 THEN sort_order ELSE 999999 END) ASC, id_question ASC", [':q' => $quizId]);
 
 if (empty($questions)) {
     set_flash_message('warning', 'This quiz has no questions! Please add questions before hosting a game.');

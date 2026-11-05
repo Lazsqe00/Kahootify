@@ -124,4 +124,58 @@ class GameplayIntegrationTest
             throw $e;
         }
     }
+
+    public function testQuestionOrderRespectsCustomSortOrder()
+    {
+        $pdo = getDB();
+        $pdo->beginTransaction();
+        try {
+            $quizId = db_insert("INSERT INTO quiz (id_creator, name) VALUES (1, 'Sort Order Test Quiz')");
+
+            $q1 = db_insert("INSERT INTO questions (id_quiz, text, sort_order) VALUES (:q, 'Q1', 2)", [':q' => $quizId]);
+            $q2 = db_insert("INSERT INTO questions (id_quiz, text, sort_order) VALUES (:q, 'Q2', 3)", [':q' => $quizId]);
+            $q3 = db_insert("INSERT INTO questions (id_quiz, text, sort_order) VALUES (:q, 'Q3', 1)", [':q' => $quizId]);
+
+            $rows = db_fetch_all(
+                "SELECT id_question FROM questions WHERE id_quiz = :q ORDER BY (CASE WHEN sort_order > 0 THEN sort_order ELSE 999999 END) ASC, id_question ASC",
+                [':q' => $quizId]
+            );
+            $ids = array_column($rows, 'id_question');
+
+            $this->assertEquals([(int)$q3, (int)$q1, (int)$q2], array_map('intval', $ids), "Questions must follow sort_order (Q3=1, Q1=2, Q2=3)");
+
+            $pdo->rollBack();
+        } catch (Throwable $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+    }
+
+    public function testCleanupStaleWaitingPlayers()
+    {
+        $pdo = getDB();
+        $pdo->beginTransaction();
+        try {
+            $quizId = db_insert("INSERT INTO quiz (id_creator, name) VALUES (1, 'Stale Players Quiz')");
+            $rId = db_insert("INSERT INTO room (id_quiz, id_creator, pin, status) VALUES (:q, 1, 999888, 'waiting')", [':q' => $quizId]);
+
+            $staleTime = time() - 30;
+            $freshTime = time();
+
+            $p1 = db_insert("INSERT INTO players (id_room, nickname, last_seen_at) VALUES (:r, 'StalePlayer', :t)", [':r' => $rId, ':t' => $staleTime]);
+            $p2 = db_insert("INSERT INTO players (id_room, nickname, last_seen_at) VALUES (:r, 'ActivePlayer', :t)", [':r' => $rId, ':t' => $freshTime]);
+
+            $deleted = cleanup_stale_waiting_players($rId, 10);
+            $this->assertEquals(1, $deleted, "Should delete exactly 1 stale player");
+
+            $remaining = db_fetch_all("SELECT id_player FROM players WHERE id_room = :r", [':r' => $rId]);
+            $remainingIds = array_column($remaining, 'id_player');
+            $this->assertEquals([(int)$p2], array_map('intval', $remainingIds), "Only active player should remain");
+
+            $pdo->rollBack();
+        } catch (Throwable $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+    }
 }

@@ -142,6 +142,9 @@ if ($action === 'get_players') {
         echo json_encode(['success' => false, 'message' => 'Room does not exist']);
         exit;
     }
+    if (function_exists('cleanup_stale_waiting_players')) {
+        cleanup_stale_waiting_players($roomId);
+    }
     $players = filter_room_players($roomId, db_fetch_all("SELECT id_player, nickname, score, status, team_id, team_name FROM players WHERE id_room = :r ORDER BY (team_id IS NOT NULL AND team_id > 0) DESC, team_id ASC, id_player ASC", [':r' => $roomId]));
     foreach ($players as &$lobbyPlayer) {
         $appearance = get_player_appearance($room, (int) $lobbyPlayer['id_player']);

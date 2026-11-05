@@ -7,15 +7,6 @@ require_once __DIR__ . '/../../includes/room_access.php';
 $error = '';
 $pin = '';
 
-// Clean up any abandoned waiting lobby player when returning to Game PIN entry
-$existingPlayerId = intval($_SESSION['id_player'] ?? 0);
-$existingRoomId   = intval($_SESSION['player_room_id'] ?? 0);
-if ($existingPlayerId > 0 && $existingRoomId > 0) {
-    $oldRoom = db_fetch_one("SELECT status FROM room WHERE id_room = :r", [':r' => $existingRoomId]);
-    if ($oldRoom && $oldRoom['status'] === 'waiting') {
-        remove_player_from_room($existingPlayerId, $existingRoomId);
-    }
-}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' || isset($_GET['pin'])) {
     $submittedPin = $_SERVER['REQUEST_METHOD'] === 'POST' ? ($_POST['pin'] ?? '') : $_GET['pin'];

@@ -160,6 +160,19 @@ function remove_player_from_room($playerId, $roomId) {
     return true;
 }
 
+function cleanup_stale_waiting_players($roomId, $timeoutSeconds = 8) {
+    $roomId = (int)$roomId;
+    if ($roomId <= 0) return 0;
+
+    $room = db_fetch_one("SELECT status FROM room WHERE id_room = :r", [':r' => $roomId]);
+    if (!$room || ($room['status'] ?? '') !== 'waiting') return 0;
+
+    $thresh = time() - $timeoutSeconds;
+    $stmt = getDB()->prepare("DELETE FROM players WHERE id_room = :r AND last_seen_at IS NOT NULL AND last_seen_at < :t");
+    $stmt->execute([':r' => $roomId, ':t' => $thresh]);
+    return $stmt->rowCount();
+}
+
 function room_is_locked($room) {
     $roomId = is_array($room) ? (int)($room['id_room'] ?? 0) : (int)$room;
     if ($roomId <= 0) return false;
@@ -243,7 +256,7 @@ function join_room_player($roomId, $pin, $nickname, $characterId = null, $access
         }
 
         $playerId = db_insert(
-            'INSERT INTO players (id_room, nickname, score, answers_correct, is_kicked, character_id, accessory_id, status, team_id, team_name) VALUES (:r, :nick, :score, 0, 0, :char, :acc, :st, :tid, :tname)',
+            'INSERT INTO players (id_room, nickname, score, answers_correct, is_kicked, character_id, accessory_id, status, team_id, team_name, last_seen_at) VALUES (:r, :nick, :score, 0, 0, :char, :acc, :st, :tid, :tname, UNIX_TIMESTAMP())',
             [
                 ':r'     => $roomId,
                 ':nick'  => $nickname,

@@ -25,6 +25,7 @@ if ($roomId <= 0 || $playerId <= 0 || !$player || !player_request_is_valid($play
 $room = db_fetch_one('SELECT id_room, pin, status FROM room WHERE id_room = :r', [':r' => $roomId]);
 if (!$room) redirect('modules/player/join.php');
 if (player_is_kicked($room, $playerId)) redirect_removed_player($playerId);
+db_execute("UPDATE players SET last_seen_at = UNIX_TIMESTAMP() WHERE id_player = :p", [':p' => $playerId]);
 $characterRoom = $room;
 
 $ownsPlayer = ((int) ($_SESSION['id_player'] ?? 0) === $playerId && (int) ($_SESSION['player_room_id'] ?? 0) === $roomId)
@@ -117,6 +118,7 @@ require_once __DIR__ . '/../../includes/header.php';
 const roomId = <?= $roomId ?>;
 const playerId = <?= $playerId ?>;
 const playerToken = '<?= htmlspecialchars($token) ?>';
+let isNavigatingToGame = false;
 
 sessionStorage.setItem('kahoot_pid', playerId);
 sessionStorage.setItem('kahoot_token', playerToken);
@@ -128,13 +130,27 @@ setInterval(function() {
             return;
         }
         if (res && res.success) {
-
             if (res.status !== 'waiting') {
+                isNavigatingToGame = true;
                 window.location.href = '<?= BASE_URL ?>modules/player/play.php?pid=' + playerId + '&token=' + playerToken;
             }
         }
     });
 }, 1000);
+
+function sendLeaveBeacon() {
+    if (isNavigatingToGame) return;
+    if (navigator.sendBeacon) {
+        const formData = new FormData();
+        formData.append('id_room', String(roomId));
+        formData.append('pid', String(playerId));
+        formData.append('token', playerToken);
+        navigator.sendBeacon('<?= BASE_URL ?>modules/api/player_leave.php', formData);
+    }
+}
+
+window.addEventListener('pagehide', sendLeaveBeacon);
+window.addEventListener('beforeunload', sendLeaveBeacon);
 </script>
 </body>
 </html>

@@ -194,7 +194,7 @@ if ($isResultPhase || $isLeaderboardPhase) {
 
 $selectedQIds = !empty($room['question_order']) ? json_decode($room['question_order'], true) : null;
 if (!is_array($selectedQIds) || empty($selectedQIds)) {
-    $fallbackQuestions = db_fetch_all("SELECT id_question FROM questions WHERE id_quiz = :q ORDER BY id_question ASC", [':q' => $room['id_quiz']]);
+    $fallbackQuestions = db_fetch_all("SELECT id_question FROM questions WHERE id_quiz = :q ORDER BY (CASE WHEN sort_order > 0 THEN sort_order ELSE 999999 END) ASC, id_question ASC", [':q' => $room['id_quiz']]);
     $selectedQIds = array_column($fallbackQuestions, 'id_question');
 }
 $totalQuestions = count($selectedQIds);
