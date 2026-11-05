@@ -685,3 +685,81 @@ h1, h2, h3, h4, h5, h6, .brand-font, .btn, .badge {
 }
 
 
+
+
+/* Sleek inside-input password toggle button */
+.password-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.password-wrapper .form-control {
+    padding-right: 42px !important;
+}
+
+.password-wrapper .form-control.is-invalid {
+    background-image: none !important;
+}
+
+.btn-toggle-eye {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    color: #9aa0a6;
+    cursor: pointer;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    outline: none !important;
+    box-shadow: none !important;
+    transition: color 0.2s ease, background-color 0.2s ease;
+}
+
+.btn-toggle-eye:hover {
+    color: #495057;
+    background-color: rgba(0, 0, 0, 0.05) !important;
+}
+
+.btn-toggle-eye:focus {
+    color: var(--kahoot-purple, #46178F);
+    background-color: rgba(70, 23, 143, 0.08) !important;
+}
+
+.btn-toggle-eye i {
+    font-size: 16px;
+    pointer-events: none;
+}
+
+.password-wrapper + .invalid-feedback {
+    display: none;
+    width: 100%;
+    margin-top: 0.25rem;
+    font-size: 80%;
+    color: #dc3545;
+}
+
+/* Inside input-group (e.g. login modal) */
+.input-group > .password-wrapper {
+    flex: 1 1 auto;
+    width: 1%;
+}
+
+.input-group > .password-wrapper .form-control {
+    border-top-left-radius: 0 !important;
+    border-bottom-left-radius: 0 !important;
+    border-top-right-radius: 0.25rem !important;
+    border-bottom-right-radius: 0.25rem !important;
+}
+
+.input-group > .password-wrapper .form-control.is-invalid {
+    z-index: 2;
+}

@@ -88,6 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = trim($_POST['username'] ?? '');
     $email    = trim($_POST['email'] ?? '');
     $password = trim($_POST['password'] ?? '');
+    $confirmPassword = trim($_POST['confirm_password'] ?? '');
     $role     = intval($_POST['role'] ?? 1);
 
     $errors = [];
@@ -110,6 +111,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors['password'] = 'Please enter a password!';
     } elseif (strlen($password) < 6) {
         $errors['password'] = 'Password must be at least 6 characters long!';
+    }
+
+    if ($confirmPassword === '') {
+        $errors['confirm_password'] = 'Please confirm your password!';
+    } elseif ($confirmPassword !== $password) {
+        $errors['confirm_password'] = 'Passwords do not match!';
     }
 
     if (!empty($errors)) {

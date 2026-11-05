@@ -35,7 +35,12 @@
                             <div class="input-group-prepend">
                                 <span class="input-group-text"><i class="fas fa-key"></i></span>
                             </div>
-                            <input type="password" name="password" id="loginPassword" class="form-control" required autocomplete="current-password">
+                            <div class="password-wrapper position-relative flex-grow-1">
+                                <input type="password" name="password" id="loginPassword" class="form-control" placeholder="Password" required autocomplete="current-password">
+                                <button type="button" class="toggle-password btn-toggle-eye" tabindex="-1" title="Show password" aria-label="Show password">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </div>
                         </div>
                         <small class="form-text text-muted">Default password: <b>123456</b></small>
                     </div>
@@ -92,9 +97,25 @@
 
                     <div class="form-group">
                         <label class="font-weight-bold">Password</label>
-                        <input type="password" name="password" id="signUpPassword" class="form-control <?= !empty($_SESSION['signup_errors']['password']) ? 'is-invalid' : '' ?>" required autocomplete="new-password">
-                        <div class="invalid-feedback font-weight-bold" id="signUpPasswordError"><?= !empty($_SESSION['signup_errors']['password']) ? '<i class="fas fa-exclamation-circle mr-1"></i> ' . htmlspecialchars($_SESSION['signup_errors']['password']) : '' ?></div>
+                        <div class="password-wrapper position-relative">
+                            <input type="password" name="password" id="signUpPassword" class="form-control <?= !empty($_SESSION['signup_errors']['password']) ? 'is-invalid' : '' ?>" placeholder="Password" required autocomplete="new-password">
+                            <button type="button" class="toggle-password btn-toggle-eye" tabindex="-1" title="Show password" aria-label="Show password">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                        <div class="invalid-feedback font-weight-bold <?= !empty($_SESSION['signup_errors']['password']) ? 'd-block' : '' ?>" id="signUpPasswordError"><?= !empty($_SESSION['signup_errors']['password']) ? '<i class="fas fa-exclamation-circle mr-1"></i> ' . htmlspecialchars($_SESSION['signup_errors']['password']) : '' ?></div>
                         <small class="form-text text-muted">Must be at least 6 characters</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="font-weight-bold">Confirm Password</label>
+                        <div class="password-wrapper position-relative">
+                            <input type="password" name="confirm_password" id="signUpConfirmPassword" class="form-control <?= !empty($_SESSION['signup_errors']['confirm_password']) ? 'is-invalid' : '' ?>" placeholder="Confirm password" required autocomplete="new-password">
+                            <button type="button" class="toggle-password btn-toggle-eye" tabindex="-1" title="Show password" aria-label="Show password">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                        <div class="invalid-feedback font-weight-bold <?= !empty($_SESSION['signup_errors']['confirm_password']) ? 'd-block' : '' ?>" id="signUpConfirmPasswordError"><?= !empty($_SESSION['signup_errors']['confirm_password']) ? '<i class="fas fa-exclamation-circle mr-1"></i> ' . htmlspecialchars($_SESSION['signup_errors']['confirm_password']) : '' ?></div>
                     </div>
 
                     <div class="form-group">
@@ -186,12 +207,12 @@ $(document).ready(function() {
 
     function setFieldError($input, $errorElem, message) {
         $input.addClass('is-invalid');
-        $errorElem.html('<i class="fas fa-exclamation-circle mr-1"></i> ' + message);
+        $errorElem.html('<i class="fas fa-exclamation-circle mr-1"></i> ' + message).show();
     }
 
     function clearFieldError($input, $errorElem) {
         $input.removeClass('is-invalid');
-        $errorElem.text('');
+        $errorElem.text('').hide();
     }
 
     // Real-time / Blur checking for Username
@@ -256,6 +277,16 @@ $(document).ready(function() {
         if ($(this).hasClass('is-invalid')) {
             clearFieldError($(this), $('#signUpPasswordError'));
         }
+        var confirmVal = $('#signUpConfirmPassword').val();
+        if (confirmVal && $('#signUpConfirmPassword').hasClass('is-invalid') && confirmVal === $(this).val()) {
+            clearFieldError($('#signUpConfirmPassword'), $('#signUpConfirmPasswordError'));
+        }
+    });
+
+    $('#signUpConfirmPassword').on('input', function() {
+        if ($(this).hasClass('is-invalid')) {
+            clearFieldError($(this), $('#signUpConfirmPasswordError'));
+        }
     });
 
     $('#signUpName').on('input', function() {
@@ -277,11 +308,13 @@ $(document).ready(function() {
         var $username = $('#signUpUsername');
         var $email = $('#signUpEmail');
         var $password = $('#signUpPassword');
+        var $confirmPassword = $('#signUpConfirmPassword');
 
         var nameVal = $.trim($name.val());
         var usernameVal = $.trim($username.val());
         var emailVal = $.trim($email.val());
         var passwordVal = $password.val();
+        var confirmPasswordVal = $confirmPassword.val();
 
         var hasError = false;
 
@@ -289,6 +322,7 @@ $(document).ready(function() {
         clearFieldError($username, $('#signUpUsernameError'));
         clearFieldError($email, $('#signUpEmailError'));
         clearFieldError($password, $('#signUpPasswordError'));
+        clearFieldError($confirmPassword, $('#signUpConfirmPasswordError'));
         $errAlert.addClass('d-none');
 
         if (!nameVal) {
@@ -314,6 +348,14 @@ $(document).ready(function() {
             hasError = true;
         } else if (passwordVal.length < 6) {
             setFieldError($password, $('#signUpPasswordError'), 'Password must be at least 6 characters long!');
+            hasError = true;
+        }
+
+        if (!confirmPasswordVal) {
+            setFieldError($confirmPassword, $('#signUpConfirmPasswordError'), 'Please confirm your password!');
+            hasError = true;
+        } else if (confirmPasswordVal !== passwordVal) {
+            setFieldError($confirmPassword, $('#signUpConfirmPasswordError'), 'Passwords do not match!');
             hasError = true;
         }
 
@@ -345,6 +387,7 @@ $(document).ready(function() {
                     if (res.errors.username) setFieldError($username, $('#signUpUsernameError'), res.errors.username);
                     if (res.errors.email) setFieldError($email, $('#signUpEmailError'), res.errors.email);
                     if (res.errors.password) setFieldError($password, $('#signUpPasswordError'), res.errors.password);
+                    if (res.errors.confirm_password) setFieldError($confirmPassword, $('#signUpConfirmPasswordError'), res.errors.confirm_password);
                 }
 
                 $form.find('.is-invalid').first().focus();
@@ -364,6 +407,7 @@ $(document).ready(function() {
                 if (errs.username) setFieldError($username, $('#signUpUsernameError'), errs.username);
                 if (errs.email) setFieldError($email, $('#signUpEmailError'), errs.email);
                 if (errs.password) setFieldError($password, $('#signUpPasswordError'), errs.password);
+                if (errs.confirm_password) setFieldError($confirmPassword, $('#signUpConfirmPasswordError'), errs.confirm_password);
             }
 
             $form.find('.is-invalid').first().focus();
@@ -377,6 +421,35 @@ $(document).ready(function() {
         clearFieldError($('#signUpUsername'), $('#signUpUsernameError'));
         clearFieldError($('#signUpEmail'), $('#signUpEmailError'));
         clearFieldError($('#signUpPassword'), $('#signUpPasswordError'));
+        clearFieldError($('#signUpConfirmPassword'), $('#signUpConfirmPasswordError'));
+        $('#signUpModal input[type="text"]').filter('#signUpPassword, #signUpConfirmPassword').attr('type', 'password');
+        $('#signUpModal .toggle-password i').removeClass('fa-eye-slash').addClass('fa-eye');
+    });
+
+    $('#loginModal').on('hidden.bs.modal', function() {
+        if ($('#loginPassword').attr('type') === 'text') {
+            $('#loginPassword').attr('type', 'password');
+            $('#loginModal .toggle-password i').removeClass('fa-eye-slash').addClass('fa-eye');
+        }
+    });
+
+    // Global Password Visibility Toggle
+    $(document).on('click', '.toggle-password', function(e) {
+        e.preventDefault();
+        var targetSelector = $(this).data('target');
+        var $input = targetSelector ? $(targetSelector) : $(this).closest('.password-wrapper, .input-group').find('input');
+        if ($input.length === 0) return;
+
+        var $icon = $(this).find('i');
+        if ($input.attr('type') === 'password') {
+            $input.attr('type', 'text');
+            $icon.removeClass('fa-eye').addClass('fa-eye-slash');
+            $(this).attr('title', 'Hide password').attr('aria-label', 'Hide password');
+        } else {
+            $input.attr('type', 'password');
+            $icon.removeClass('fa-eye-slash').addClass('fa-eye');
+            $(this).attr('title', 'Show password').attr('aria-label', 'Show password');
+        }
     });
 });
 </script>
