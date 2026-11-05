@@ -639,13 +639,10 @@ require_once __DIR__ . '/../../includes/navbar.php';
     border-radius: 8px;
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: 7px;
     box-shadow: 0 2px 4px rgba(70, 23, 143, 0.2);
     transition: all 0.15s ease;
     text-decoration: none !important;
-}
-.btn-host-game i {
-    margin-right: 6px;
 }
 .btn-host-game:hover {
     background: #391177 !important;
@@ -756,11 +753,11 @@ $availableTeams = TeamManager::getTeamsForEntity($quiz);
 
             <?php if ($isObstacle && count($questions) < intval($quiz['total_pieces'] ?? 4)): ?>
                 <button type="button" class="btn btn-sm btn-host-game disabled" onclick="alert('This Puzzle quiz requires exactly <?= intval($quiz['total_pieces'] ?? 4) ?> questions for all <?= intval($quiz['total_pieces'] ?? 4) ?> tiles before hosting! Currently has <?= count($questions) ?> questions.')" title="Complete all tiles to host">
-                    <i class="fas fa-play mr-2"></i> Host Game
+                    <i class="fas fa-play"></i> Host Game
                 </button>
             <?php else: ?>
                 <a href="<?= BASE_URL ?>modules/host/create_room.php?id_quiz=<?= $quiz['id_quiz'] ?>" class="btn btn-sm btn-host-game" title="Host live game session">
-                    <i class="fas fa-play mr-2"></i> Host Game
+                    <i class="fas fa-play"></i> Host Game
                 </a>
             <?php endif; ?>
         </div>

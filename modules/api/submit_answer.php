@@ -14,10 +14,18 @@ $data = json_decode($raw, true);
 $playerId = intval($data['id_player'] ?? 0);
 $answerId = intval($data['id_answer'] ?? 0);
 $roomId   = intval($data['id_room'] ?? 0);
+$qIdInput = intval($data['id_question'] ?? 0);
 
-if ($playerId <= 0 || $answerId <= 0 || $roomId <= 0) {
+if ($playerId <= 0 || ($answerId <= 0 && $qIdInput <= 0) || $roomId <= 0) {
     echo json_encode(['success' => false, 'message' => 'Missing required data']);
     exit;
+}
+
+if ($answerId <= 0 && $qIdInput > 0) {
+    $firstAns = db_fetch_one("SELECT id_answer FROM answers WHERE id_question = :qid ORDER BY is_correct DESC LIMIT 1", [':qid' => $qIdInput]);
+    if ($firstAns) {
+        $answerId = intval($firstAns['id_answer']);
+    }
 }
 
 if (!player_request_is_valid($playerId, $roomId, $data['token'] ?? '')) {
@@ -50,7 +58,7 @@ try {
         }
 
         $ans = db_fetch_one(
-            "SELECT a.*, q.points, q.time_limit, q.mode, q.mode_config, q.piece_index, r.question_start_time, r.status, r.game_type
+            "SELECT a.*, q.points, q.time_limit, q.mode, q.mode_config, q.piece_index, q.question_type, r.question_start_time, r.status, r.game_type
              FROM answers a
              JOIN questions q ON a.id_question = q.id_question
              JOIN room r ON r.id_room = :r
@@ -99,7 +107,30 @@ try {
             return ['success' => false, 'message' => 'You have already answered this question'];
         }
 
-        $isCorrect = ($ans['is_correct'] == 1);
+        $isTextType = (($ans['question_type'] ?? '') === 'text' || isset($data['text_answer']));
+        if ($isTextType) {
+            $userText = trim((string)($data['text_answer'] ?? ''));
+            $correctAnsRow = db_fetch_one("SELECT * FROM answers WHERE id_question = :qid AND is_correct = 1 LIMIT 1", [':qid' => $qId]);
+            $correctText = trim((string)($correctAnsRow['text'] ?? ($ans['text'] ?? '')));
+            $isCorrect = (mb_strtolower($userText, 'UTF-8') === mb_strtolower($correctText, 'UTF-8'));
+
+            if ($isCorrect && $correctAnsRow) {
+                $answerId = intval($correctAnsRow['id_answer']);
+            } else {
+                $wrongAnsRow = db_fetch_one("SELECT * FROM answers WHERE id_question = :qid AND is_correct = 0 LIMIT 1", [':qid' => $qId]);
+                if (!$wrongAnsRow) {
+                    $newAid = db_insert("INSERT INTO answers (id_question, is_correct, text) VALUES (:qid, 0, :txt)", [
+                        ':qid' => $qId,
+                        ':txt' => $userText ?: 'Incorrect'
+                    ]);
+                    $answerId = intval($newAid);
+                } else {
+                    $answerId = intval($wrongAnsRow['id_answer']);
+                }
+            }
+        } else {
+            $isCorrect = ($ans['is_correct'] == 1);
+        }
         $timeLimit  = intval($ans['time_limit'] ?: 20);
         $startTime  = intval($ans['question_start_time'] ?: time());
         $elapsed    = max(0, time() - $startTime);

@@ -70,6 +70,8 @@ $isDisqualified = false;
 
 $currentQuestion = db_fetch_one("SELECT * FROM questions WHERE id_question = :qid", [':qid' => $qId]);
 $questionMode = $currentQuestion['mode'] ?? 'normal';
+$questionType = $currentQuestion['question_type'] ?? 'multiple_choice';
+$isTextQuestion = ($questionType === 'text');
 $modeConfig = !empty($currentQuestion['mode_config']) ? json_decode($currentQuestion['mode_config'], true) : [];
 
 $playerLog = db_fetch_one("SELECT * FROM player_question_logs WHERE id_room = :r AND id_question = :q AND id_player = :p", [
@@ -972,7 +974,59 @@ elseif ($phase === 'question'):
             </div>
         <?php endif; ?>
 
-        <?php if (!$showOnDevice): ?>
+        <?php if ($isTextQuestion): ?>
+            <div class="container my-3" style="max-width: 600px;">
+                <div class="card border-0 shadow-lg text-center p-4" style="border-radius: 20px; background: #ffffff;">
+                    <div class="mb-3">
+                        <span class="badge badge-primary px-3 py-2 font-weight-bold" style="font-size: 0.95rem; border-radius: 50px; background-color: #46178f;">
+                            <i class="fas fa-keyboard mr-1"></i> TYPE ANSWER
+                        </span>
+                    </div>
+
+                    <?php if ($showOnDevice): ?>
+                        <h3 class="font-weight-bold text-dark mb-3">
+                            <?= htmlspecialchars($currentQuestion['text'] ?? '') ?>
+                        </h3>
+                        <?php if ($hasQuestionImage): ?>
+                            <div class="text-center mb-3">
+                                <?php if ($questionMediaType === 'video'): ?>
+                                    <video src="<?= htmlspecialchars($questionImageUrl) ?>" controls autoplay muted loop class="img-fluid rounded shadow-sm" style="max-height: 220px; max-width: 100%; border-radius: 12px;"></video>
+                                <?php else: ?>
+                                    <img src="<?= htmlspecialchars($questionImageUrl) ?>" alt="Question Media" class="img-fluid rounded shadow-sm" style="max-height: 220px; object-fit: contain; border-radius: 12px;">
+                                <?php endif; ?>
+                            </div>
+                        <?php endif; ?>
+                    <?php else: ?>
+                        <h3 class="font-weight-bold text-dark mb-1">Type your answer</h3>
+                        <p class="text-muted font-weight-bold small mb-3">Look at the host screen for the question and type your answer below</p>
+                    <?php endif; ?>
+
+                    <div class="d-flex justify-content-between align-items-center my-2 px-1">
+                        <div id="playerTimerBox" class="timer-circle <?= $remainingSeconds <= 5 ? 'warning' : '' ?>" style="width: 48px; height: 48px; font-size: 1.25rem;">
+                            <span id="playerTimer"><?= $remainingSeconds ?></span>
+                        </div>
+                        <span class="badge badge-light px-3 py-2 text-muted font-weight-bold shadow-sm" style="border-radius: 50px;">
+                            <i class="fas fa-clock mr-1 text-primary"></i> Answer before time is up
+                        </span>
+                    </div>
+
+                    <form id="textAnswerForm" onsubmit="submitTextAnswer(event)" class="mt-3">
+                        <div class="form-group mb-3">
+                            <input type="text" id="playerTextAnswerInput" class="form-control form-control-lg text-center font-weight-bold"
+                                   placeholder="Type answer here..."
+                                   autocomplete="off"
+                                   autofocus
+                                   required
+                                   style="border-radius: 14px; border: 3px solid #cbd5e1; font-size: 1.35rem; padding: 14px 20px; color: #1e1136;">
+                        </div>
+                        <button type="submit" id="btnSubmitTextAnswer" class="btn btn-block btn-lg font-weight-bold text-white shadow"
+                                style="background: #1368ce; border-radius: 14px; border-bottom: 4px solid #0b458b; font-size: 1.25rem; padding: 12px;">
+                            <i class="fas fa-paper-plane mr-2"></i> Submit
+                        </button>
+                    </form>
+                </div>
+            </div>
+        <?php elseif (!$showOnDevice): ?>
             <div class="player-buttons-grid">
                 <div class="player-btn red" onclick="submitAnswer(<?= $answers[0]['id_answer'] ?? 0 ?>)">
                     <span class="text-white">🔺</span>
@@ -1137,6 +1191,47 @@ function submitAnswer(answerId) {
     });
 }
 
+function submitTextAnswer(e) {
+    if (e) e.preventDefault();
+    const input = document.getElementById('playerTextAnswerInput');
+    if (!input) return;
+    const textVal = input.value.trim();
+    if (!textVal) return;
+
+    const submitAudio = document.getElementById('submitSfx');
+    if (submitAudio) {
+        try {
+            submitAudio.volume = 0.8;
+            submitAudio.currentTime = 0;
+            submitAudio.play().catch(function() {});
+        } catch(e) {}
+    }
+
+    $('#btnSubmitTextAnswer').prop('disabled', true).css('opacity', '0.7');
+    $(input).prop('disabled', true);
+
+    $.ajax({
+        url: '<?= BASE_URL ?>modules/api/submit_answer.php',
+        type: 'POST',
+        dataType: 'json',
+        contentType: 'application/json',
+        data: JSON.stringify({
+            id_player: playerId,
+            id_answer: <?= intval($answers[0]['id_answer'] ?? 0) ?>,
+            id_question: <?= intval($qId) ?>,
+            text_answer: textVal,
+            id_room: roomId,
+            token: playerToken
+        }),
+        success: function(res) {
+            refreshPlayerPage();
+        },
+        error: function() {
+            refreshPlayerPage();
+        }
+    });
+}
+
 let playerGetReadyRemaining = <?= intval($getReadyRemaining) ?>;
 let playerSeconds = <?= intval($remainingSeconds) ?>;
 let playerTimerStarted = false;
@@ -1149,6 +1244,8 @@ function startPlayerTimer() {
 
     if (playerSeconds <= 0) {
         $('.answer-box, .player-btn').css('pointer-events', 'none').css('opacity', '0.6');
+        $('#btnSubmitTextAnswer').prop('disabled', true).css('opacity', '0.6');
+        $('#playerTextAnswerInput').prop('disabled', true);
     } else if (timerEl) {
         const playerCountdown = setInterval(function() {
             if (isPausedByBuzzer) return; // Freeze player countdown during buzzer
@@ -1159,6 +1256,8 @@ function startPlayerTimer() {
                 clearInterval(playerCountdown);
                 timerEl.textContent = '0';
                 $('.answer-box, .player-btn').css('pointer-events', 'none').css('opacity', '0.6');
+                $('#btnSubmitTextAnswer').prop('disabled', true).css('opacity', '0.6');
+                $('#playerTextAnswerInput').prop('disabled', true);
             } else {
                 timerEl.textContent = playerSeconds;
                 if (playerSeconds <= 5 && timerBox) {
@@ -1172,9 +1271,11 @@ function startPlayerTimer() {
 function startPlayerQuestionPhase() {
     $('#playerGetReadyView').fadeOut(200, function() {
         $('#playerAnswersView').fadeIn(200);
-        <?php if ($showOnDevice && $phase === 'question' && !$myVote && !$isSittingOut && !$isEliminated && !$isSpectator): ?>
+        <?php if (($showOnDevice || $isTextQuestion) && $phase === 'question' && !$myVote && !$isSittingOut && !$isEliminated && !$isSpectator): ?>
         startPlayerTimer();
         <?php endif; ?>
+        const textInp = document.getElementById('playerTextAnswerInput');
+        if (textInp) textInp.focus();
     });
 }
 
@@ -1198,7 +1299,7 @@ $(document).ready(function() {
             }
         }, 1000);
     } else {
-        <?php if ($showOnDevice && $phase === 'question' && !$myVote && !$isSittingOut && !$isEliminated && !$isSpectator): ?>
+        <?php if (($showOnDevice || $isTextQuestion) && $phase === 'question' && !$myVote && !$isSittingOut && !$isEliminated && !$isSpectator): ?>
         startPlayerTimer();
         <?php endif; ?>
     }

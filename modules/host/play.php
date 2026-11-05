@@ -124,6 +124,7 @@ if ($phase === 'result') {
     $answers = db_fetch_all("SELECT * FROM answers WHERE id_question = :qid ORDER BY id_answer ASC", [':qid' => $qId]);
     $currentIdx = array_search((int)$qId, $selectedQIds, true);
     $questionNumber = ($currentIdx !== false) ? ($currentIdx + 1) : 1;
+    $isTextQuestion = (($currentQuestion['question_type'] ?? '') === 'text');
 
     $voteCountsRaw = db_fetch_all(
         "SELECT v.id_answer, COUNT(*) as vote_count 
@@ -192,6 +193,36 @@ if ($phase === 'result') {
             <?php endif; ?>
         </div>
 
+        <?php if ($isTextQuestion): ?>
+            <?php
+                $correctAnsRow = null;
+                $correctCount = 0;
+                $incorrectCount = 0;
+                foreach ($answers as $a) {
+                    if ($a['is_correct'] == 1) {
+                        $correctAnsRow = $a;
+                        $correctCount += ($voteCounts[$a['id_answer']] ?? 0);
+                    } else {
+                        $incorrectCount += ($voteCounts[$a['id_answer']] ?? 0);
+                    }
+                }
+                $correctText = $correctAnsRow['text'] ?? '';
+            ?>
+            <div class="card border-0 shadow-sm p-4 text-center mb-4" style="border-radius: 20px; background: #ffffff;">
+                <span class="text-muted text-uppercase font-weight-bold small mb-2 d-block">Correct Text Answer</span>
+                <div class="d-inline-block bg-success text-white font-weight-bold px-4 py-3 shadow mb-3" style="font-size: 1.9rem; border-radius: 14px; letter-spacing: 0.5px;">
+                    <i class="fas fa-check-circle mr-2"></i> <?= htmlspecialchars($correctText) ?>
+                </div>
+                <div class="d-flex justify-content-center" style="gap: 20px;">
+                    <div class="badge badge-light px-3 py-2 text-dark font-weight-bold" style="font-size: 1.1rem; border-radius: 50px;">
+                        <span class="text-success font-weight-bold mr-1">✓ <?= $correctCount ?></span> Correct
+                    </div>
+                    <div class="badge badge-light px-3 py-2 text-dark font-weight-bold" style="font-size: 1.1rem; border-radius: 50px;">
+                        <span class="text-danger font-weight-bold mr-1">✗ <?= $incorrectCount ?></span> Incorrect
+                    </div>
+                </div>
+            </div>
+        <?php else: ?>
         <div class="row">
             <?php foreach ($answers as $idx => $a):
                 $cIdx = $idx % 4;
@@ -223,6 +254,7 @@ if ($phase === 'result') {
                 </div>
             <?php endforeach; ?>
         </div>
+        <?php endif; ?>
 
         <div class="text-center mt-4">
             <a href="leaderboard.php?qid=<?= $qId ?>&show_scoreboard=1" class="btn btn-kahoot btn-kahoot-blue btn-lg px-5 py-3 font-weight-bold shadow" style="font-size: 1.25rem;">
@@ -238,6 +270,8 @@ if ($phase === 'result') {
 
 $currentQuestion = db_fetch_one("SELECT * FROM questions WHERE id_question = :qid", [':qid' => $qId]);
 $questionMode = $currentQuestion['mode'] ?? 'normal';
+$questionType = $currentQuestion['question_type'] ?? 'multiple_choice';
+$isTextQuestion = ($questionType === 'text');
 $modeConfig = !empty($currentQuestion['mode_config']) ? json_decode($currentQuestion['mode_config'], true) : [];
 
 $currentIdx = array_search((int)$qId, $selectedQIds, true);
@@ -644,6 +678,15 @@ require_once __DIR__ . '/../../includes/header.php';
         </div>
     </div>
 
+    <?php if ($isTextQuestion): ?>
+        <div class="card border-0 shadow text-center p-4 my-3" style="border-radius: 20px; background: #ffffff;">
+            <div style="font-size: 3.5rem;" class="mb-2">⌨️</div>
+            <h3 class="font-weight-bold text-dark mb-2">Type Answer</h3>
+            <p class="text-muted font-weight-bold mb-0" style="font-size: 1.2rem;">
+                Players are typing their answers on their devices...
+            </p>
+        </div>
+    <?php else: ?>
     <div class="row">
         <?php foreach ($answers as $idx => $a):
             $cIdx = $idx % 4;
@@ -676,6 +719,7 @@ require_once __DIR__ . '/../../includes/header.php';
             </div>
         <?php endforeach; ?>
     </div>
+    <?php endif; ?>
     </div>
 </div>
 
