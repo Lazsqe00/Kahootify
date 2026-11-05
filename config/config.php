@@ -10,8 +10,8 @@ define('DB_HOST', '127.0.0.1');
 define('DB_USER', 'root');
 define('DB_PASS', '');
 define('DB_NAME', 'kahoot_btn');
-define('DB_PORT_DEFAULT', 3307);
-define('DB_PORT_BACKUP', 3306);
+define('DB_PORT_DEFAULT', 3306);
+define('DB_PORT_BACKUP', 3307);
 
 $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || ($_SERVER['SERVER_PORT'] ?? 0) == 443) ? "https://" : "http://";
 $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
