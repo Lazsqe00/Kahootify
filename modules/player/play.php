@@ -332,7 +332,7 @@ require_once __DIR__ . '/../../includes/header.php';
         <div class="font-weight-bold badge badge-light text-dark px-3 py-2" style="font-size: 0.95rem;">
             Score: <?= number_format(max(0, intval($player['score']))) ?>
         </div>
-        <a href="<?= BASE_URL ?>index.php" class="btn btn-sm btn-outline-light font-weight-bold rounded-pill px-3" onclick="return confirm('Are you sure you want to leave the room and return home?');" title="Return to Home">
+        <a href="<?= BASE_URL ?>modules/player/leave.php?pid=<?= $playerId ?>&token=<?= urlencode($token) ?>&target=index" class="btn btn-sm btn-outline-light font-weight-bold rounded-pill px-3" onclick="return confirm('Are you sure you want to leave the room and return home?');" title="Return to Home">
             <i class="fas fa-home mr-1"></i> Home
         </a>
     </div>
@@ -767,8 +767,8 @@ elseif ($phase === 'wager'):
                 <p class="mb-0">You joined late after the match had already started.</p>
             </div>
         <?php elseif ($myWagerTier !== null): ?>
-            <!-- CONFIRMATION SCREEN AFTER CHOOSING STAR OF HOPE (GREEN LIKE SUBMITTED ANSWER) -->
-            <div class="d-flex align-items-center justify-content-center text-center text-white" style="min-height: calc(100vh - 120px); background: #26890c; border-radius: 20px; box-shadow: 0 12px 30px rgba(0,0,0,0.25);">
+            <!-- CONFIRMATION SCREEN AFTER CHOOSING STAR OF HOPE -->
+            <div class="d-flex align-items-center justify-content-center text-center text-white" style="min-height: calc(100vh - 140px);">
                 <div class="p-4" style="max-width: 520px;">
                     <div style="font-size: 4.5rem;" class="mb-3">⭐</div>
                     <h2 class="font-weight-bold mb-2" style="font-size: 2.2rem;">Star of Hope Chosen!</h2>

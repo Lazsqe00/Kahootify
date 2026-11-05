@@ -131,9 +131,33 @@ function player_request_is_valid($playerId, $roomId, $token) {
 
 function redirect_removed_player($playerId) {
     if ((int)($_SESSION['id_player'] ?? 0) === (int)$playerId) {
-        unset($_SESSION['id_player'], $_SESSION['player_room_id'], $_SESSION['player_pin'], $_SESSION['player_nickname']);
+        unset($_SESSION['id_player'], $_SESSION['player_room_id'], $_SESSION['player_pin'], $_SESSION['player_nickname'], $_SESSION['player_team_id'], $_SESSION['player_team_name']);
     }
     redirect('modules/player/join.php?removed=1');
+}
+
+function remove_player_from_room($playerId, $roomId) {
+    $playerId = (int)$playerId;
+    $roomId   = (int)$roomId;
+    if ($playerId <= 0 || $roomId <= 0) return false;
+
+    $room = db_fetch_one("SELECT status FROM room WHERE id_room = :r", [':r' => $roomId]);
+    if ($room && $room['status'] === 'waiting') {
+        db_execute("DELETE FROM players WHERE id_player = :p AND id_room = :r", [
+            ':p' => $playerId,
+            ':r' => $roomId
+        ]);
+    } else {
+        db_execute("UPDATE players SET is_kicked = 1, status = 'ELIMINATED' WHERE id_player = :p AND id_room = :r", [
+            ':p' => $playerId,
+            ':r' => $roomId
+        ]);
+    }
+
+    if ((int)($_SESSION['id_player'] ?? 0) === $playerId) {
+        unset($_SESSION['id_player'], $_SESSION['player_nickname'], $_SESSION['player_team_id'], $_SESSION['player_team_name']);
+    }
+    return true;
 }
 
 function room_is_locked($room) {

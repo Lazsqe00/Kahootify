@@ -304,12 +304,6 @@ if ($phase === 'wager') {
             <span class="text-white font-weight-bold" style="font-size: 1.05rem;">Question <?= $questionNumber ?> / <?= $totalQuestions ?></span>
         </div>
         <div class="d-flex align-items-center">
-            <a href="play.php?action=lock_wager" class="btn btn-kahoot btn-kahoot-blue btn-kahoot-sm mr-2">
-                <i class="fas fa-play mr-1"></i> Start Question
-            </a>
-            <a href="play.php?action=skip_question" class="btn btn-kahoot btn-kahoot-secondary btn-kahoot-sm" onclick="return confirm('Skip this question? Player scores will not change.');">
-                Skip Question
-            </a>
         </div>
     </nav>
 

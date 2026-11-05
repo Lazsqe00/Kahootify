@@ -22,6 +22,13 @@ if ($roomId <= 0) {
 }
 
 $room = db_fetch_one('SELECT * FROM room WHERE id_room = :r AND pin = :pin', [':r' => $roomId, ':pin' => $pin]);
+
+// If player previously joined this room while waiting and went back to rename/re-team, remove the old player record cleanly
+$existingPlayerId = intval($_SESSION['id_player'] ?? 0);
+if ($existingPlayerId > 0 && $roomId > 0 && $room && $room['status'] === 'waiting') {
+    remove_player_from_room($existingPlayerId, $roomId);
+}
+
 $error = room_join_error($room);
 $canJoin = $error === '';
 $isTeamMode = TeamManager::isTeamMode($room);

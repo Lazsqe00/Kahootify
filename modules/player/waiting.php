@@ -65,7 +65,7 @@ require_once __DIR__ . '/../../includes/header.php';
     <a href="<?= BASE_URL ?>index.php" class="d-flex align-items-center text-decoration-none">
         <img src="<?= BASE_URL ?>assets/img/logo.png" alt="Logo" style="max-height: 32px; filter: brightness(100);" class="mr-2">
     </a>
-    <a href="<?= BASE_URL ?>index.php" class="btn btn-sm btn-outline-light font-weight-bold rounded-pill px-3" onclick="return confirm('Are you sure you want to leave this room and return home?');">
+    <a href="<?= BASE_URL ?>modules/player/leave.php?pid=<?= $playerId ?>&token=<?= urlencode($token) ?>&target=index" class="btn btn-sm btn-outline-light font-weight-bold rounded-pill px-3" onclick="return confirm('Are you sure you want to leave this room and return home?');">
         <i class="fas fa-home mr-1"></i> Home
     </a>
 </nav>
@@ -84,6 +84,15 @@ require_once __DIR__ . '/../../includes/header.php';
             <h2 class="font-weight-bold mb-0" style="color: var(--kahoot-purple);">
                 <i class="fas fa-smile-wink text-warning mr-2"></i><?= htmlspecialchars($nickname) ?>
             </h2>
+        </div>
+
+        <div class="mb-3">
+            <a href="<?= BASE_URL ?>modules/player/leave.php?pid=<?= $playerId ?>&token=<?= urlencode($token) ?>&target=nickname" 
+               class="btn btn-outline-light font-weight-bold rounded-pill px-4 py-2"
+               style="border-width: 2px; font-size: 0.95rem; background: rgba(255,255,255,0.15);"
+               onclick="return confirm('Do you want to change your name or team? Your current slot will be freed.');">
+                <i class="fas fa-arrow-left mr-1"></i> Change Nickname / Team
+            </a>
         </div>
 
         <details class="waiting-editor" <?= $characterError !== '' ? 'open' : '' ?>>
