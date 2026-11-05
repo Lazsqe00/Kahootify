@@ -515,13 +515,6 @@ require_once __DIR__ . '/../../includes/header.php';
             <a href="play.php?action=skip_question" onclick="stopQuestionAudio(); return confirm('Skip this question? Player scores will not change.');" class="btn btn-kahoot btn-kahoot-secondary btn-kahoot-sm">
                 Skip Question
             </a>
-        <?php else: ?>
-            <a href="play.php?action=show_result" onclick="stopQuestionAudio()" class="btn btn-kahoot btn-kahoot-blue btn-kahoot-sm mr-2">
-                Leaderboard
-            </a>
-            <a href="play.php?action=skip_question" onclick="stopQuestionAudio(); return confirm('Skip this question? Player scores will not change.');" class="btn btn-kahoot btn-kahoot-secondary btn-kahoot-sm">
-                Skip Question
-            </a>
         <?php endif; ?>
     </div>
 </nav>
