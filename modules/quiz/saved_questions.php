@@ -278,6 +278,127 @@ body {
     color: #ffffff;
     text-decoration: none;
 }
+
+/* Pagination Bar for Saved Questions */
+.saved-pagination-bar {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 14px 20px;
+    margin-top: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.saved-pagination-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.saved-pagination-info {
+    font-size: 0.88rem;
+    color: #64748b;
+    margin: 0;
+}
+
+.saved-pagination-info .highlight {
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.saved-pagination-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.saved-page-btn {
+    min-width: 34px;
+    height: 34px;
+    padding: 0 8px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: #475569;
+    background: transparent;
+    border: 1px solid transparent;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.15s ease;
+    text-decoration: none;
+}
+
+.saved-page-btn:hover:not(.active):not(.dots) {
+    background-color: #f1f5f9;
+    color: #0f172a;
+}
+
+.saved-page-btn.active {
+    background-color: #46178f;
+    color: #ffffff;
+    border-color: #46178f;
+    box-shadow: 0 2px 6px rgba(70, 23, 143, 0.25);
+    cursor: default;
+}
+
+.saved-page-btn.dots {
+    cursor: default;
+    color: #94a3b8;
+    padding: 0 4px;
+}
+
+.saved-page-nav-btn {
+    padding: 0 12px;
+    height: 34px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.86rem;
+    font-weight: 600;
+    color: #334155;
+    background-color: #ffffff;
+    border: 1px solid #cbd5e1;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.15s ease;
+}
+
+.saved-page-nav-btn:hover:not(:disabled) {
+    background-color: #f8fafc;
+    border-color: #94a3b8;
+    color: #0f172a;
+}
+
+.saved-page-nav-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    background-color: #f8fafc;
+    border-color: #e2e8f0;
+}
+
+@media (max-width: 640px) {
+    .saved-pagination-bar {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 12px;
+    }
+    .saved-pagination-left,
+    .saved-pagination-right {
+        justify-content: center;
+        width: 100%;
+    }
+}
 </style>
 
 <div class="review-container">
@@ -302,6 +423,11 @@ body {
         <a href="<?= BASE_URL ?>modules/quiz/list.php" class="empty-btn">
             Back to Kahoots
         </a>
+    </div>
+
+    <div id="noSearchState" class="empty-review d-none">
+        <div class="empty-title">No matching questions</div>
+        <p class="empty-sub">Try searching with a different keyword.</p>
     </div>
 
     <div id="questionsContainer">
@@ -373,26 +499,221 @@ body {
         <?php endforeach; ?>
     </div>
 
+    <!-- Pagination Footer Component -->
+    <div id="savedPagination" class="saved-pagination-bar" style="display: none;"></div>
+
 </div>
 
 <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
 <script>
-$(document).ready(function() {
-    $('#searchInput').on('keyup', function() {
-        const query = $(this).val().toLowerCase().trim();
-        let matchCount = 0;
-        $('.question-item').each(function() {
-            const itemText = $(this).data('text');
-            if (!query || itemText.indexOf(query) !== -1) {
-                $(this).show();
-                matchCount++;
+class SavedQuestionsPagination {
+    constructor(options) {
+        this.container = $(options.container || '#questionsContainer');
+        this.paginationContainer = $(options.pagination || '#savedPagination');
+        this.emptySearchState = $(options.emptySearchState || '#noSearchState');
+        this.pageSize = parseInt(options.pageSize, 10) || 10;
+        this.currentPage = parseInt(options.initialPage, 10) || 1;
+        this.searchQuery = '';
+        this.init();
+    }
+
+    init() {
+        this.render();
+    }
+
+    setPage(page) {
+        this.currentPage = page;
+        this.render();
+        this.scrollToTop();
+        this.updateUrl();
+    }
+
+    setSearch(query) {
+        this.searchQuery = (query || '').toLowerCase().trim();
+        this.currentPage = 1;
+        this.render();
+    }
+
+    updateUrl() {
+        try {
+            const url = new URL(window.location);
+            if (this.currentPage > 1) {
+                url.searchParams.set('page', this.currentPage);
             } else {
-                $(this).hide();
+                url.searchParams.delete('page');
+            }
+            window.history.replaceState({}, '', url);
+        } catch (e) {
+            // Ignore if URL modification is restricted
+        }
+    }
+
+    scrollToTop() {
+        const toolbar = $('.review-toolbar');
+        if (toolbar.length) {
+            const targetOffset = toolbar.offset().top - 20;
+            if ($(window).scrollTop() > targetOffset) {
+                $('html, body').animate({ scrollTop: targetOffset }, 200);
+            }
+        }
+    }
+
+    getMatchingItems() {
+        const allItems = this.container.children('.question-item');
+        if (!this.searchQuery) {
+            return allItems;
+        }
+        return allItems.filter((_, el) => {
+            const text = $(el).data('text') || '';
+            return text.indexOf(this.searchQuery) !== -1;
+        });
+    }
+
+    render() {
+        const allItems = this.container.children('.question-item');
+        const totalItemsCount = allItems.length;
+
+        // If no questions in total (all removed or none saved)
+        if (totalItemsCount === 0) {
+            this.paginationContainer.hide();
+            this.emptySearchState.addClass('d-none');
+            return;
+        }
+
+        const matchingItems = this.getMatchingItems();
+        const totalMatching = matchingItems.length;
+
+        // Hide all items first
+        allItems.hide();
+
+        if (totalMatching === 0) {
+            this.emptySearchState.removeClass('d-none');
+            this.paginationContainer.hide();
+            return;
+        }
+
+        this.emptySearchState.addClass('d-none');
+
+        const totalPages = Math.ceil(totalMatching / this.pageSize) || 1;
+
+        if (this.currentPage > totalPages) {
+            this.currentPage = totalPages;
+        }
+        if (this.currentPage < 1) {
+            this.currentPage = 1;
+        }
+
+        // Show items for current page
+        const startIndex = (this.currentPage - 1) * this.pageSize;
+        const endIndex = Math.min(startIndex + this.pageSize, totalMatching);
+
+        matchingItems.slice(startIndex, endIndex).show();
+
+        // If total matching is <= pageSize (10 items), hide pagination controls
+        if (totalMatching <= this.pageSize) {
+            this.paginationContainer.hide().empty();
+            return;
+        }
+
+        // Render pagination controls
+        this.renderPaginationControls(startIndex, endIndex, totalMatching, totalPages);
+    }
+
+    renderPaginationControls(startIndex, endIndex, totalCount, totalPages) {
+        const displayStart = startIndex + 1;
+        const displayEnd = endIndex;
+
+        const html = `
+            <div class="saved-pagination-left">
+                <p class="saved-pagination-info">
+                    Showing <span class="highlight">${displayStart}</span> – <span class="highlight">${displayEnd}</span> of <span class="highlight">${totalCount}</span> questions
+                </p>
+            </div>
+            <div class="saved-pagination-right">
+                <button type="button" class="saved-page-nav-btn prev-btn" ${this.currentPage === 1 ? 'disabled' : ''}>
+                    <i class="fas fa-chevron-left" style="font-size: 11px;"></i>
+                    <span>Previous</span>
+                </button>
+                <div class="saved-page-numbers d-inline-flex align-items-center" style="gap: 4px;">
+                    ${this.generatePageButtons(totalPages)}
+                </div>
+                <button type="button" class="saved-page-nav-btn next-btn" ${this.currentPage === totalPages ? 'disabled' : ''}>
+                    <span>Next</span>
+                    <i class="fas fa-chevron-right" style="font-size: 11px;"></i>
+                </button>
+            </div>
+        `;
+
+        this.paginationContainer.html(html).show();
+
+        // Attach event listeners
+        this.paginationContainer.find('.prev-btn').off('click').on('click', () => {
+            if (this.currentPage > 1) {
+                this.setPage(this.currentPage - 1);
             }
         });
+
+        this.paginationContainer.find('.next-btn').off('click').on('click', () => {
+            if (this.currentPage < totalPages) {
+                this.setPage(this.currentPage + 1);
+            }
+        });
+
+        this.paginationContainer.find('.saved-page-btn[data-page]').off('click').on('click', (e) => {
+            const page = parseInt($(e.currentTarget).data('page'), 10);
+            if (page && page !== this.currentPage) {
+                this.setPage(page);
+            }
+        });
+    }
+
+    generatePageButtons(totalPages) {
+        if (totalPages <= 1) {
+            return `<button type="button" class="saved-page-btn active" data-page="1">1</button>`;
+        }
+
+        let pages = [];
+        if (totalPages <= 7) {
+            for (let i = 1; i <= totalPages; i++) {
+                pages.push(i);
+            }
+        } else {
+            if (this.currentPage <= 4) {
+                pages = [1, 2, 3, 4, 5, '...', totalPages];
+            } else if (this.currentPage >= totalPages - 3) {
+                pages = [1, '...', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+            } else {
+                pages = [1, '...', this.currentPage - 1, this.currentPage, this.currentPage + 1, '...', totalPages];
+            }
+        }
+
+        return pages.map(p => {
+            if (p === '...') {
+                return `<span class="saved-page-btn dots">…</span>`;
+            }
+            const isActive = (p === this.currentPage);
+            return `<button type="button" class="saved-page-btn ${isActive ? 'active' : ''}" data-page="${p}">${p}</button>`;
+        }).join('');
+    }
+}
+
+$(document).ready(function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const initialPage = parseInt(urlParams.get('page'), 10) || 1;
+
+    const paginator = new SavedQuestionsPagination({
+        container: '#questionsContainer',
+        pagination: '#savedPagination',
+        emptySearchState: '#noSearchState',
+        pageSize: 10,
+        initialPage: initialPage
     });
 
-    $('.btn-unsave').on('click', async function() {
+    $('#searchInput').on('input keyup', function() {
+        paginator.setSearch($(this).val());
+    });
+
+    $('#questionsContainer').on('click', '.btn-unsave', async function() {
         const btn = $(this);
         const questionId = btn.data('question-id');
         const cardId = btn.data('card-id');
@@ -422,7 +743,10 @@ $(document).ready(function() {
 
                     if (remaining === 0) {
                         $('#searchInput').closest('.search-box').remove();
+                        $('#savedPagination').hide();
                         $('#emptyState').removeClass('d-none').hide().fadeIn(250);
+                    } else {
+                        paginator.render();
                     }
                 });
             } else {
