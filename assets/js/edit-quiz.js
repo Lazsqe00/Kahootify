@@ -415,8 +415,12 @@ function initFormValidation() {
             return;
         }
         var correctCount = 0;
+        var chosenCorrectIdx = -1;
         for (var j = 0; j < 4; j++) {
-            if (document.getElementById('answerCorrect_' + j).checked) { correctCount++; }
+            if (document.getElementById('answerCorrect_' + j).checked) {
+                correctCount++;
+                chosenCorrectIdx = j;
+            }
         }
         if (correctCount === 0) {
             e.preventDefault();
@@ -427,6 +431,17 @@ function initFormValidation() {
             e.preventDefault();
             alert('Only 1 answer can be marked as correct.');
             return;
+        }
+        if (chosenCorrectIdx >= 0) {
+            var cText  = (document.getElementById('answerText_' + chosenCorrectIdx).value || '').trim() !== '';
+            var cUsesImg  = document.getElementById('answerUseImage_' + chosenCorrectIdx).value === '1';
+            var cHasNewImg = document.getElementById('answerImgFile_' + chosenCorrectIdx).files.length > 0;
+            var cHasKeep  = (document.getElementById('answerKeepImage_' + chosenCorrectIdx).value || '').trim() !== '';
+            if (!cText && !(cUsesImg && (cHasNewImg || cHasKeep))) {
+                e.preventDefault();
+                alert('The answer marked as correct must not be empty.');
+                return;
+            }
         }
     });
 }

@@ -122,6 +122,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'show_result') {
 if ($phase === 'result') {
     $currentQuestion = db_fetch_one("SELECT * FROM questions WHERE id_question = :qid", [':qid' => $qId]);
     $answers = db_fetch_all("SELECT * FROM answers WHERE id_question = :qid ORDER BY id_answer ASC", [':qid' => $qId]);
+$answers = array_values(array_filter($answers, function($a) {
+    return (isset($a['text']) && trim((string)$a['text']) !== '') || !empty($a['image_path']);
+}));
     $currentIdx = array_search((int)$qId, $selectedQIds, true);
     $questionNumber = ($currentIdx !== false) ? ($currentIdx + 1) : 1;
     $isTextQuestion = (($currentQuestion['question_type'] ?? '') === 'text');
@@ -389,6 +392,9 @@ if ($phase === 'wager') {
 // QUESTION PHASE HOST VIEW (Normal or Wager)
 // =========================================================================
 $answers = db_fetch_all("SELECT * FROM answers WHERE id_question = :qid ORDER BY id_answer ASC", [':qid' => $qId]);
+$answers = array_values(array_filter($answers, function($a) {
+    return (isset($a['text']) && trim((string)$a['text']) !== '') || !empty($a['image_path']);
+}));
 
 $questionMediaUrl = '';
 $questionMediaType = 'image';

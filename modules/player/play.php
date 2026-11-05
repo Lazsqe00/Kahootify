@@ -85,6 +85,9 @@ $myWagerTierLabel = $myWagerTier ? WagerCalculator::getTierLabel($myWagerTier) :
 $myWagerAmount = intval($playerLog['wager_amount'] ?? 0);
 
 $answers = db_fetch_all("SELECT * FROM answers WHERE id_question = :qid ORDER BY id_answer ASC", [':qid' => $qId]);
+$answers = array_values(array_filter($answers, function($a) {
+    return (isset($a['text']) && trim((string)$a['text']) !== '') || !empty($a['image_path']);
+}));
 $timeLimit = intval($currentQuestion['time_limit'] ?? 20);
 if ($timeLimit <= 0) {
     $timeLimit = 20;
@@ -268,6 +271,28 @@ require_once __DIR__ . '/../../includes/header.php';
     font-weight: 700;
     color: #334155;
     margin-top: 15px;
+}
+.player-buttons-grid.player-grid-1 {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr;
+}
+.player-buttons-grid.player-grid-2 {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr;
+}
+@media (max-width: 576px) {
+    .player-buttons-grid.player-grid-2 {
+        grid-template-columns: 1fr;
+        grid-template-rows: 1fr 1fr;
+    }
+}
+.player-buttons-grid.player-grid-3 {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+}
+.player-buttons-grid.player-grid-4 {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
 }
 </style>
 
@@ -1027,22 +1052,21 @@ elseif ($phase === 'question'):
                 </div>
             </div>
         <?php elseif (!$showOnDevice): ?>
-            <div class="player-buttons-grid">
-                <div class="player-btn red" onclick="submitAnswer(<?= $answers[0]['id_answer'] ?? 0 ?>)">
-                    <span class="text-white">🔺</span>
-                </div>
-
-                <div class="player-btn blue" onclick="submitAnswer(<?= $answers[1]['id_answer'] ?? 0 ?>)">
-                    <span class="text-white">🔷</span>
-                </div>
-
-                <div class="player-btn yellow" onclick="submitAnswer(<?= $answers[2]['id_answer'] ?? 0 ?>)">
-                    <span class="text-white">🟡</span>
-                </div>
-
-                <div class="player-btn green" onclick="submitAnswer(<?= $answers[3]['id_answer'] ?? 0 ?>)">
-                    <span class="text-white">🟩</span>
-                </div>
+            <?php
+            $btnCount = count($answers);
+            $btnIcons = [KAHOOT_ICON_RED, KAHOOT_ICON_BLUE, KAHOOT_ICON_YELLOW, KAHOOT_ICON_GREEN];
+            $btnColors = ['red', 'blue', 'yellow', 'green'];
+            ?>
+            <div class="player-buttons-grid player-grid-<?= min(4, max(1, $btnCount)) ?>">
+                <?php foreach ($answers as $idx => $a):
+                    $cIdx = $idx % 4;
+                    $ansId = intval($a['id_answer'] ?? 0);
+                    $spanCol = ($btnCount === 3 && $idx === 2) ? 'grid-column: span 2;' : '';
+                ?>
+                    <div class="player-btn <?= $btnColors[$cIdx] ?>" onclick="submitAnswer(<?= $ansId ?>)" style="<?= $spanCol ?>">
+                        <span class="text-white"><?= $btnIcons[$cIdx] ?></span>
+                    </div>
+                <?php endforeach; ?>
             </div>
         <?php else: ?>
             <div class="container my-3" style="max-width: 1050px;">
