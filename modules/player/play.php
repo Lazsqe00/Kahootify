@@ -88,6 +88,20 @@ $answers = db_fetch_all("SELECT * FROM answers WHERE id_question = :qid ORDER BY
 $answers = array_values(array_filter($answers, function($a) {
     return (isset($a['text']) && trim((string)$a['text']) !== '') || !empty($a['image_path']);
 }));
+$textCorrectAnswer = '';
+$textCharCount = 0;
+if ($isTextQuestion) {
+    foreach ($answers as $a) {
+        if (!empty($a['is_correct'])) {
+            $textCorrectAnswer = trim((string)($a['text'] ?? ''));
+            break;
+        }
+    }
+    if ($textCorrectAnswer === '' && !empty($answers[0]['text'])) {
+        $textCorrectAnswer = trim((string)$answers[0]['text']);
+    }
+    $textCharCount = mb_strlen($textCorrectAnswer, 'UTF-8');
+}
 $timeLimit = intval($currentQuestion['time_limit'] ?? 20);
 if ($timeLimit <= 0) {
     $timeLimit = 20;
@@ -293,6 +307,43 @@ require_once __DIR__ . '/../../includes/header.php';
 .player-buttons-grid.player-grid-4 {
     grid-template-columns: 1fr 1fr;
     grid-template-rows: 1fr 1fr;
+}
+.text-answer-char-preview {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin: 12px 0 16px;
+}
+.text-char-dashes {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.text-char-dash {
+    display: inline-block;
+    width: 14px;
+    height: 3.5px;
+    background-color: #8854c0;
+    border-radius: 3px;
+    transition: background-color 0.15s ease, transform 0.15s ease;
+}
+.text-char-dash.active {
+    background-color: #26890c;
+    transform: scaleY(1.3);
+}
+.text-char-space {
+    display: inline-block;
+    width: 12px;
+}
+.text-char-count {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #64748b;
+    margin-top: 6px;
+    letter-spacing: 0.2px;
 }
 </style>
 
@@ -1036,17 +1087,37 @@ elseif ($phase === 'question'):
                     </div>
 
                     <form id="textAnswerForm" onsubmit="submitTextAnswer(event)" class="mt-3">
-                        <div class="form-group mb-3">
+                        <div class="form-group mb-2">
                             <input type="text" id="playerTextAnswerInput" class="form-control form-control-lg text-center font-weight-bold"
-                                   placeholder="Type answer here..."
+                                   placeholder="Type your answer here..."
                                    autocomplete="off"
                                    autofocus
                                    required
-                                   style="border-radius: 14px; border: 3px solid #cbd5e1; font-size: 1.35rem; padding: 14px 20px; color: #1e1136;">
+                                   style="border-radius: 14px; border: 2.5px solid #cbd5e1; font-size: 1.35rem; padding: 14px 20px; color: #1e1136;">
                         </div>
+
+                        <?php if ($textCharCount > 0): ?>
+                            <div class="text-answer-char-preview">
+                                <div class="text-char-dashes">
+                                    <?php
+                                    $chars = preg_split('//u', $textCorrectAnswer, -1, PREG_SPLIT_NO_EMPTY);
+                                    foreach ($chars as $ch):
+                                        if ($ch === ' '):
+                                    ?>
+                                        <span class="text-char-space">&nbsp;</span>
+                                    <?php else: ?>
+                                        <span class="text-char-dash"></span>
+                                    <?php endif; endforeach; ?>
+                                </div>
+                                <div class="text-char-count">
+                                    <?= $textCharCount ?> <?= $textCharCount === 1 ? 'character' : 'characters' ?>
+                                </div>
+                            </div>
+                        <?php endif; ?>
+
                         <button type="submit" id="btnSubmitTextAnswer" class="btn btn-block btn-lg font-weight-bold text-white shadow"
-                                style="background: #1368ce; border-radius: 14px; border-bottom: 4px solid #0b458b; font-size: 1.25rem; padding: 12px;">
-                            <i class="fas fa-paper-plane mr-2"></i> Submit
+                                style="background: #26890c; border: none; border-bottom: 4px solid #1a6208; border-radius: 14px; font-size: 1.25rem; padding: 12px 20px;">
+                            <i class="fas fa-paper-plane mr-2"></i> Submit Answer
                         </button>
                     </form>
                 </div>
@@ -1304,6 +1375,20 @@ function startPlayerQuestionPhase() {
 }
 
 $(document).ready(function() {
+    const textInp = document.getElementById('playerTextAnswerInput');
+    if (textInp) {
+        const dashes = document.querySelectorAll('.text-char-dash');
+        textInp.addEventListener('input', function() {
+            const typedLen = this.value.length;
+            dashes.forEach((dash, idx) => {
+                if (idx < typedLen) {
+                    dash.classList.add('active');
+                } else {
+                    dash.classList.remove('active');
+                }
+            });
+        });
+    }
     if (playerGetReadyRemaining > 0) {
         const pGrInterval = setInterval(function() {
             playerGetReadyRemaining--;
