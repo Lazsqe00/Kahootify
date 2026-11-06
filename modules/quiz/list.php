@@ -492,23 +492,23 @@ document.addEventListener('DOMContentLoaded', function() {
                             <!-- LEFT COLUMN: Practice Link & Open Button -->
                             <div class="col-md-7 pr-md-4">
                                 <label class="small font-weight-bold text-muted text-uppercase mb-1" style="font-size: 0.75rem; letter-spacing: 0.5px;">
-                                    Đường link ôn tập
+                                    Practice Link
                                 </label>
                                 <div class="input-group mb-2 shadow-sm" style="border-radius: 10px; overflow: hidden; border: 1.5px solid #cbd5e1;">
-                                    <input type="text" class="form-control border-0 bg-light text-truncate font-weight-bold text-primary" value="<?= htmlspecialchars($rUrl) ?>" readonly onclick="window.open(this.value, '_blank')" style="cursor: pointer; font-size: 0.88rem; height: 42px;" title="Nhấp vào để mở trang ôn tập">
+                                    <input type="text" class="form-control border-0 bg-light text-truncate font-weight-bold text-primary" value="<?= htmlspecialchars($rUrl) ?>" readonly onclick="window.open(this.value, '_blank')" style="cursor: pointer; font-size: 0.88rem; height: 42px;" title="Click to open practice page">
                                     <div class="input-group-append">
                                         <button type="button" class="btn btn-primary font-weight-bold px-3 d-flex align-items-center" onclick="copyTextToClipboard('<?= htmlspecialchars($rUrl) ?>', this)" style="background: #46178f; border-color: #46178f; font-size: 0.88rem;">
-                                            <i class="fas fa-copy mr-1"></i> Sao chép
+                                            <i class="fas fa-copy mr-1"></i> Copy
                                         </button>
                                     </div>
                                 </div>
                                 <p class="text-muted small mb-3" style="font-size: 0.82rem;">
-                                    <i class="fas fa-info-circle text-info mr-1"></i> Nhấp vào link hoặc nút bên dưới để vào làm bài ngay.
+                                    <i class="fas fa-info-circle text-info mr-1"></i> Click the link or button below to start practicing now.
                                 </p>
 
                                 <div class="pt-2 border-top">
                                     <a href="<?= htmlspecialchars($rUrl) ?>" target="_blank" rel="noopener" class="btn btn-outline-primary btn-sm font-weight-bold px-3 py-2 rounded-pill shadow-sm" style="border-color: #46178f; color: #46178f;">
-                                        <i class="fas fa-external-link-alt mr-1"></i> Vào trang ôn tập ngay
+                                        <i class="fas fa-external-link-alt mr-1"></i> Start Practice Now
                                     </a>
                                 </div>
                             </div>
@@ -516,17 +516,17 @@ document.addEventListener('DOMContentLoaded', function() {
                             <!-- RIGHT COLUMN: QR Code -->
                             <div class="col-md-5 text-center pl-md-4 mt-4 mt-md-0" style="border-left: 1.5px solid #f1f5f9;">
                                 <p class="font-weight-bold text-dark mb-2" style="font-size: 0.95rem;">
-                                    <i class="fas fa-qrcode mr-1 text-primary"></i> Quét mã QR để vào ôn tập
+                                    <i class="fas fa-qrcode mr-1 text-primary"></i> Scan QR code to join review
                                 </p>
                                 <div class="d-flex justify-content-center">
-                                    <button type="button" class="border p-2 bg-white shadow-sm qr-zoom-trigger" data-toggle="modal" data-target="#qrZoomModal_<?= $q['id_quiz'] ?>" title="Nhấp để phóng to mã QR" style="cursor: zoom-in; outline: none; border-radius: 12px; border-color: #e2e8f0;">
+                                    <button type="button" class="border p-2 bg-white shadow-sm qr-zoom-trigger" data-toggle="modal" data-target="#qrZoomModal_<?= $q['id_quiz'] ?>" title="Click QR code to enlarge" style="cursor: zoom-in; outline: none; border-radius: 12px; border-color: #e2e8f0;">
                                         <div id="reviewQrCode_<?= $q['id_quiz'] ?>" class="review-qr-code mx-auto" data-url="<?= htmlspecialchars($rUrl) ?>" style="width: 145px; height: 145px;">
                                             <div class="spinner-border text-primary" role="status"></div>
                                         </div>
                                     </button>
                                 </div>
                                 <p class="small text-muted mt-2 mb-0" style="font-size: 0.8rem; color: #94a3b8;">
-                                    Nhấp mã QR để phóng to
+                                    Click QR code to enlarge
                                 </p>
                             </div>
                         </div>
@@ -541,7 +541,7 @@ document.addEventListener('DOMContentLoaded', function() {
         <div class="modal-dialog modal-dialog-centered" role="document" style="max-width: 460px;">
             <div class="modal-content border-0 p-4 text-center shadow-lg" style="border-radius: 24px;">
                 <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="font-weight-bold text-dark mb-0"><i class="fas fa-qrcode mr-2 text-primary"></i> Quét mã để ôn tập</h5>
+                    <h5 class="font-weight-bold text-dark mb-0"><i class="fas fa-qrcode mr-2 text-primary"></i> Scan QR code to practice</h5>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close" style="outline: none;">
                         <span aria-hidden="true">&times;</span>
                     </button>
@@ -550,7 +550,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div class="spinner-border text-primary mt-5" role="status"></div>
                 </div>
                 
-                <button type="button" class="btn btn-secondary font-weight-bold rounded-pill px-4 mx-auto" data-dismiss="modal">Đóng</button>
+                <button type="button" class="btn btn-secondary font-weight-bold rounded-pill px-4 mx-auto" data-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
