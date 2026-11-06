@@ -36,7 +36,8 @@ do {
     $existing = db_fetch_one("SELECT id_room FROM room WHERE pin = :pin AND status != 'finished'", [':pin' => $pin]);
 } while ($existing);
 
-db_execute("UPDATE room SET status = 'finished' WHERE id_creator = :c AND status != 'finished'", [':c' => $creatorId]);
+db_execute("UPDATE room SET status = 'cancelled' WHERE id_creator = :c AND status NOT IN ('finished', 'cancelled')", [':c' => $creatorId]);
+db_execute("DELETE FROM room WHERE id_creator = :c AND status = 'cancelled' AND id_room NOT IN (SELECT DISTINCT id_room FROM players)", [':c' => $creatorId]);
 
 $roomId = db_insert(
     "INSERT INTO room (id_quiz, id_creator, pin, status, game_type, opened_pieces, buzzer_status, is_team_mode, team_count, team_player_limit) VALUES (:q, :c, :pin, 'waiting', :gt, '[]', 'idle', :tm, :tc, :tpl)",

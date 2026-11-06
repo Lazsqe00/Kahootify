@@ -34,7 +34,7 @@ if ($allOpened) {
 }
 
 $isDisqualified = !empty($player['is_disqualified_obstacle']);
-$secretImageUrl = !empty($quiz['obstacle_image']) ? BASE_URL . $quiz['obstacle_image'] : '';
+$secretImageUrl = !empty($quiz['obstacle_image']) ? (preg_match('#^https?://#i', $quiz['obstacle_image']) ? $quiz['obstacle_image'] : BASE_URL . ltrim($quiz['obstacle_image'], '/')) : '';
 
 // Grid layout
 $cols = 2; $rows = 2;

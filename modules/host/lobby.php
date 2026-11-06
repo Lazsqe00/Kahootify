@@ -131,7 +131,11 @@ if (isset($_GET['start_game'])) {
 }
 
 if (isset($_GET['cancel_game'])) {
-    db_execute("UPDATE room SET status = 'finished' WHERE id_room = :r", [':r' => $roomId]);
+    db_execute("UPDATE room SET status = 'cancelled' WHERE id_room = :r", [':r' => $roomId]);
+    $hasPlayers = (int)db_count('players', 'id_room = :r', [':r' => $roomId]);
+    if ($hasPlayers === 0) {
+        db_execute("DELETE FROM room WHERE id_room = :r", [':r' => $roomId]);
+    }
     unset($_SESSION['id_room'], $_SESSION['pin'], $_SESSION['id_quiz']);
     set_flash_message('info', 'Game room has been cancelled!');
     redirect('modules/quiz/list.php');

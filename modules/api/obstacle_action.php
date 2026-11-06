@@ -419,6 +419,7 @@ if ($action === 'host_confirm_guess') {
             'winner_team_name'  => $player['team_name'] ?? null,
             'winner_team_color' => $wTeam['color'] ?? null,
             'answer'            => $room['obstacle_answer'],
+            'obstacle_image'    => (!empty($room['obstacle_image']) ? (preg_match('#^https?://#i', $room['obstacle_image']) ? $room['obstacle_image'] : BASE_URL . ltrim($room['obstacle_image'], '/')) : null),
             'message'           => 'Confirmed CORRECT! Player has won the game.'
         ]);
         exit;
@@ -615,7 +616,7 @@ if ($action === 'get_obstacle_state') {
 
     // Secret image returned if winner exists OR all pieces opened
     $obstacleImage = (!empty($room['obstacle_image']) && ($isRevealed || $allPiecesOpened)) 
-        ? BASE_URL . $room['obstacle_image'] 
+        ? (preg_match('#^https?://#i', $room['obstacle_image']) ? $room['obstacle_image'] : BASE_URL . ltrim($room['obstacle_image'], '/')) 
         : null;
 
     $liveTeams = !empty($room['is_team_mode']) ? TeamManager::getTeamLeaderboard($roomId) : [];

@@ -8,6 +8,16 @@ $quiz = db_fetch_one("SELECT * FROM quiz WHERE id_quiz = :q", [':q' => $room['id
 $totalPieces = intval($quiz['total_pieces'] ?? 4);
 if (!in_array($totalPieces, [4, 6, 8, 9, 10, 12, 15, 16, 20, 25])) $totalPieces = 4;
 
+$rawObsImg = $quiz['obstacle_image'] ?? ($room['obstacle_image'] ?? '');
+$secretImageUrl = '';
+if (!empty($rawObsImg)) {
+    if (preg_match('#^https?://#i', $rawObsImg)) {
+        $secretImageUrl = $rawObsImg;
+    } else {
+        $secretImageUrl = BASE_URL . ltrim($rawObsImg, '/');
+    }
+}
+
 $openedPieces = !empty($room['opened_pieces']) ? json_decode($room['opened_pieces'], true) : [];
 if (!is_array($openedPieces)) $openedPieces = [];
 $allOpened = (count($openedPieces) >= $totalPieces);
@@ -270,8 +280,8 @@ require_once __DIR__ . '/header.php';
                 <div class="alert alert-success font-weight-bold py-2 mb-3 shadow" style="font-size: 1.15rem; border-radius: 12px; background: rgba(40, 167, 69, 0.25); border: 1px solid #28a745; color: #2ecc71;">
                     <i class="fas fa-unlock-alt mr-2"></i> ALL PIECES REVEALED - SECRET PICTURE UNLOCKED!
                 </div>
-                <?php if (!empty($quiz['obstacle_image'])): ?>
-                    <img src="<?= BASE_URL . htmlspecialchars($quiz['obstacle_image']) ?>" class="img-fluid rounded shadow border border-warning mb-2" style="max-height: 420px; object-fit: contain; width: 100%; background: #000;" alt="Secret picture">
+                <?php if (!empty($secretImageUrl)): ?>
+                    <img src="<?= htmlspecialchars($secretImageUrl) ?>" class="img-fluid rounded shadow border border-warning mb-2" style="max-height: 420px; object-fit: contain; width: 100%; background: #000;" alt="Secret picture">
                 <?php endif; ?>
                 <div class="mt-3 p-3 rounded text-center" style="background: rgba(255, 255, 255, 0.08); border: 1px dashed rgba(255, 255, 255, 0.3);">
                     <h5 class="text-warning font-weight-bold mb-0">
@@ -326,14 +336,6 @@ require_once __DIR__ . '/header.php';
                 ...
             </div>
         </div>
-        <div class="p-2 mb-3 rounded bg-dark border border-secondary text-left d-flex align-items-center justify-content-between px-3">
-            <span class="text-white-50 small font-weight-bold">
-                <i class="fas fa-key mr-1 text-warning"></i> Secret picture keyword:
-            </span>
-            <span class="badge badge-light text-dark font-weight-bold px-2 py-1" style="font-size: 0.95rem;" id="reviewTargetAnswer">
-                <?= htmlspecialchars($quiz['obstacle_answer'] ?? '') ?>
-            </span>
-        </div>
         <p class="text-white font-weight-bold mb-3" style="font-size: 1.05rem;">
             Do you confirm this answer is CORRECT or INCORRECT?
         </p>
@@ -365,7 +367,7 @@ require_once __DIR__ . '/header.php';
             KEYWORD: ...
         </div>
         <div>
-            <img src="" id="winnerSecretImg" class="revealed-img-box" alt="Secret picture has been fully revealed!">
+            <img src="<?= htmlspecialchars($secretImageUrl) ?>" id="winnerSecretImg" class="revealed-img-box" alt="Secret picture has been fully revealed!" style="<?= empty($secretImageUrl) ? 'display: none;' : '' ?>">
         </div>
         <p class="text-muted small">The picture is 100% revealed on all players' screens!</p>
         <div class="mt-4">
@@ -440,8 +442,9 @@ function hostSubmitReview(isCorrect) {
                 clearInterval(pollInterval);
                 $('#winnerNickDisplay').text('Congratulations to Champion: ' + (res.winner_name || '') + '!');
                 $('#winnerAnswerDisplay').text('CORRECT KEYWORD: ' + (res.answer || ''));
-                if (res.obstacle_image) {
-                    $('#winnerSecretImg').attr('src', res.obstacle_image);
+                const secretImg = res.obstacle_image || '<?= htmlspecialchars($secretImageUrl, ENT_QUOTES, 'UTF-8') ?>';
+                if (secretImg) {
+                    $('#winnerSecretImg').attr('src', secretImg).show();
                 }
                 $('#winnerModal').css('display', 'flex');
                 try {
@@ -506,8 +509,9 @@ const pollInterval = setInterval(function() {
                 const winnerLabel = data.winner_player_name + (data.winner_team_name ? ' (' + data.winner_team_name + ')' : '');
                 $('#winnerNickDisplay').text('Congratulations to Champion: ' + winnerLabel + '!');
                 $('#winnerAnswerDisplay').text('CORRECT KEYWORD: ' + (data.obstacle_answer || ''));
-                if (data.obstacle_image) {
-                    $('#winnerSecretImg').attr('src', data.obstacle_image);
+                const secretImg = data.obstacle_image || '<?= htmlspecialchars($secretImageUrl, ENT_QUOTES, 'UTF-8') ?>';
+                if (secretImg) {
+                    $('#winnerSecretImg').attr('src', secretImg).show();
                 }
                 $('#winnerModal').css('display', 'flex');
                 try {
@@ -543,9 +547,6 @@ const pollInterval = setInterval(function() {
 
             $('#reviewPlayerName').text(buzzerLabel);
             $('#reviewPlayerGuess').text(data.buzzer_guess || '...');
-            if (data.obstacle_answer) {
-                $('#reviewTargetAnswer').text(data.obstacle_answer);
-            }
             if (!$('#hostReviewModal').is(':visible') && !winnerDeclared) {
                 $('#hostReviewModal').css('display', 'flex');
             }

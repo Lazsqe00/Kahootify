@@ -644,7 +644,7 @@ body {
                             <i class="fas fa-check"></i> Selected
                         </span>
                     </div>
-                    <div class="format-title">Wager</div>
+                    <div class="format-title">Star of hope</div>
                     <div class="format-desc">Players bet a portion of their points on each answer</div>
                 </div>
 

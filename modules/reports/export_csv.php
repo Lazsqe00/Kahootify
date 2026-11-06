@@ -17,7 +17,7 @@ $room = db_fetch_one("
     SELECT r.*, q.name as quiz_name
     FROM room r
     JOIN quiz q ON r.id_quiz = q.id_quiz
-    WHERE r.id_room = :r AND r.id_creator = :c
+    WHERE r.id_room = :r AND r.id_creator = :c AND r.status = 'finished'
 ", [':r' => $roomId, ':c' => $creatorId]);
 
 if (!$room) {

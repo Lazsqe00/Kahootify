@@ -48,6 +48,7 @@ $sql = "
     LEFT JOIN players p ON r.id_room = p.id_room
     WHERE r.id_creator = :c AND r.status = 'finished'
     GROUP BY r.id_room
+    HAVING total_players > 0
     ORDER BY r.id_room DESC
 ";
 

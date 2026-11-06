@@ -231,16 +231,33 @@ $answers = array_values(array_filter($answers, function($a) {
                 $cIdx = $idx % 4;
                 $isAnsCorrect = ($a['is_correct'] == 1);
                 $cnt = $voteCounts[$a['id_answer']] ?? 0;
+                $ansImgUrl = '';
+                if (!empty($a['image_path'])) {
+                    if (preg_match('#^https?://#i', $a['image_path'])) {
+                        $ansImgUrl = $a['image_path'];
+                    } else {
+                        $aImgFile = basename($a['image_path']);
+                        $aImgDiskPath = dirname(__DIR__, 2) . '/assets/img/questions/' . $aImgFile;
+                        if (file_exists($aImgDiskPath)) {
+                            $ansImgUrl = BASE_URL . 'assets/img/questions/' . rawurlencode($aImgFile);
+                        }
+                    }
+                }
             ?>
                 <div class="col-md-6 mb-3">
                     <div class="answer-box shadow-sm d-flex justify-content-between align-items-center position-relative"
                          style="background-color: <?= $colors[$cIdx] ?>; border-radius: 12px; padding: 18px 22px; <?= $isAnsCorrect ? 'opacity: 1;' : 'opacity: 0.65;' ?>">
                         
-                        <div class="d-flex align-items-center flex-grow-1 mr-3 text-truncate">
-                            <span class="symbol mr-3" style="font-size: 1.8rem;"><?= $icons[$cIdx] ?></span>
-                            <span class="font-weight-bold text-white text-truncate" style="font-size: 1.3rem;">
-                                <?= htmlspecialchars($a['text']) ?>
-                            </span>
+                        <div class="d-flex align-items-center flex-grow-1 mr-3" style="min-width: 0;">
+                            <span class="symbol mr-3 flex-shrink-0" style="font-size: 1.8rem;"><?= $icons[$cIdx] ?></span>
+                            <?php if ($ansImgUrl): ?>
+                                <img src="<?= htmlspecialchars($ansImgUrl) ?>" alt="Answer" class="img-fluid rounded mr-3 bg-white p-1 flex-shrink-0" style="max-height: 55px; max-width: 85px; object-fit: contain; box-shadow: 0 2px 4px rgba(0,0,0,0.15);">
+                            <?php endif; ?>
+                            <?php if (!empty($a['text'])): ?>
+                                <span class="font-weight-bold text-white text-truncate" style="font-size: 1.3rem;">
+                                    <?= htmlspecialchars($a['text']) ?>
+                                </span>
+                            <?php endif; ?>
                         </div>
 
                         <div class="d-flex align-items-center" style="gap: 8px;">
@@ -588,12 +605,6 @@ require_once __DIR__ . '/../../includes/header.php';
                 <div class="small text-white-50">PREDICTED KEYWORD:</div>
                 <div class="h3 font-weight-bold text-warning mb-0" id="hostQReviewPlayerGuess" style="letter-spacing: 1px; word-break: break-word;">...</div>
             </div>
-            <?php if (!empty($room['obstacle_answer'])): ?>
-                <div class="alert alert-dark border border-secondary text-left py-2 px-3 mb-3 small" style="background: #120924;">
-                    <span class="text-white-50">Secret picture keyword:</span>
-                    <span class="font-weight-bold text-success ml-1"><?= htmlspecialchars($room['obstacle_answer']) ?></span>
-                </div>
-            <?php endif; ?>
             <div class="d-flex justify-content-between mt-4">
                 <button type="button" class="btn btn-danger btn-lg font-weight-bold px-4 py-3 shadow" style="border-radius: 14px; width: 48%; font-size: 1.15rem;" onclick="hostConfirmQGuess(false)">
                     <i class="fas fa-times-circle mr-2"></i> INCORRECT (FALSE)

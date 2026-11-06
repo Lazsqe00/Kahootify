@@ -503,10 +503,14 @@ class GameStateManager
         $endCheck = WagerCalculator::checkGameEnd($allPlayers, $questionsLeft, $modeId, $initialActiveCount);
 
         if ($endCheck['isFinished']) {
-            db_execute("UPDATE room SET status = 'finished' WHERE id_room = :r", [':r' => $roomId]);
+            $newStatus = 'res_' . $questionId;
+            db_execute("UPDATE room SET status = :s WHERE id_room = :r", [
+                ':s' => $newStatus,
+                ':r' => $roomId,
+            ]);
             return [
                 'success'     => true,
-                'status'      => 'finished',
+                'status'      => $newStatus,
                 'is_finished' => true,
                 'end_reason'  => $endCheck['reason'],
                 'winner'      => $endCheck['winner'],

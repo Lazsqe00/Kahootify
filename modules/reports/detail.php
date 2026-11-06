@@ -18,7 +18,7 @@ $room = db_fetch_one("
     SELECT r.*, q.name as quiz_name, q.description as quiz_description
     FROM room r
     JOIN quiz q ON r.id_quiz = q.id_quiz
-    WHERE r.id_room = :r AND r.id_creator = :c
+    WHERE r.id_room = :r AND r.id_creator = :c AND r.status = 'finished'
 ", [':r' => $roomId, ':c' => $creatorId]);
 
 if (!$room) {
@@ -127,6 +127,20 @@ foreach ($questions as $qIndex => $q) {
         $ans['symbol'] = $styleMeta['symbol'];
         $ans['label'] = $styleMeta['name'];
         $ans['color'] = $styleMeta['color'];
+
+        $ansImgUrl = '';
+        if (!empty($ans['image_path'])) {
+            if (preg_match('#^https?://#i', $ans['image_path'])) {
+                $ansImgUrl = $ans['image_path'];
+            } else {
+                $aImgFile = basename($ans['image_path']);
+                $aImgDiskPath = dirname(__DIR__, 2) . '/assets/img/questions/' . $aImgFile;
+                if (file_exists($aImgDiskPath)) {
+                    $ansImgUrl = BASE_URL . 'assets/img/questions/' . rawurlencode($aImgFile);
+                }
+            }
+        }
+        $ans['image_url'] = $ansImgUrl;
     }
     unset($ans);
 
@@ -720,9 +734,14 @@ require_once __DIR__ . '/../../includes/navbar.php';
                                                 <span class="saas-answer-symbol" style="background-color: <?= $ans['color'] ?>;">
                                                     <?= $ans['symbol'] ?>
                                                 </span>
-                                                <span class="font-weight-medium" style="color: #0f172a; font-size: 13.5px;">
-                                                    <?= htmlspecialchars($ans['text']) ?>
-                                                </span>
+                                                <?php if (!empty($ans['image_url'])): ?>
+                                                    <img src="<?= htmlspecialchars($ans['image_url']) ?>" alt="Answer" class="img-fluid rounded border bg-white p-1 mr-2" style="max-height: 36px; max-width: 50px; object-fit: contain;">
+                                                <?php endif; ?>
+                                                <?php if (!empty($ans['text'])): ?>
+                                                    <span class="font-weight-medium" style="color: #0f172a; font-size: 13.5px;">
+                                                        <?= htmlspecialchars($ans['text']) ?>
+                                                    </span>
+                                                <?php endif; ?>
                                             </div>
                                             <?php if ($isCorrect): ?>
                                                 <span class="saas-badge saas-badge-emerald" style="font-size: 11px; padding: 2px 6px;">
