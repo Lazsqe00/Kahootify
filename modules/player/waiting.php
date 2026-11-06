@@ -36,7 +36,14 @@ $_SESSION['character_csrf'] ??= bin2hex(random_bytes(32));
 $characterError = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $csrf = $_POST['csrf_token'] ?? null;
+    $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+
     if (!is_string($csrf) || !hash_equals($_SESSION['character_csrf'], $csrf)) {
+        if ($isAjax) {
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['success' => false, 'message' => 'Please refresh the page and try again.']);
+            exit;
+        }
         http_response_code(403);
         $characterError = 'Please refresh the page and try again.';
     } else {
@@ -45,11 +52,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $newAccessory = $_POST['accessory_id'] ?? '';
             if (!is_string($newCharacter) || !is_string($newAccessory)) throw new InvalidArgumentException();
             save_player_character($characterRoom, $playerId, $newCharacter, $newAccessory);
+
+            if ($isAjax) {
+                $newAppearance = get_player_appearance($characterRoom, $playerId);
+                $avatarSvg = player_appearance_image($newAppearance, 'waiting-character');
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['success' => true, 'avatar_svg' => $avatarSvg]);
+                exit;
+            }
+
             redirect('modules/player/waiting.php?pid=' . $playerId . '&token=' . urlencode($token));
         } catch (InvalidArgumentException $exception) {
             $characterError = 'Please choose an available character and accessory.';
+            if ($isAjax) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['success' => false, 'message' => $characterError]);
+                exit;
+            }
         } catch (Throwable $exception) {
             $characterError = 'Your changes could not be saved. Please try again.';
+            if ($isAjax) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['success' => false, 'message' => $characterError]);
+                exit;
+            }
         }
     }
 }
@@ -99,8 +125,10 @@ require_once __DIR__ . '/../../includes/header.php';
         <details class="waiting-editor" <?= $characterError !== '' ? 'open' : '' ?>>
             <summary>Edit character</summary>
             <?php if ($characterError !== ''): ?><p role="alert" class="text-danger"><?= htmlspecialchars($characterError) ?></p><?php endif; ?>
-            <form method="post">
+            <form method="post" action="waiting.php?pid=<?= $playerId ?>&token=<?= urlencode($token) ?>" id="characterEditForm">
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['character_csrf']) ?>">
+                <input type="hidden" name="pid" value="<?= $playerId ?>">
+                <input type="hidden" name="token" value="<?= htmlspecialchars($token) ?>">
                 <?php require __DIR__ . '/../../includes/character_picker.php'; ?>
                 <button type="submit" class="btn btn-kahoot character-save">Done</button>
             </form>
@@ -119,9 +147,71 @@ const roomId = <?= $roomId ?>;
 const playerId = <?= $playerId ?>;
 const playerToken = '<?= htmlspecialchars($token) ?>';
 let isNavigatingToGame = false;
+let isInternalNavigation = false;
 
 sessionStorage.setItem('kahoot_pid', playerId);
 sessionStorage.setItem('kahoot_token', playerToken);
+
+// AJAX Character editing: updates live without full page reload
+const charEditForm = document.getElementById('characterEditForm');
+if (charEditForm) {
+    charEditForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        isInternalNavigation = true;
+
+        const saveBtn = charEditForm.querySelector('.character-save');
+        const origText = saveBtn ? saveBtn.textContent : 'Done';
+        if (saveBtn) {
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Saving...';
+        }
+
+        const formData = new FormData(charEditForm);
+        fetch(charEditForm.action || window.location.href, {
+            method: 'POST',
+            body: formData,
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+            if (data && data.success) {
+                if (data.avatar_svg) {
+                    const profileAvatar = document.querySelector('.waiting-profile .waiting-character');
+                    if (profileAvatar) {
+                        profileAvatar.outerHTML = data.avatar_svg;
+                    }
+                }
+                const details = document.querySelector('details.waiting-editor');
+                if (details) details.removeAttribute('open');
+            } else if (data && data.message) {
+                alert(data.message);
+            }
+        })
+        .catch(function() {
+            // Fallback: normal submit if fetch fails
+            isInternalNavigation = true;
+            charEditForm.submit();
+        })
+        .finally(function() {
+            if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.textContent = origText;
+            }
+            setTimeout(function() {
+                isInternalNavigation = false;
+            }, 500);
+        });
+    });
+}
+
+// Mark internal navigation when clicking legitimate internal links
+document.querySelectorAll('a').forEach(function(link) {
+    link.addEventListener('click', function(e) {
+        if (!e.defaultPrevented) {
+            isInternalNavigation = true;
+        }
+    });
+});
 
 setInterval(function() {
     $.getJSON('<?= BASE_URL ?>modules/api/game_state.php?action=get_room_status&id_room=' + roomId + '&pid=' + playerId + '&token=' + encodeURIComponent(playerToken), function(res) {
@@ -139,7 +229,7 @@ setInterval(function() {
 }, 1000);
 
 function sendLeaveBeacon() {
-    if (isNavigatingToGame) return;
+    if (isNavigatingToGame || isInternalNavigation) return;
     if (navigator.sendBeacon) {
         const formData = new FormData();
         formData.append('id_room', String(roomId));
@@ -149,7 +239,10 @@ function sendLeaveBeacon() {
     }
 }
 
-window.addEventListener('pagehide', sendLeaveBeacon);
+window.addEventListener('pagehide', function(e) {
+    if (e.persisted) return;
+    sendLeaveBeacon();
+});
 window.addEventListener('beforeunload', sendLeaveBeacon);
 </script>
 </body>
