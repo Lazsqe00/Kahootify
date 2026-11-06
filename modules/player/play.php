@@ -279,7 +279,7 @@ require_once __DIR__ . '/../../includes/header.php';
         </span>
         <?php if ($questionMode === 'wager'): ?>
             <span class="badge badge-warning text-dark font-weight-bold ml-1 px-2 py-1 shadow-sm" style="font-size: 0.85rem;">
-                <i class="fas fa-dice mr-1"></i> Wager
+                <i class="fas fa-star mr-1"></i> Star of Hope
             </span>
         <?php endif; ?>
         <?php if ($isObstacleMode && !empty($currentQuestion['piece_index'])): ?>
