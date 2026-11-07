@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../includes/room_access.php';
 require_once __DIR__ . '/../../includes/modes/QuestionModeRegistry.php';
 require_once __DIR__ . '/../../includes/modes/GameStateManager.php';
 require_once __DIR__ . '/../../includes/modes/WagerCalculator.php';
+require_once __DIR__ . '/../../includes/quiz_helpers.php';
 
 $raw = file_get_contents('php://input');
 $data = json_decode($raw, true);
@@ -51,7 +52,7 @@ if (!$playerCheck) {
 $currentStreak = intval($playerCheck['current_streak'] ?? 0);
 
 try {
-    $result = with_room_access_lock($room, function ($handle) use ($room, $playerId, $answerId, $roomId, $currentStreak, $playerCheck) {
+    $result = with_room_access_lock($room, function ($handle) use ($room, $playerId, $answerId, $roomId, $currentStreak, $playerCheck, $data, $qIdInput) {
         $state = read_room_access_state($handle);
         if (!empty($state['kicked'][$playerId])) {
             return ['success' => false, 'kicked' => true, 'message' => 'You were removed from the game by the host.'];
@@ -65,6 +66,22 @@ try {
              WHERE a.id_answer = :aid",
             [':r' => $roomId, ':aid' => $answerId]
         );
+
+        if (!$ans && $qIdInput > 0) {
+            $qFallback = db_fetch_one(
+                "SELECT q.*, r.question_start_time, r.status, r.game_type
+                 FROM questions q
+                 JOIN room r ON r.id_room = :r
+                 WHERE q.id_question = :qid",
+                [':r' => $roomId, ':qid' => $qIdInput]
+            );
+            if ($qFallback) {
+                $ans = $qFallback;
+                $ans['id_answer'] = 0;
+                $ans['is_correct'] = 0;
+                $ans['text'] = '';
+            }
+        }
 
         if (!$ans) {
             return ['success' => false, 'message' => 'Invalid answer or room'];
@@ -110,12 +127,27 @@ try {
         $isTextType = (($ans['question_type'] ?? '') === 'text' || isset($data['text_answer']));
         if ($isTextType) {
             $userText = trim((string)($data['text_answer'] ?? ''));
-            $correctAnsRow = db_fetch_one("SELECT * FROM answers WHERE id_question = :qid AND is_correct = 1 LIMIT 1", [':qid' => $qId]);
-            $correctText = trim((string)($correctAnsRow['text'] ?? ($ans['text'] ?? '')));
-            $isCorrect = (mb_strtolower($userText, 'UTF-8') === mb_strtolower($correctText, 'UTF-8'));
+            $correctAnsRows = db_fetch_all("SELECT * FROM answers WHERE id_question = :qid AND is_correct = 1", [':qid' => $qId]);
+            $correctTexts = [];
+            foreach ($correctAnsRows as $cr) {
+                if (isset($cr['text']) && trim((string)$cr['text']) !== '') {
+                    $correctTexts[] = trim((string)$cr['text']);
+                }
+            }
+            if (empty($correctTexts) && !empty($ans['text']) && ($ans['is_correct'] ?? 0) == 1) {
+                $correctTexts[] = trim((string)$ans['text']);
+            }
 
-            if ($isCorrect && $correctAnsRow) {
-                $answerId = intval($correctAnsRow['id_answer']);
+            $isCorrect = is_text_answer_correct($userText, $correctTexts);
+
+            if ($isCorrect && !empty($correctAnsRows)) {
+                $answerId = intval($correctAnsRows[0]['id_answer']);
+            } elseif ($isCorrect && empty($correctAnsRows)) {
+                $newAid = db_insert("INSERT INTO answers (id_question, is_correct, text) VALUES (:qid, 1, :txt)", [
+                    ':qid' => $qId,
+                    ':txt' => $userText ?: 'Correct'
+                ]);
+                $answerId = intval($newAid);
             } else {
                 $wrongAnsRow = db_fetch_one("SELECT * FROM answers WHERE id_question = :qid AND is_correct = 0 LIMIT 1", [':qid' => $qId]);
                 if (!$wrongAnsRow) {

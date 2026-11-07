@@ -25,12 +25,36 @@
     let musicEnabled = true;
     let musicRequest = 0;
     let cue = null;
+    let audioCtx = null;
+    let bgGainNode = null;
+
+    function ensureBgAudioBoost() {
+        if (!audio) return;
+        try {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            if (!audio._gainAttached) {
+                const source = audioCtx.createMediaElementSource(audio);
+                bgGainNode = audioCtx.createGain();
+                bgGainNode.gain.value = 2.0;
+                source.connect(bgGainNode);
+                bgGainNode.connect(audioCtx.destination);
+                audio._gainAttached = true;
+            }
+        } catch (_) {
+            audio.volume = 1.0;
+        }
+    }
 
     function playCue(filename) {
         if (!musicEnabled || !audio) return;
         if (cue) cue.pause();
         cue = new Audio(new URL(filename, audio.src).href);
-        cue.volume = .55;
+        cue.volume = .70;
         cue.play().catch(() => {});
     }
 
@@ -126,7 +150,9 @@
         winner.removeAttribute('aria-hidden');
         const label = { 1: 'First', 2: 'Second', 3: 'Third' }[place];
         announcement.textContent = label + ' place' + (place !== 1 && winner.dataset.nickname ? ': ' + winner.dataset.nickname + '!' : '.');
-        if (place !== 1) playCue('podium-' + place + (place === 2 ? 'nd' : 'rd') + '.mp3');
+        if (place === 2 || place === 3) {
+            playCue('podium-' + place + (place === 2 ? 'nd' : 'rd') + '.mp3');
+        }
     }
 
     function start() {
@@ -154,9 +180,12 @@
         announcement.textContent = 'And the winners are...';
         if (musicEnabled && audio) {
             audio.currentTime = 0;
+            audio.volume = 1.0;
+            ensureBgAudioBoost();
             audio.play().catch(() => {
                 const playOnGesture = () => {
                     if (musicEnabled && audio && audio.paused) {
+                        ensureBgAudioBoost();
                         audio.play().catch(() => {});
                     }
                 };
@@ -183,7 +212,7 @@
             playCue('podium-1st.mp3');
             celebrate();
         }, 12700));
-        timers.push(setTimeout(() => finish(), 14500));
+        timers.push(setTimeout(() => finish(), 17500));
     }
 
     standingsToggle.hidden = false;
@@ -205,7 +234,7 @@
             if (playing) skip.focus();
         });
         music.hidden = false;
-        audio.volume = .35;
+        audio.volume = 1.0;
         function updateMusic(enabled) {
             musicEnabled = enabled;
             music.textContent = enabled ? 'Music: On' : 'Music: Off';
@@ -222,6 +251,7 @@
             }
             updateMusic(true);
             try {
+                ensureBgAudioBoost();
                 await audio.play();
             } catch (_) {
                 if (request === musicRequest) {

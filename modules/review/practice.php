@@ -779,10 +779,41 @@ function loadQuestion(index) {
     }
 }
 
+function normalizePracticeText(str) {
+    if (!str) return '';
+    return str.toString()
+        .normalize('NFC')
+        .toLowerCase()
+        .replace(/[“”‘’`]/g, '"')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function isPracticeTextCorrect(userText, correctText) {
+    const normUser = normalizePracticeText(userText);
+    if (!normUser) return false;
+    const normUserNoPunct = normUser.replace(/^[.,!?;:'"]+|[.,!?;:'"]+$/g, '');
+
+    const rawCorrect = (correctText || '').toString();
+    const variants = [rawCorrect];
+    if (/[;\/|]/.test(rawCorrect)) {
+        rawCorrect.split(/[;\/|]+/).forEach(v => variants.push(v));
+    }
+
+    for (let variant of variants) {
+        const normCorrect = normalizePracticeText(variant);
+        if (!normCorrect) continue;
+        if (normUser === normCorrect) return true;
+        const normCorrectNoPunct = normCorrect.replace(/^[.,!?;:'"]+|[.,!?;:'"]+$/g, '');
+        if (normUserNoPunct && normUserNoPunct === normCorrectNoPunct) return true;
+    }
+    return false;
+}
+
 function onTextAnswerSubmitted(qIndex, enteredText, correctText) {
     if (answersState[qIndex] !== null) return;
 
-    const isCorrect = (enteredText.trim().toLowerCase() === correctText.trim().toLowerCase());
+    const isCorrect = isPracticeTextCorrect(enteredText, correctText);
 
     answersState[qIndex] = {
         selectedAnswerId: null,
